@@ -238,6 +238,8 @@ export interface InvoiceExtraction {
   notes: string | null
 }
 
+export type BankTransactionStatus = "BOOKED" | "PENDING" | "UNDEFINED"
+
 export interface BankTransaction {
   id: string
   tenant_id: string
@@ -258,6 +260,10 @@ export interface BankTransaction {
   matched_at: string | null
   matched_by: InvoiceMatchedBy | null
   raw_data: Record<string, unknown> | null
+  counterparty_name: string | null
+  counterparty_iban: string | null
+  bank_reference: string | null
+  external_status: BankTransactionStatus | null
   created_at: string
 }
 

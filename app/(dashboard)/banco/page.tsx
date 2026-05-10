@@ -194,6 +194,10 @@ export default async function BancoPage() {
           currency: t.currency ?? "EUR",
           type: t.type as "debit" | "credit" | null,
           invoice_id: t.invoice_id,
+          counterparty_name: t.counterparty_name,
+          counterparty_iban: t.counterparty_iban,
+          bank_reference: t.bank_reference,
+          external_status: t.external_status,
         }))}
       />
 

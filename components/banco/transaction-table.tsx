@@ -21,6 +21,10 @@ export type BankTxRow = {
   currency: string
   type: "debit" | "credit" | null
   invoice_id: string | null
+  counterparty_name: string | null
+  counterparty_iban: string | null
+  bank_reference: string | null
+  external_status: string | null
 }
 
 export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
@@ -72,9 +76,31 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
                   {formatDate(tx.date)}
                 </TableCell>
                 <TableCell>
-                  <p className="text-sm truncate max-w-md">
-                    {tx.description ?? "—"}
+                  <p className="text-sm truncate max-w-md font-medium">
+                    {tx.counterparty_name ?? tx.description ?? "—"}
                   </p>
+                  {(tx.counterparty_name && tx.description) ||
+                  tx.bank_reference ? (
+                    <p className="text-xs text-muted-foreground truncate max-w-md">
+                      {tx.counterparty_name && tx.description
+                        ? tx.description
+                        : null}
+                      {tx.counterparty_name &&
+                        tx.description &&
+                        tx.bank_reference &&
+                        " · "}
+                      {tx.bank_reference && (
+                        <span className="font-mono">
+                          ref {tx.bank_reference}
+                        </span>
+                      )}
+                    </p>
+                  ) : null}
+                  {tx.counterparty_iban && (
+                    <p className="text-[10px] text-muted-foreground font-mono">
+                      {tx.counterparty_iban}
+                    </p>
+                  )}
                 </TableCell>
                 <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                   <p className="truncate">{tx.account_name ?? "—"}</p>
@@ -94,18 +120,28 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
                   {formatCurrency(Math.abs(tx.amount))}
                 </TableCell>
                 <TableCell>
-                  {tx.invoice_id ? (
-                    <Badge
-                      variant="outline"
-                      className="bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40"
-                    >
-                      Conciliado
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary" className="text-xs">
-                      Sem match
-                    </Badge>
-                  )}
+                  <div className="flex flex-col gap-1 items-start">
+                    {tx.invoice_id ? (
+                      <Badge
+                        variant="outline"
+                        className="bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40"
+                      >
+                        Conciliado
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="text-xs">
+                        Sem match
+                      </Badge>
+                    )}
+                    {tx.external_status === "PENDING" && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40"
+                      >
+                        Pendente
+                      </Badge>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             )

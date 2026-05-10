@@ -160,6 +160,15 @@ export async function POST() {
   const rows = allTransactions.map((t) => {
     const acct = accountMap.get(t.accountId)
     const amount = tinkAmountToNumber(t.amount.value)
+
+    // Counterparty: para débitos é payee (a quem pagámos),
+    // para créditos é payer (quem nos pagou).
+    const counterparty =
+      amount < 0 ? t.counterparties?.payee : t.counterparties?.payer
+    const counterpartyName = counterparty?.name ?? null
+    const counterpartyIban =
+      counterparty?.identifiers?.financialInstitution?.accountNumber ?? null
+
     return {
       tenant_id: ctx.tenantId,
       external_id: t.id,
@@ -174,6 +183,10 @@ export async function POST() {
       description: tinkTransactionDescription(t),
       type: amount < 0 ? ("debit" as const) : ("credit" as const),
       category: t.categories?.pfm?.name ?? null,
+      counterparty_name: counterpartyName,
+      counterparty_iban: counterpartyIban,
+      bank_reference: t.reference ?? null,
+      external_status: t.status ?? null,
       raw_data: t as unknown as never,
     }
   })

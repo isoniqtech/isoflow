@@ -72,12 +72,16 @@ export type Database = {
           account_name: string | null
           amount: number
           bank_name: string | null
+          bank_reference: string | null
           category: string | null
+          counterparty_iban: string | null
+          counterparty_name: string | null
           created_at: string | null
           currency: string | null
           date: string
           description: string | null
           external_id: string | null
+          external_status: string | null
           iban: string | null
           id: string
           invoice_id: string | null
@@ -94,12 +98,16 @@ export type Database = {
           account_name?: string | null
           amount: number
           bank_name?: string | null
+          bank_reference?: string | null
           category?: string | null
+          counterparty_iban?: string | null
+          counterparty_name?: string | null
           created_at?: string | null
           currency?: string | null
           date: string
           description?: string | null
           external_id?: string | null
+          external_status?: string | null
           iban?: string | null
           id?: string
           invoice_id?: string | null
@@ -116,12 +124,16 @@ export type Database = {
           account_name?: string | null
           amount?: number
           bank_name?: string | null
+          bank_reference?: string | null
           category?: string | null
+          counterparty_iban?: string | null
+          counterparty_name?: string | null
           created_at?: string | null
           currency?: string | null
           date?: string
           description?: string | null
           external_id?: string | null
+          external_status?: string | null
           iban?: string | null
           id?: string
           invoice_id?: string | null
