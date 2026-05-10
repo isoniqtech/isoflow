@@ -37,15 +37,23 @@ export type MatchScore = {
   }
 }
 
-const TOTAL_POSSIBLE_POINTS = 170 // somatório dos pesos abaixo
+/**
+ * Score normalizado 0..1 baseado em sinais.
+ *
+ * Filosofia: amount_exact + date_close + supplier_in_text já é match forte
+ * (≈0.90) mesmo sem counterparty/reference que sandbox/banks pequenos não
+ * devolvem. Total possível 100 (não 170) para que matches "fortes" cheguem
+ * naturalmente acima de 0.85.
+ */
+const TOTAL_POSSIBLE_POINTS = 100
 
 const WEIGHTS = {
-  amount_exact: 50,
-  amount_close: 30, // só conta se amount_exact for false
-  date_close: 30,
-  nif_in_description: 20,
+  amount_exact: 45,
+  amount_close: 25, // só conta se amount_exact for false
+  date_close: 25,
+  nif_in_description: 25,
   supplier_in_text: 20,
-  iban_match: 20,
+  iban_match: 25,
   reference_match: 30,
 }
 
@@ -229,7 +237,7 @@ export async function runAutoReconciliation(
       // Faturas incoming pagam-se com débitos (amount < 0). Filtrar.
       if (tx.amount > 0) continue
       const score = calculateMatchScore(inv, tx)
-      if (score.score >= 0.5) candidates.push(score)
+      if (score.score >= 0.4) candidates.push(score)
     }
   }
   candidates.sort((a, b) => b.score - a.score)
@@ -238,7 +246,7 @@ export async function runAutoReconciliation(
     if (usedInvoices.has(c.invoice_id) || usedTxs.has(c.bank_transaction_id)) {
       continue
     }
-    if (c.score >= 0.95) {
+    if (c.score >= 0.85) {
       // Auto-confirma
       const { error } = await supabase.from("reconciliations").insert({
         tenant_id: tenantId,
@@ -272,7 +280,7 @@ export async function runAutoReconciliation(
         usedInvoices.add(c.invoice_id)
         usedTxs.add(c.bank_transaction_id)
       }
-    } else if (c.score >= 0.8) {
+    } else if (c.score >= 0.65) {
       // Sugere — não toca em invoice/bank ainda
       const { error } = await supabase.from("reconciliations").insert({
         tenant_id: tenantId,
