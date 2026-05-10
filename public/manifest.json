@@ -1,0 +1,41 @@
+{
+  "name": "ISOFlow — by ISONIQ TECH",
+  "short_name": "ISOFlow",
+  "description": "Plataforma SaaS portuguesa para gestão automática de faturas, conciliação bancária e controlo de obras/projetos.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#2563EB",
+  "lang": "pt-PT",
+  "categories": ["business", "finance", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nova fatura",
+      "short_name": "Fatura",
+      "url": "/faturas/nova",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Projetos",
+      "short_name": "Projetos",
+      "url": "/projetos",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}
