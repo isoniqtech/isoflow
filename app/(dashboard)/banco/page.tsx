@@ -11,6 +11,7 @@ import {
   BankSyncButton,
   BankCallbackToast,
 } from "@/components/banco/bank-connect"
+import { AutoReconcileButton } from "@/components/banco/auto-reconcile-button"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { createClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
@@ -76,6 +77,7 @@ export default async function BancoPage() {
           {isConnected ? (
             <>
               <BankSyncButton />
+              <AutoReconcileButton />
               <BankConnectButton variant="outline" label="Religar" />
             </>
           ) : (
