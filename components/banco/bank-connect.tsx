@@ -10,16 +10,19 @@ export function BankConnectButton({
   variant = "default",
   label = "Ligar banco",
   className,
+  market,
 }: {
   variant?: "default" | "outline"
   label?: string
   className?: string
+  market?: "PT" | "SE"
 }) {
   const [busy, setBusy] = useState(false)
 
   async function handleConnect() {
     setBusy(true)
-    const res = await fetch("/api/banco/connect", { method: "POST" })
+    const qs = market ? `?market=${market}` : ""
+    const res = await fetch(`/api/banco/connect${qs}`, { method: "POST" })
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}))
       toast.error("Não foi possível iniciar ligação", {

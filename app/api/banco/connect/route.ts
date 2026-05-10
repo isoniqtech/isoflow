@@ -8,7 +8,7 @@ import { buildTinkLinkUrl } from "@/lib/banking/tink"
  * redirecionar o utilizador. O `state` codifica tenant_id + user_id +
  * nonce e é validado no callback (CSRF + atribuição de tenant).
  */
-export async function POST() {
+export async function POST(req: Request) {
   const ctx = await getApiContext()
   if (!ctx) return jsonError("Unauthorized", 401)
   if (!hasPermission(ctx.role, "integracoes", "view_all")) {
@@ -26,13 +26,17 @@ export async function POST() {
     return jsonError("Credenciais Tink não configuradas no servidor", 500)
   }
 
+  // Permitir ?market=SE&locale=sv_SE para testar com Tink Demobank (sueco).
+  // Default PT/pt_PT para uso real com bancos portugueses.
+  const url = new URL(req.url)
+  const market = url.searchParams.get("market") ?? "PT"
+  const locale = url.searchParams.get("locale") ?? (market === "SE" ? "sv_SE" : "pt_PT")
+
   const redirectUri = `${appUrl.replace(/\/$/, "")}/api/banking/callback`
   const nonce = randomBytes(16).toString("hex")
   const state = `${ctx.tenantId}.${ctx.userId}.${nonce}`
 
-  // Sem precisar de DB para o state — encriptamos os dados dentro dele.
-  // Ver lógica de validação no callback.
-  const tinkUrl = buildTinkLinkUrl({ redirectUri, state })
+  const tinkUrl = buildTinkLinkUrl({ redirectUri, state, market, locale })
 
   return Response.json({ data: { url: tinkUrl } })
 }
