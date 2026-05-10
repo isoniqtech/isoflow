@@ -3,6 +3,9 @@
 @tailwind utilities;
 
 @layer base {
+  /* =========================================================
+     Default theme (neutral zinc) — claro / escuro
+     ========================================================= */
   :root {
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
@@ -24,6 +27,13 @@
     --input: 240 5.9% 90%;
     --ring: 240 5.9% 10%;
     --radius: 0.5rem;
+
+    /* Chart palette (default — monocromática elegante) */
+    --chart-1: 240 5.9% 10%;
+    --chart-2: 240 5% 30%;
+    --chart-3: 240 4% 55%;
+    --chart-4: 240 4% 70%;
+    --chart-5: 240 5% 85%;
   }
 
   .dark {
@@ -46,6 +56,103 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 240 4.9% 83.9%;
+
+    --chart-1: 0 0% 98%;
+    --chart-2: 240 5% 75%;
+    --chart-3: 240 5% 55%;
+    --chart-4: 240 5% 35%;
+    --chart-5: 240 5% 20%;
+  }
+
+  /* =========================================================
+     Studio theme — indigo + amber + emerald + rose + teal
+     Sofisticado, multi-tonal, distintivo. Mantém legibilidade.
+     ========================================================= */
+  .studio {
+    /* Backgrounds com leve tom quente (cream) para diferenciar do branco puro */
+    --background: 36 33% 98%;
+    --foreground: 231 35% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 231 35% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 231 35% 12%;
+
+    /* Primary: indigo profundo — botões e ações principais */
+    --primary: 231 60% 28%;
+    --primary-foreground: 36 33% 98%;
+
+    /* Secondary: cool slate — botões secundários */
+    --secondary: 220 18% 94%;
+    --secondary-foreground: 231 50% 22%;
+
+    /* Muted: warm cream — backgrounds subtis */
+    --muted: 36 20% 95%;
+    --muted-foreground: 231 15% 42%;
+
+    /* Accent: bright indigo — para hovers e estados ativos */
+    --accent: 231 70% 92%;
+    --accent-foreground: 231 60% 22%;
+
+    /* Destructive: refined rose */
+    --destructive: 346 78% 51%;
+    --destructive-foreground: 36 33% 98%;
+
+    /* Border: cool gray with hint of indigo */
+    --border: 220 16% 88%;
+    --input: 220 16% 90%;
+    --ring: 231 60% 38%;
+
+    /* Radius ligeiramente maior para look mais elegante */
+    --radius: 0.625rem;
+
+    /* Chart: paleta colorida e harmoniosa */
+    --chart-1: 231 60% 35%;   /* indigo */
+    --chart-2: 38 92% 52%;    /* amber */
+    --chart-3: 160 70% 38%;   /* emerald */
+    --chart-4: 346 75% 55%;   /* rose */
+    --chart-5: 188 75% 38%;   /* teal */
+  }
+
+  .studio-dark {
+    /* Background midnight com hint indigo */
+    --background: 231 32% 7%;
+    --foreground: 36 25% 96%;
+    --card: 231 28% 11%;
+    --card-foreground: 36 25% 96%;
+    --popover: 231 30% 9%;
+    --popover-foreground: 36 25% 96%;
+
+    /* Primary: bright indigo (mais saturado em dark) */
+    --primary: 231 78% 65%;
+    --primary-foreground: 231 32% 7%;
+
+    /* Secondary: navy mais leve */
+    --secondary: 231 22% 16%;
+    --secondary-foreground: 36 20% 92%;
+
+    /* Muted: navy escuro */
+    --muted: 231 22% 14%;
+    --muted-foreground: 36 12% 70%;
+
+    /* Accent: indigo muted */
+    --accent: 231 30% 18%;
+    --accent-foreground: 231 60% 85%;
+
+    /* Destructive: rose vibrante mas legível */
+    --destructive: 346 72% 56%;
+    --destructive-foreground: 36 25% 96%;
+
+    --border: 231 18% 20%;
+    --input: 231 18% 18%;
+    --ring: 231 78% 60%;
+    --radius: 0.625rem;
+
+    /* Chart: cores vivas mas legíveis em dark */
+    --chart-1: 231 75% 65%;   /* indigo */
+    --chart-2: 38 90% 60%;    /* amber */
+    --chart-3: 160 65% 50%;   /* emerald */
+    --chart-4: 346 72% 62%;   /* rose */
+    --chart-5: 188 70% 52%;   /* teal */
   }
 }
 
@@ -55,5 +162,17 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Sutil melhoria de tipografia em todos os temas */
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Apenas Studio: backdrop subtil em cards para mais profundidade */
+@layer components {
+  .studio .ring-elegant,
+  .studio-dark .ring-elegant {
+    box-shadow:
+      0 1px 2px 0 hsl(var(--foreground) / 0.04),
+      0 1px 3px 1px hsl(var(--foreground) / 0.04);
   }
 }
