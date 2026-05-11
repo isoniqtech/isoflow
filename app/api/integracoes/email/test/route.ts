@@ -41,7 +41,7 @@ export async function POST(req: Request) {
   const credentials: EmailCredentials = {
     provider: parsed.provider as EmailProvider,
     email: parsed.email,
-    appPassword: parsed.appPassword,
+    appPassword: parsed.appPassword.replace(/\s+/g, ""),
     imapHost: parsed.imapHost ?? undefined,
     imapPort: parsed.imapPort ?? undefined,
     tag: parsed.tag ?? null,

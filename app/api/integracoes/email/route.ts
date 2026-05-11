@@ -103,7 +103,10 @@ export async function POST(req: Request) {
 
   let api_key_encrypted: string | null = existing?.api_key_encrypted ?? null
   if (parsed.appPassword) {
-    api_key_encrypted = encrypt(parsed.appPassword)
+    // Gmail mostra app passwords como "xxxx xxxx xxxx xxxx" — aceitamos
+    // com ou sem espaços. Strip de whitespace para ser tolerante.
+    const cleaned = parsed.appPassword.replace(/\s+/g, "")
+    api_key_encrypted = encrypt(cleaned)
   }
   if (!api_key_encrypted) {
     return jsonError("App password é obrigatória na primeira gravação", 400)
