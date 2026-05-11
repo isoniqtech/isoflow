@@ -16,7 +16,7 @@ import {
 import { matchProjectFromText } from "@/lib/utils/projects"
 import { debitCredits } from "@/lib/utils/credits"
 import { log as auditLog } from "@/lib/utils/audit"
-import { sendToN8N, type N8nResult } from "@/lib/webhooks/n8n"
+import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
 
 type Client = SupabaseClient<Database>
 
@@ -389,62 +389,11 @@ export async function processEmailInvoice(
         console.warn("debit credits failed:", debit)
       }
 
-      // n8n forwarder — buscar config per-tenant
-      const { data: erpIntegration } = await supabase
-        .from("tenant_integrations")
-        .select("config, api_key_encrypted")
-        .eq("tenant_id", tenantId)
-        .eq("type", "erp")
-        .eq("provider", "n8n")
-        .eq("is_active", true)
-        .maybeSingle()
-
-      let n8nResult: N8nResult | null = null
+      // n8n forwarder — forwardInvoiceToN8N trata de tudo (decrypt secret,
+      // gerar signed URL, atualizar invoice.erp_synced).
+      let n8nForward: Awaited<ReturnType<typeof forwardInvoiceToN8N>> | null = null
       try {
-        const erpConfig = (erpIntegration?.config ?? {}) as {
-          url?: string
-          secret?: string
-        }
-        n8nResult = await sendToN8N(
-          {
-            tenant_id: tenantId,
-            invoice: {
-              id: inserted.id,
-              supplier_name: inserted.supplier_name,
-              supplier_nif: inserted.supplier_nif,
-              invoice_number: inserted.invoice_number,
-              invoice_date: inserted.invoice_date,
-              due_date: extraction.due_date,
-              subtotal: extraction.subtotal,
-              vat_rate: extraction.vat_rate,
-              vat_amount: extraction.vat_amount,
-              total: inserted.total !== null ? Number(inserted.total) : null,
-              currency: inserted.currency ?? "EUR",
-              description: inserted.description,
-              category: inserted.category,
-              source: inserted.source ?? "email",
-              file_path: inserted.file_path,
-            },
-            metadata: {
-              sent_by: sender.name,
-              sender_email: sender.email,
-              project_id: projectId,
-            },
-          },
-          {
-            url: erpConfig.url,
-            secret: erpConfig.secret,
-          },
-        )
-        if (n8nResult.ok && erpIntegration) {
-          await supabase
-            .from("invoices")
-            .update({
-              erp_synced: true,
-              erp_synced_at: new Date().toISOString(),
-            })
-            .eq("id", inserted.id)
-        }
+        n8nForward = await forwardInvoiceToN8N(supabase, inserted.id, tenantId)
       } catch (e) {
         console.warn("n8n forward failed:", e)
       }
@@ -468,7 +417,8 @@ export async function processEmailInvoice(
         metadata: {
           source: "email",
           confidence: extraction.confidence,
-          n8n_sent: n8nResult?.ok ?? false,
+          n8n_sent: n8nForward?.ok ?? false,
+          n8n_skipped: n8nForward?.skipped ?? false,
         },
       })
     } catch (e) {

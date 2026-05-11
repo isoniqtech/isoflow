@@ -1,8 +1,10 @@
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { log } from "@/lib/utils/audit"
+import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
 
 const invoiceInputSchema = z.object({
   type: z.enum(["incoming", "outgoing"]).default("incoming"),
@@ -147,6 +149,14 @@ export async function POST(req: Request) {
       total: invoice.total,
     },
   })
+
+  // n8n forwarder (fire-and-forget — não bloqueia a resposta da API)
+  try {
+    const admin = createAdminClient()
+    void forwardInvoiceToN8N(admin, invoice.id, ctx.tenantId)
+  } catch (e) {
+    console.warn("n8n forward (manual upload) failed:", e)
+  }
 
   return Response.json({ data: invoice }, { status: 201 })
 }

@@ -3,7 +3,6 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import {
   ChevronLeft,
-  FileSpreadsheet,
   Landmark,
   MessageCircle,
 } from "lucide-react"
@@ -11,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { IntegrationCard } from "@/components/configuracoes/integration-card"
 import { EmailIntegrationCard } from "@/components/configuracoes/email-integration-card"
+import { ErpIntegrationCard } from "@/components/configuracoes/erp-integration-card"
 import {
   BankConnectButton,
   BankCallbackToast,
@@ -100,9 +100,40 @@ export default async function IntegracoesPage() {
     }
   }
 
-  const erp = getStatus("erp")
   const banking = getStatus("banking") as BankingStatus
   const whatsapp = getStatus("whatsapp")
+
+  // ERP/n8n integration — load full record (config) to populate form.
+  const erpRow = byType.get("erp")
+  type ErpConfigType = { url?: string }
+  let erpInitial: {
+    id: string
+    url: string
+    has_secret: boolean
+    is_active: boolean
+    last_sync_at: string | null
+    sync_error: string | null
+  } | null = null
+  if (erpRow) {
+    const { data: row } = await supabase
+      .from("tenant_integrations")
+      .select("id, config, is_active, last_sync_at, sync_error, api_key_encrypted")
+      .eq("type", "erp")
+      .eq("provider", "n8n")
+      .maybeSingle()
+    if (row) {
+      const cfg = (row.config ?? {}) as ErpConfigType
+      erpInitial = {
+        id: row.id,
+        url: cfg.url ?? "",
+        has_secret: Boolean(row.api_key_encrypted),
+        is_active: row.is_active ?? false,
+        last_sync_at: row.last_sync_at,
+        sync_error: row.sync_error,
+      }
+    }
+  }
+  const canEditErp = hasPermission(session.role, "integracoes", "edit")
 
   // Email IMAP integration — load full record (config) to populate form.
   const emailRow = byType.get("email")
@@ -180,18 +211,7 @@ export default async function IntegracoesPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <IntegrationCard
-          icon={FileSpreadsheet}
-          title="ERP"
-          description="Sincroniza faturas para o ERP onde fazes contabilidade."
-          status={erp.status}
-          provider={erp.provider}
-          lastSyncAt={erp.lastSyncAt}
-          errorMessage={erp.errorMessage}
-          onConnectLabel="Configurar ERP"
-          onConnectTitle="UI de credenciais em desenvolvimento"
-          onConnectDisabled
-        />
+        <ErpIntegrationCard initial={erpInitial} canEdit={canEditErp} />
 
         {/* Card Banking customizado: usa o BankConnectButton em vez do disabled */}
         <Card className={cn(banking.status === "error" && "border-destructive/40")}>

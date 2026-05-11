@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   Loader2,
   MoreHorizontal,
+  Send,
   Trash2,
   XCircle,
 } from "lucide-react"
@@ -35,14 +36,17 @@ export function InvoiceActions({
   status,
   canEdit,
   canDelete,
+  erpSynced,
 }: {
   invoiceId: string
   status: InvoiceStatus
   canEdit: boolean
   canDelete: boolean
+  erpSynced?: boolean
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
+  const [resending, setResending] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   async function changeStatus(newStatus: InvoiceStatus) {
@@ -63,6 +67,32 @@ export function InvoiceActions({
     toast.success("Estado atualizado")
     setBusy(false)
     router.refresh()
+  }
+
+  async function handleResendErp() {
+    setResending(true)
+    try {
+      const res = await fetch(`/api/faturas/${invoiceId}/resend-erp`, {
+        method: "POST",
+      })
+      const body = await res.json().catch(() => ({}))
+      if (res.ok && body.ok) {
+        toast.success(`Enviada para ERP (HTTP ${body.status ?? 200})`)
+        router.refresh()
+      } else {
+        toast.error("Falha ao re-enviar para ERP", {
+          description:
+            body.error ?? `HTTP ${res.status}${body.status ? ` · resposta ${body.status}` : ""}`,
+          duration: 12000,
+        })
+      }
+    } catch (e) {
+      toast.error("Erro a contactar o servidor", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setResending(false)
+    }
   }
 
   async function handleDelete() {
@@ -130,6 +160,23 @@ export function InvoiceActions({
               <CheckCircle2 className="mr-2 h-4 w-4" />
               Reabrir (pendente)
             </DropdownMenuItem>
+          )}
+          {canEdit && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={handleResendErp}
+                disabled={resending}
+                className="cursor-pointer"
+              >
+                {resending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                {erpSynced ? "Re-enviar para ERP" : "Enviar para ERP"}
+              </DropdownMenuItem>
+            </>
           )}
           {canDelete && (
             <>

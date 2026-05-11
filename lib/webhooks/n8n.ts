@@ -1,4 +1,9 @@
 import { createHmac } from "crypto"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import type { Database } from "@/types/supabase"
+import { decrypt } from "@/lib/utils/encryption"
+
+const SIGNED_URL_TTL_SECONDS = 60 * 60 // 1 hora
 
 export interface N8nInvoicePayload {
   tenant_id: string
@@ -89,5 +94,155 @@ export async function sendToN8N(
       ok: false,
       error: e instanceof Error ? e.message : String(e),
     }
+  }
+}
+
+type Client = SupabaseClient<Database>
+
+export interface ForwardResult {
+  /** "skipped" quando não há integração activa. */
+  skipped?: boolean
+  ok: boolean
+  status?: number | null
+  error?: string | null
+}
+
+/**
+ * Carrega a integração ERP/n8n do tenant, gera signed URL do ficheiro
+ * (se existir) e envia o payload completo para o webhook. Atualiza
+ * invoices.erp_synced / erp_synced_at / sync_error consoante o resultado.
+ *
+ * Pode ser chamado:
+ *  - Automaticamente após criar fatura (email/manual upload)
+ *  - Manualmente pelo user via botão "Re-enviar para ERP"
+ */
+export async function forwardInvoiceToN8N(
+  admin: Client,
+  invoiceId: string,
+  tenantId: string,
+): Promise<ForwardResult> {
+  // 1. Buscar integração ERP do tenant
+  const { data: integration } = await admin
+    .from("tenant_integrations")
+    .select("config, api_key_encrypted, is_active")
+    .eq("tenant_id", tenantId)
+    .eq("type", "erp")
+    .eq("provider", "n8n")
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (!integration) {
+    return { skipped: true, ok: true }
+  }
+
+  const config = (integration.config ?? {}) as { url?: string }
+  if (!config.url) {
+    return { skipped: true, ok: true }
+  }
+
+  let secret: string | null = null
+  if (integration.api_key_encrypted) {
+    try {
+      secret = decrypt(integration.api_key_encrypted)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      await admin
+        .from("tenant_integrations")
+        .update({
+          sync_error: `Decrypt secret: ${msg}`,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("tenant_id", tenantId)
+        .eq("type", "erp")
+        .eq("provider", "n8n")
+      return { ok: false, error: msg }
+    }
+  }
+
+  // 2. Buscar fatura
+  const { data: invoice, error: invErr } = await admin
+    .from("invoices")
+    .select(
+      "id, tenant_id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, subtotal, vat_rate, vat_amount, total, currency, description, category, source, file_path, sent_by, sender_email, project_id",
+    )
+    .eq("id", invoiceId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle()
+
+  if (invErr || !invoice) {
+    return { ok: false, error: invErr?.message ?? "Fatura não encontrada" }
+  }
+
+  // 3. Signed URL do ficheiro (se houver)
+  let fileUrl: string | null = null
+  if (invoice.file_path) {
+    const bucket = process.env.INVOICE_FILES_BUCKET || "invoice-files"
+    const { data: signed } = await admin.storage
+      .from(bucket)
+      .createSignedUrl(invoice.file_path, SIGNED_URL_TTL_SECONDS)
+    fileUrl = signed?.signedUrl ?? null
+  }
+
+  // 4. Enviar
+  const result = await sendToN8N(
+    {
+      tenant_id: tenantId,
+      invoice: {
+        id: invoice.id,
+        supplier_name: invoice.supplier_name,
+        supplier_nif: invoice.supplier_nif,
+        invoice_number: invoice.invoice_number,
+        invoice_date: invoice.invoice_date,
+        due_date: invoice.due_date,
+        subtotal: invoice.subtotal !== null ? Number(invoice.subtotal) : null,
+        vat_rate: invoice.vat_rate !== null ? Number(invoice.vat_rate) : null,
+        vat_amount:
+          invoice.vat_amount !== null ? Number(invoice.vat_amount) : null,
+        total: invoice.total !== null ? Number(invoice.total) : null,
+        currency: invoice.currency ?? "EUR",
+        description: invoice.description,
+        category: invoice.category,
+        source: invoice.source ?? "manual",
+        file_path: invoice.file_path,
+      },
+      file_url: fileUrl,
+      metadata: {
+        sent_by: invoice.sent_by,
+        sender_email: invoice.sender_email,
+        project_id: invoice.project_id,
+      },
+    },
+    { url: config.url, secret },
+  )
+
+  // 5. Atualizar status na fatura + integração
+  const now = new Date().toISOString()
+  if (result.ok) {
+    await admin
+      .from("invoices")
+      .update({ erp_synced: true, erp_synced_at: now, updated_at: now })
+      .eq("id", invoiceId)
+    await admin
+      .from("tenant_integrations")
+      .update({ last_sync_at: now, sync_error: null, updated_at: now })
+      .eq("tenant_id", tenantId)
+      .eq("type", "erp")
+      .eq("provider", "n8n")
+  } else {
+    await admin
+      .from("tenant_integrations")
+      .update({
+        sync_error: result.error?.slice(0, 500) ?? `HTTP ${result.status}`,
+        updated_at: now,
+      })
+      .eq("tenant_id", tenantId)
+      .eq("type", "erp")
+      .eq("provider", "n8n")
+  }
+
+  return {
+    ok: result.ok,
+    status: result.status ?? null,
+    error: result.error ?? null,
   }
 }
