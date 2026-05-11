@@ -55,7 +55,9 @@ export async function POST() {
 
   return Response.json({
     data: {
+      emailsPrefilter: summary.emailsPrefilter,
       emailsFetched: summary.emailsFetched,
+      rejectedAddresses: summary.rejectedAddresses,
       invoicesCreated,
       duplicatesSkipped: duplicates,
       errors: summary.errors,

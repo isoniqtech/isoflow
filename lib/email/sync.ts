@@ -22,7 +22,12 @@ type IntegrationConfig = {
 
 export interface SyncSummary {
   tenantId: string
+  /** Emails UNSEEN totais antes de filtrar por tag. */
+  emailsPrefilter: number
+  /** Emails que passaram o filtro de tag e foram processados. */
   emailsFetched: number
+  /** Endereços de To: encontrados nos emails rejeitados pela tag (debug). */
+  rejectedAddresses: string[]
   results: ProcessingResult[]
   errors: string[]
   /** True quando outro sync já estava em curso e não tentámos nada. */
@@ -50,7 +55,9 @@ export async function syncTenantEmails(
 ): Promise<SyncSummary> {
   const summary: SyncSummary = {
     tenantId,
+    emailsPrefilter: 0,
     emailsFetched: 0,
+    rejectedAddresses: [],
     results: [],
     errors: [],
   }
@@ -118,10 +125,12 @@ export async function syncTenantEmails(
 
   try {
     await withInbox(credentials, async (conn) => {
-      const messages = await fetchNewEmailsOnConnection(conn, credentials)
-      summary.emailsFetched = messages.length
+      const fetched = await fetchNewEmailsOnConnection(conn, credentials)
+      summary.emailsPrefilter = fetched.prefilterCount
+      summary.emailsFetched = fetched.matched.length
+      summary.rejectedAddresses = fetched.rejectedAddresses
 
-      for (const { uid, parsed } of messages) {
+      for (const { uid, parsed } of fetched.matched) {
         try {
           const result = await processEmailInvoice(parsed, tenantId, admin)
           summary.results.push(result)

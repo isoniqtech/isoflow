@@ -160,8 +160,14 @@ export function EmailIntegrationCard({
       const res = await fetch("/api/email/sync", { method: "POST" })
       const body = await res.json()
       if (res.ok) {
-        const { emailsFetched, invoicesCreated, duplicatesSkipped, errors } =
-          body.data
+        const {
+          emailsPrefilter,
+          emailsFetched,
+          rejectedAddresses,
+          invoicesCreated,
+          duplicatesSkipped,
+          errors,
+        } = body.data
         const parts = [
           `${emailsFetched} email(s)`,
           `${invoicesCreated} fatura(s)`,
@@ -170,6 +176,23 @@ export function EmailIntegrationCard({
         toast.success("Sincronização concluída", {
           description: parts.join(" · "),
         })
+
+        // Se a tag rejeitou tudo, mostrar pista útil ao user
+        if (
+          emailsPrefilter > 0 &&
+          emailsFetched === 0 &&
+          rejectedAddresses?.length
+        ) {
+          const list = rejectedAddresses.slice(0, 3).join(", ")
+          toast.warning(
+            `${emailsPrefilter} email(s) ignorados pela tag de routing`,
+            {
+              description: `Para: ${list}${rejectedAddresses.length > 3 ? "…" : ""}\nReencaminha para "${initial?.email?.replace("@", `+${initial.tag}@`) ?? "<email>+<tag>"}" ou apaga a tag.`,
+              duration: 15000,
+            },
+          )
+        }
+
         if (errors?.length) {
           toast.error(`${errors.length} erro(s)`, {
             description: errors.slice(0, 3).join("\n"),

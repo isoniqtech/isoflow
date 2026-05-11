@@ -99,6 +99,15 @@ function matchesTag(
   )
 }
 
+export interface FetchResult {
+  /** Total de emails UNSEEN encontrados antes de filtrar por tag. */
+  prefilterCount: number
+  /** Emails que passaram o filtro de tag e vão ser processados. */
+  matched: Array<{ uid: number; parsed: ParsedMail }>
+  /** Endereços encontrados em emails rejeitados pelo filtro (para debug). */
+  rejectedAddresses: string[]
+}
+
 /**
  * Busca emails não lidos numa connection JÁ aberta (caller responsável por
  * `connectToImap` + `openBox` antes — ver withInbox helper).
@@ -107,7 +116,7 @@ function matchesTag(
 export async function fetchNewEmailsOnConnection(
   connection: ImapSimple,
   credentials: EmailCredentials,
-): Promise<Array<{ uid: number; parsed: ParsedMail }>> {
+): Promise<FetchResult> {
   const searchCriteria = ["UNSEEN"]
   const fetchOptions = {
     bodies: [""],
@@ -117,20 +126,32 @@ export async function fetchNewEmailsOnConnection(
   const messages = await connection.search(searchCriteria, fetchOptions)
   const limited = messages.slice(0, 50)
 
-  const out: Array<{ uid: number; parsed: ParsedMail }> = []
+  const matched: FetchResult["matched"] = []
+  const rejectedAddresses: string[] = []
   for (const msg of limited) {
     const fullPart = msg.parts.find((p) => p.which === "")
     if (!fullPart) continue
     try {
       const parsed = await simpleParser(fullPart.body as string)
       if (matchesTag(parsed, credentials.email, credentials.tag)) {
-        out.push({ uid: msg.attributes.uid, parsed })
+        matched.push({ uid: msg.attributes.uid, parsed })
+      } else {
+        // Capturamos o primeiro To: para debug — assim o user vê para onde
+        // os emails rejeitados foram enviados.
+        const to = parsed.to
+        if (to) {
+          const arr = Array.isArray(to) ? to : [to]
+          const addr = arr[0]?.value?.[0]?.address
+          if (addr && !rejectedAddresses.includes(addr)) {
+            rejectedAddresses.push(addr)
+          }
+        }
       }
     } catch (e) {
       console.warn("parse email failed:", e)
     }
   }
-  return out
+  return { prefilterCount: limited.length, matched, rejectedAddresses }
 }
 
 /**
@@ -139,7 +160,7 @@ export async function fetchNewEmailsOnConnection(
  */
 export async function fetchNewEmails(
   credentials: EmailCredentials,
-): Promise<Array<{ uid: number; parsed: ParsedMail }>> {
+): Promise<FetchResult> {
   return withInbox(credentials, (conn) =>
     fetchNewEmailsOnConnection(conn, credentials),
   )
