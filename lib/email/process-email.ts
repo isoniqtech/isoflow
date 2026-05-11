@@ -117,12 +117,16 @@ export async function processEmailInvoice(
     details: [],
   }
 
-  // 1. Nível 1 — email já processado?
+  // 1. Nível 1 — email já processado com sucesso?
+  // Só consideramos "já processado" quando houve invoice criada ou duplicado
+  // detectado. Falhas (sem créditos, parsing falhado, etc.) devem poder
+  // ser retentadas em próximas sincronizações.
   const { data: existing } = await supabase
     .from("email_processing_log")
-    .select("id")
+    .select("id, invoices_created, duplicates_skipped")
     .eq("tenant_id", tenantId)
     .eq("email_message_id", messageId)
+    .or("invoices_created.gt.0,duplicates_skipped.gt.0")
     .maybeSingle()
   if (existing) {
     return { ...result, skipped: true, reason: "already_processed" }
