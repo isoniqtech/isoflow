@@ -1,6 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk"
+import sharp from "sharp"
 
 const CLAUDE_MODEL = "claude-sonnet-4-5"
+
+/**
+ * Claude API rejeita imagens > 5MB base64. Damos uma margem de segurança.
+ * Aceitamos PDFs maiores (até 32MB conforme docs), só comprimimos imagens.
+ */
+const CLAUDE_IMAGE_MAX_BYTES = 4_800_000
 
 export type InvoiceFileType = "pdf" | "jpg" | "jpeg" | "png" | "tiff" | "webp"
 
@@ -113,6 +120,42 @@ function normaliseMediaType(fileType: InvoiceFileType): {
 type ImageMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif"
 
 /**
+ * Comprime imagens grandes para caber no limite da Claude API (5 MB).
+ * Estratégia: tenta reduzir dimensão progressivamente até ficar abaixo
+ * de CLAUDE_IMAGE_MAX_BYTES. Output sempre em JPEG (compressão melhor).
+ */
+async function compressImageForClaude(
+  inputBase64: string,
+): Promise<{ base64: string; mediaType: ImageMediaType }> {
+  const input = Buffer.from(inputBase64, "base64")
+  if (input.length <= CLAUDE_IMAGE_MAX_BYTES) {
+    return { base64: inputBase64, mediaType: "image/jpeg" }
+  }
+  // Re-encode em JPEG com várias qualidades + downscales até caber.
+  const widthSteps = [2400, 1800, 1400, 1100, 900]
+  const qualitySteps = [85, 75, 65, 55]
+  for (const width of widthSteps) {
+    for (const quality of qualitySteps) {
+      const out = await sharp(input)
+        .rotate() // respeitar EXIF orientation
+        .resize({ width, withoutEnlargement: true })
+        .jpeg({ quality, mozjpeg: true })
+        .toBuffer()
+      if (out.length <= CLAUDE_IMAGE_MAX_BYTES) {
+        return { base64: out.toString("base64"), mediaType: "image/jpeg" }
+      }
+    }
+  }
+  // Última tentativa: 800px @ 50% — não devia falhar para faturas reais.
+  const fallback = await sharp(input)
+    .rotate()
+    .resize({ width: 800, withoutEnlargement: true })
+    .jpeg({ quality: 50, mozjpeg: true })
+    .toBuffer()
+  return { base64: fallback.toString("base64"), mediaType: "image/jpeg" }
+}
+
+/**
  * Envia ficheiro base64 para Claude e devolve dados estruturados.
  * Throws se ANTHROPIC_API_KEY não estiver definida.
  */
@@ -128,14 +171,23 @@ export async function extractInvoiceData(
     | { type: "document"; source: { type: "base64"; media_type: "application/pdf"; data: string } }
     | { type: "text"; text: string }
 
+  // Para imagens, garantir que cabe no limite de 5 MB da Claude API.
+  let imageData = fileBase64
+  let imageMediaType: ImageMediaType = mediaType as ImageMediaType
+  if (isImage) {
+    const compressed = await compressImageForClaude(fileBase64)
+    imageData = compressed.base64
+    imageMediaType = compressed.mediaType
+  }
+
   const content: ContentBlock[] = [
     isImage
       ? {
           type: "image",
           source: {
             type: "base64",
-            media_type: mediaType as ImageMediaType,
-            data: fileBase64,
+            media_type: imageMediaType,
+            data: imageData,
           },
         }
       : {
