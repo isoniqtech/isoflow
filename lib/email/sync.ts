@@ -25,7 +25,16 @@ export interface SyncSummary {
   emailsFetched: number
   results: ProcessingResult[]
   errors: string[]
+  /** True quando outro sync já estava em curso e não tentámos nada. */
+  alreadyRunning?: boolean
 }
+
+/**
+ * Duração máxima esperada de um sync. Se ultrapassado, o lock expira
+ * sozinho e outro sync pode arrancar. Suficientemente longo para 50
+ * emails com Claude AI (cada ~5-15s).
+ */
+const LOCK_TTL_MS = 10 * 60 * 1000 // 10 minutos
 
 /**
  * Faz fetch dos emails não lidos da integração IMAP ativa do tenant,
@@ -61,6 +70,30 @@ export async function syncTenantEmails(
   }
   if (!integration.api_key_encrypted) {
     summary.errors.push("Integração sem credenciais")
+    return summary
+  }
+
+  // Lock atómico: só corremos se sync_locked_until for null ou já passou.
+  // Postgres avalia o WHERE com o valor atual antes do UPDATE, garantindo
+  // que dois clientes simultâneos não conseguem ambos passar.
+  const lockUntil = new Date(Date.now() + LOCK_TTL_MS).toISOString()
+  const nowIso = new Date().toISOString()
+  const { data: locked, error: lockErr } = await admin
+    .from("tenant_integrations")
+    .update({ sync_locked_until: lockUntil })
+    .eq("id", integration.id)
+    .or(`sync_locked_until.is.null,sync_locked_until.lt.${nowIso}`)
+    .select("id")
+    .maybeSingle()
+  if (lockErr) {
+    summary.errors.push(`Lock acquire: ${lockErr.message}`)
+    return summary
+  }
+  if (!locked) {
+    summary.alreadyRunning = true
+    summary.errors.push(
+      "Outra sincronização ainda está a correr — espera ~1 minuto",
+    )
     return summary
   }
 
@@ -115,6 +148,7 @@ export async function syncTenantEmails(
       .update({
         last_sync_at: new Date().toISOString(),
         sync_error: null,
+        sync_locked_until: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", integration.id)
@@ -125,6 +159,7 @@ export async function syncTenantEmails(
       .from("tenant_integrations")
       .update({
         sync_error: msg,
+        sync_locked_until: null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", integration.id)

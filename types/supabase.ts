@@ -882,6 +882,7 @@ export type Database = {
           last_sync_at: string | null
           provider: string
           sync_error: string | null
+          sync_locked_until: string | null
           tenant_id: string
           type: string
           updated_at: string | null
@@ -896,6 +897,7 @@ export type Database = {
           last_sync_at?: string | null
           provider: string
           sync_error?: string | null
+          sync_locked_until?: string | null
           tenant_id: string
           type: string
           updated_at?: string | null
@@ -910,6 +912,7 @@ export type Database = {
           last_sync_at?: string | null
           provider?: string
           sync_error?: string | null
+          sync_locked_until?: string | null
           tenant_id?: string
           type?: string
           updated_at?: string | null

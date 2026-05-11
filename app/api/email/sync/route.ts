@@ -23,6 +23,13 @@ export async function POST() {
   const admin = createAdminClient()
   const summary = await syncTenantEmails(admin, ctx.tenantId)
 
+  if (summary.alreadyRunning) {
+    return Response.json(
+      { error: summary.errors[0] ?? "Sincronização já em curso" },
+      { status: 409 },
+    )
+  }
+
   const invoicesCreated = summary.results.reduce(
     (n, r) => n + r.invoicesCreated,
     0,
