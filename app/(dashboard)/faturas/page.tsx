@@ -4,6 +4,7 @@ import { Download, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { InvoiceTable } from "@/components/faturas/invoice-table"
 import { InvoiceFilters } from "@/components/faturas/invoice-filters"
+import { InvoicesRealtime } from "@/components/faturas/invoices-realtime"
 import { InvoicesPagination } from "./invoices-pagination"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import {
@@ -88,6 +89,7 @@ export default async function FaturasPage({
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-4 max-w-7xl mx-auto">
+      <InvoicesRealtime tenantId={session.tenant.id} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Faturas</h1>

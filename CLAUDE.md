@@ -814,25 +814,62 @@ CÓDIGO:
 
 ## 🌍 Variáveis de Ambiente
 
-```envSupabase
+```env
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=Claude AI
-ANTHROPIC_API_KEY=Twilio WhatsApp
+SUPABASE_SERVICE_ROLE_KEY=
+
+# Claude AI (extração de faturas)
+ANTHROPIC_API_KEY=
+
+# Twilio WhatsApp (inbound)
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
-TWILIO_WHATSAPP_NUMBER=Resend
+TWILIO_WHATSAPP_NUMBER=
+
+# Resend (email transacional + inbound de faturas)
 RESEND_API_KEY=
-RESEND_WEBHOOK_SECRET=Stripe
+RESEND_WEBHOOK_SECRET=
+
+# Stripe (subscrições + créditos)
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_STARTER_PRICE_ID=
 STRIPE_BUSINESS_PRICE_ID=
-STRIPE_PRO_PRICE_ID=Salt Edge
-SALT_EDGE_APP_ID=
-SALT_EDGE_SECRET=App
+STRIPE_PRO_PRICE_ID=
+
+# Tink (Open Banking — substitui Salt Edge)
+# https://console.tink.com → Apps → credentials
+TINK_CLIENT_ID=
+TINK_CLIENT_SECRET=
+TINK_WEBHOOK_SECRET=
+
+# App
 NEXT_PUBLIC_APP_URL=
 ADMIN_EMAIL=
+# AES-256 em hex (gerar com: openssl rand -hex 32)
 ENCRYPTION_KEY=
+# UUID do super-admin (lookup em auth.users)
 SUPER_ADMIN_USER_ID=
+
+# Inbound de faturas + AI
+# Bucket Supabase Storage onde guardamos PDFs/imagens das faturas
+INVOICE_FILES_BUCKET=
+# Domínio para emails inbound (ex: "isoflow.pt" → faturas+<tenant>@isoflow.pt)
+INBOUND_EMAIL_DOMAIN=
+
+# Gmail (OAuth — inbound de email alternativo a Resend)
+# Cria app OAuth em https://console.cloud.google.com
+GMAIL_CLIENT_ID=
+GMAIL_CLIENT_SECRET=
+
+# n8n (ERP forwarder default — clientes podem override por tenant)
+N8N_WEBHOOK_URL=
+N8N_WEBHOOK_SECRET=
+
+# Vercel Cron Jobs
+# Secret para validar pedidos cron (header Authorization: Bearer <CRON_SECRET>)
+CRON_SECRET=
+```

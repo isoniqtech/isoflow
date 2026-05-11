@@ -5,12 +5,12 @@ import {
   ChevronLeft,
   FileSpreadsheet,
   Landmark,
-  Mail,
   MessageCircle,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { IntegrationCard } from "@/components/configuracoes/integration-card"
+import { EmailIntegrationCard } from "@/components/configuracoes/email-integration-card"
 import {
   BankConnectButton,
   BankCallbackToast,
@@ -103,7 +103,52 @@ export default async function IntegracoesPage() {
   const erp = getStatus("erp")
   const banking = getStatus("banking") as BankingStatus
   const whatsapp = getStatus("whatsapp")
-  const email = getStatus("email")
+
+  // Email IMAP integration — load full record (config) to populate form.
+  const emailRow = byType.get("email")
+  type EmailConfig = {
+    provider: "gmail" | "outlook" | "imap"
+    email: string
+    imapHost?: string | null
+    imapPort?: number | null
+    tag?: string | null
+  }
+  let emailInitial: {
+    id: string
+    provider: "gmail" | "outlook" | "imap"
+    email: string
+    imapHost: string | null
+    imapPort: number | null
+    tag: string | null
+    is_active: boolean
+    last_sync_at: string | null
+    sync_error: string | null
+    has_password: boolean
+  } | null = null
+  if (emailRow) {
+    const { data: row } = await supabase
+      .from("tenant_integrations")
+      .select("id, config, is_active, last_sync_at, sync_error, api_key_encrypted")
+      .eq("type", "email")
+      .eq("provider", "imap")
+      .maybeSingle()
+    if (row) {
+      const cfg = (row.config ?? {}) as EmailConfig
+      emailInitial = {
+        id: row.id,
+        provider: cfg.provider ?? "gmail",
+        email: cfg.email ?? "",
+        imapHost: cfg.imapHost ?? null,
+        imapPort: cfg.imapPort ?? null,
+        tag: cfg.tag ?? null,
+        is_active: row.is_active ?? false,
+        last_sync_at: row.last_sync_at,
+        sync_error: row.sync_error,
+        has_password: Boolean(row.api_key_encrypted),
+      }
+    }
+  }
+  const canEditEmail = hasPermission(session.role, "integracoes", "edit")
 
   // Se Tink está ligado, expande detalhes (contas).
   const bankingRow = byType.get("banking")
@@ -221,17 +266,7 @@ export default async function IntegracoesPage() {
           onConnectTitle="Webhook Twilio será ativado depois do core"
           onConnectDisabled
         />
-        <IntegrationCard
-          icon={Mail}
-          title="Email"
-          description="Endereço dedicado para receber faturas por email."
-          status={email.status}
-          provider={email.provider}
-          lastSyncAt={email.lastSyncAt}
-          onConnectLabel="Configurar email"
-          onConnectTitle="Webhook Resend será ativado depois do core"
-          onConnectDisabled
-        />
+        <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
       </div>
 
       <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">

@@ -7,6 +7,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -206,6 +208,62 @@ export type Database = {
           },
         ]
       }
+      email_processing_log: {
+        Row: {
+          attachments_found: number | null
+          attachments_processed: number | null
+          details: Json | null
+          duplicates_skipped: number | null
+          email_message_id: string
+          errors: number | null
+          from_email: string | null
+          id: string
+          invoices_created: number | null
+          processed_at: string | null
+          status: string | null
+          subject: string | null
+          tenant_id: string
+        }
+        Insert: {
+          attachments_found?: number | null
+          attachments_processed?: number | null
+          details?: Json | null
+          duplicates_skipped?: number | null
+          email_message_id: string
+          errors?: number | null
+          from_email?: string | null
+          id?: string
+          invoices_created?: number | null
+          processed_at?: string | null
+          status?: string | null
+          subject?: string | null
+          tenant_id: string
+        }
+        Update: {
+          attachments_found?: number | null
+          attachments_processed?: number | null
+          details?: Json | null
+          duplicates_skipped?: number | null
+          email_message_id?: string
+          errors?: number | null
+          from_email?: string | null
+          id?: string
+          invoices_created?: number | null
+          processed_at?: string | null
+          status?: string | null
+          subject?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_processing_log_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           ai_confidence: number | null
@@ -220,10 +278,13 @@ export type Database = {
           currency: string | null
           description: string | null
           due_date: string | null
+          email_message_id: string | null
+          email_subject: string | null
           erp_document_id: string | null
           erp_synced: boolean | null
           erp_synced_at: string | null
           external_id: string | null
+          file_hash: string | null
           file_name: string | null
           file_path: string | null
           file_size_bytes: number | null
@@ -268,10 +329,13 @@ export type Database = {
           currency?: string | null
           description?: string | null
           due_date?: string | null
+          email_message_id?: string | null
+          email_subject?: string | null
           erp_document_id?: string | null
           erp_synced?: boolean | null
           erp_synced_at?: string | null
           external_id?: string | null
+          file_hash?: string | null
           file_name?: string | null
           file_path?: string | null
           file_size_bytes?: number | null
@@ -316,10 +380,13 @@ export type Database = {
           currency?: string | null
           description?: string | null
           due_date?: string | null
+          email_message_id?: string | null
+          email_subject?: string | null
           erp_document_id?: string | null
           erp_synced?: boolean | null
           erp_synced_at?: string | null
           external_id?: string | null
+          file_hash?: string | null
           file_name?: string | null
           file_path?: string | null
           file_size_bytes?: number | null
@@ -928,6 +995,50 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      unmatched_emails: {
+        Row: {
+          assigned_to_tenant_id: string | null
+          attachment_path: string | null
+          created_at: string | null
+          from_email: string
+          id: string
+          raw_data: Json | null
+          received_at: string | null
+          status: string | null
+          subject: string | null
+        }
+        Insert: {
+          assigned_to_tenant_id?: string | null
+          attachment_path?: string | null
+          created_at?: string | null
+          from_email: string
+          id?: string
+          raw_data?: Json | null
+          received_at?: string | null
+          status?: string | null
+          subject?: string | null
+        }
+        Update: {
+          assigned_to_tenant_id?: string | null
+          attachment_path?: string | null
+          created_at?: string | null
+          from_email?: string
+          id?: string
+          raw_data?: Json | null
+          received_at?: string | null
+          status?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unmatched_emails_assigned_to_tenant_id_fkey"
+            columns: ["assigned_to_tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       users: {
         Row: {
