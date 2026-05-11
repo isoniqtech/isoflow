@@ -124,7 +124,9 @@ export async function fetchNewEmailsOnConnection(
     struct: true,
   }
   const messages = await connection.search(searchCriteria, fetchOptions)
-  const limited = messages.slice(0, 50)
+  // IMAP devolve por sequence number ascendente (mais antigo → mais recente).
+  // Para faturas, os mais recentes são os mais relevantes — pegamos no fim.
+  const limited = messages.slice(-50)
 
   const matched: FetchResult["matched"] = []
   const rejectedAddresses: string[] = []
