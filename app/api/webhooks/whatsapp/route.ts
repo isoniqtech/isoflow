@@ -76,20 +76,24 @@ export async function POST(req: Request) {
 
     // Fluxo com mídia (nova fatura)
     if (numMedia > 0 && mediaUrl0) {
-      let tenantId: string | null = null
+      let tenantId = process.env.DEMO_TENANT_ID
 
-      try {
-        const { data: integrations } = await supabase
-          .from('tenant_integrations')
-          .select('tenant_id')
-          .eq('type', 'whatsapp')
-          .eq('provider', 'twilio')
-          .limit(1)
-          .single()
+      if (!tenantId) {
+        try {
+          const { data: integrations, error } = await supabase
+            .from('tenant_integrations')
+            .select('tenant_id')
+            .eq('type', 'whatsapp')
+            .eq('provider', 'twilio')
+            .limit(1)
+            .single()
 
-        tenantId = integrations?.tenant_id || null
-      } catch {
-        tenantId = process.env.DEMO_TENANT_ID || null
+          if (!error && integrations?.tenant_id) {
+            tenantId = integrations.tenant_id
+          }
+        } catch (e) {
+          console.warn('tenant_integrations lookup failed:', e)
+        }
       }
 
       if (!tenantId) {
