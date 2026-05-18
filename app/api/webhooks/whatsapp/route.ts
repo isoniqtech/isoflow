@@ -45,11 +45,19 @@ export async function POST(req: Request) {
     }
 
     const url = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/whatsapp`
+    console.log('🔍 Twilio webhook received:', {
+      from: paramsObj.From,
+      numMedia: paramsObj.NumMedia,
+      hasSignature: !!signature,
+      hasUrl: !!url,
+    })
+
     const isValid = validateTwilioSignature(authToken, url, paramsObj, signature)
     if (!isValid) {
-      console.warn('Invalid Twilio signature')
+      console.warn('❌ Invalid Twilio signature', { url, signature: signature?.substring(0, 20) })
       return getTwiMLResponse('❌ Assinatura inválida')
     }
+    console.log('✅ Signature valid')
 
     const from = paramsObj.From?.replace('whatsapp:', '') || ''
     const body = paramsObj.Body || ''
