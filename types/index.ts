@@ -28,6 +28,7 @@ export type InvoiceStatus =
   | "paid"
   | "rejected"
   | "duplicate"
+  | "reconciled"
 export type InvoiceSource = "whatsapp" | "email" | "manual" | "api" | "erp"
 export type InvoiceFileType = "pdf" | "jpg" | "jpeg" | "png"
 export type InvoiceMatchedBy = "auto" | "manual"

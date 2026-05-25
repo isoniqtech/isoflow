@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { CheckCircle2, Coins, Euro, FileText } from "lucide-react"
+import { CheckCircle2, Coins, Euro, FileText, TrendingDown, TrendingUp } from "lucide-react"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { getDashboardData } from "@/lib/queries/dashboard"
 import { KpiCard } from "@/components/dashboard/kpi-card"
@@ -27,7 +27,7 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <KpiCard
           label="Faturas este mês"
           value={data.kpis.invoices_this_month.toLocaleString("pt-PT")}
@@ -51,6 +51,18 @@ export default async function DashboardPage() {
           value={session.tenant.credits_balance.toLocaleString("pt-PT")}
           icon={Coins}
           hint={`Plano ${session.tenant.plan}`}
+        />
+        <KpiCard
+          label="Receita este mês"
+          value={formatCurrency(data.kpis.revenue_this_month)}
+          icon={TrendingUp}
+          hint="Faturas emitidas"
+        />
+        <KpiCard
+          label="Gastos este mês"
+          value={formatCurrency(data.kpis.expenses_this_month)}
+          icon={TrendingDown}
+          hint="Faturas recebidas"
         />
       </div>
 

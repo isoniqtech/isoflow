@@ -29,6 +29,7 @@ const STATUS_LABELS: Record<InvoiceStatus, string> = {
   paid: "Paga",
   rejected: "Rejeitada",
   duplicate: "Duplicada",
+  reconciled: "Conciliada AT",
 }
 
 const SOURCE_LABELS: Record<InvoiceSource, string> = {

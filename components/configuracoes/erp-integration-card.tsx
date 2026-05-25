@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Loader2,
+  RefreshCw,
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
@@ -40,6 +41,7 @@ export function ErpIntegrationCard({
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
+  const [syncing, setSyncing] = useState(false)
 
   async function handleTest() {
     if (!url || !secret) {
@@ -112,6 +114,39 @@ export function ErpIntegrationCard({
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSyncToconline() {
+    setSyncing(true)
+    try {
+      const now = new Date()
+      const res = await fetch("/api/faturas/sync-toconline", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          month: now.getMonth() + 1,
+          year: now.getFullYear(),
+          type: "both",
+        }),
+      })
+      const body = await res.json()
+      if (res.ok) {
+        toast.success(`Sync TOCONLINE concluído`, {
+          description: `${body.created ?? 0} criadas · ${body.updated ?? 0} actualizadas${body.errors?.length ? ` · ${body.errors.length} erros` : ""}`,
+        })
+        router.refresh()
+      } else {
+        toast.error("Sync falhou", {
+          description: body.error ?? `HTTP ${res.status}`,
+        })
+      }
+    } catch (e) {
+      toast.error("Erro de rede", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -284,6 +319,21 @@ export function ErpIntegrationCard({
             >
               Editar
             </Button>
+            {initial?.is_active && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSyncToconline}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Sincronizar TOCONLINE
+              </Button>
+            )}
           </div>
         )}
       </CardContent>

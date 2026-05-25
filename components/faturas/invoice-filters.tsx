@@ -80,6 +80,7 @@ export function InvoiceFilters({
           <SelectItem value="paid">Paga</SelectItem>
           <SelectItem value="rejected">Rejeitada</SelectItem>
           <SelectItem value="duplicate">Duplicada</SelectItem>
+          <SelectItem value="reconciled">Conciliada AT</SelectItem>
         </SelectContent>
       </Select>
 

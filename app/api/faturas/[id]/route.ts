@@ -14,6 +14,7 @@ const invoiceUpdateSchema = z
       "paid",
       "rejected",
       "duplicate",
+      "reconciled",
     ]),
     supplier_name: z.string().trim().max(200).nullable(),
     supplier_nif: z

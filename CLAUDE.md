@@ -873,3 +873,175 @@ N8N_WEBHOOK_SECRET=
 # Secret para validar pedidos cron (header Authorization: Bearer <CRON_SECRET>)
 CRON_SECRET=
 ```
+
+ TASKS ACTUAIS — Sprint de Testes
+
+Implementa estas 3 funcionalidades por ordem. Não alteres nada fora do que está descrito.
+Antes de qualquer alteração, lê o ficheiro completo envolvido.
+
+
+⚠️ REGRAS DE SEGURANÇA PARA ESTAS TASKS
+Regra 1 — Antes de alterar InvoiceStatus em types/index.ts:
+Corre primeiro:
+bashgrep -r "InvoiceStatus|STATUS_LABELS|STATUS_CLASSES" --include="*.ts" --include="*.tsx" -l | grep -v node_modules | grep -v .next
+Actualiza TODOS os ficheiros encontrados em simultâneo. Ficheiros confirmados com Record<InvoiceStatus, ...>:
+
+components/faturas/status-badge.tsx — STATUS_LABELS e STATUS_CLASSES
+components/faturas/invoice-filters.tsx — <SelectItem> de estados
+
+Regra 2 — Não alterar assinaturas de API routes existentes.
+Só criar novas: /api/faturas/[id]/file-url e /api/faturas/sync-toconline.
+Regra 3 — Não tocar em: middleware.ts, lib/supabase/, app/(auth)/.
+Regra 4 — O status na tabela invoices é text com CHECK constraint (não enum PostgreSQL). Actualizar o CHECK constraint na migration e os tipos TypeScript.
+
+TASK 1 — Gráfico Receita vs Gastos no Dashboard
+1. lib/queries/dashboard.ts
+Alterar ChartPoint (actualmente { month: string; count: number; value: number }):
+tsexport type ChartPoint = {
+  month: string
+  count: number
+  value: number      // manter
+  revenue: number    // novo — soma de outgoing
+  expenses: number   // novo — soma de incoming
+}
+Adicionar a DashboardKpis (sem remover campos existentes):
+tsrevenue_this_month: number
+expenses_this_month: number
+net_this_month: number
+Na query monthInvoices, adicionar type ao select:
+ts.select("id, total, status, invoice_date, created_at, type")
+Calcular após monthList:
+tsconst revenue = monthList.filter(i => i.type === "outgoing").reduce((s, i) => s + Number(i.total ?? 0), 0)
+const expenses = monthList.filter(i => i.type === "incoming").reduce((s, i) => s + Number(i.total ?? 0), 0)
+// kpis: { ...existentes, revenue_this_month: revenue, expenses_this_month: expenses, net_this_month: revenue - expenses }
+Na query chartRows, adicionar type:
+ts.select("created_at, total, type")
+Actualizar buildChart: inicializar buckets com revenue: 0, expenses: 0. No loop separar por tipo. Incluir no return.
+2. components/dashboard/invoices-chart.tsx
+tsconst chartConfig = {
+  revenue: { label: "Receita", color: "hsl(var(--chart-1))" },
+  expenses: { label: "Gastos", color: "hsl(var(--chart-2))" },
+} satisfies ChartConfig
+Substituir <Bar dataKey="count"/> por duas barras: revenue e expenses.
+Actualizar CardTitle para "Receita vs Gastos — 6 meses".
+Manter: Card, ChartContainer, h-56 w-full, CartesianGrid, XAxis.
+3. app/(dashboard)/page.tsx
+Adicionar imports TrendingUp, TrendingDown de lucide-react.
+Mudar grid para sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 e adicionar 2 KpiCards:
+tsx<KpiCard label="Receita este mês" value={formatCurrency(data.kpis.revenue_this_month)} icon={TrendingUp} hint="Faturas emitidas" />
+<KpiCard label="Gastos este mês" value={formatCurrency(data.kpis.expenses_this_month)} icon={TrendingDown} hint="Faturas recebidas" />
+
+TASK 2 — Detalhe da Fatura com Imagem + Campos Editáveis
+Criar app/api/faturas/[id]/file-url/route.ts:
+
+GET — verificar tenant_id, gerar signed URL (TTL 3600s) do bucket invoice-files
+Retornar { url: string, file_type: string }
+
+Implementar lib/queries/invoice-detail.ts:
+tsexport async function getInvoiceDetail(invoiceId: string, tenantId: string)
+// Select todos os campos + project(id, name, color, type)
+// Retornar null se não encontrar
+Implementar app/(dashboard)/faturas/[id]/page.tsx:
+
+Server Component, chamar getInvoiceDetail, redirect /faturas se null
+Layout 2 colunas (mobile: stack vertical)
+Banner âmbar se needs_review: true
+Breadcrumb: Faturas → número da fatura
+
+Implementar components/faturas/invoice-detail.tsx:
+Painel esquerdo (viewer):
+
+Buscar signed URL de GET /api/faturas/[id]/file-url
+PDF → PdfViewer; imagem → <img>; sem ficheiro → placeholder com ícone FileText
+Botão "Descarregar original"
+
+Painel direito (dados + edição):
+
+Modo visualização por defeito, botão "Editar"
+Modo edição: todos os campos inline editáveis (supplier_name, supplier_nif, invoice_number, invoice_date, due_date, subtotal, vat_rate, vat_amount, total, description, category, notes)
+category → Select com: transporte, alimentacao, tecnologia, servicos, material, combustivel, comunicacoes, alojamento, formacao, outro
+Save → PATCH /api/faturas/{id} + toast
+Usar react-hook-form + zod
+
+Secção de estados:
+
+<StatusBadge status={invoice.status} />
+Badge ERP: erp_synced → verde "ERP Sincronizado" / cinza "ERP Pendente"
+Badge AT: at_communicated → verde "Na e-Fatura" / cinza "Não comunicado AT"
+Se needs_review: badge âmbar "Precisa Revisão"
+
+
+TASK 3 — Integração TOCONLINE + Estados de Conciliação
+Implementar lib/integrations/toconline.ts (actualmente export {}):
+tsexport interface TOCOnlineDocument {
+  id: number
+  document_type: string
+  date: string
+  document_number: string
+  total: number
+  subtotal: number
+  vat_total: number
+  communication_status?: string  // "sent"|"pending"|"error"
+  supplier_tax_registration_number?: string
+  supplier_business_name?: string
+  client_tax_registration_number?: string
+  client_business_name?: string
+}
+
+export async function fetchPurchaseDocuments(accessToken: string, baseUrl: string, filters?: { dateFrom?: string; dateTo?: string }): Promise<TOCOnlineDocument[]>
+// GET /api/v1/commercial_purchases_documents com filtros de data
+
+export async function fetchSalesDocuments(accessToken: string, baseUrl: string, filters?: { dateFrom?: string; dateTo?: string }): Promise<TOCOnlineDocument[]>
+// GET /api/v1/commercial_sales_documents com filtros de data
+
+export function mapTOCDocumentToInvoice(doc: TOCOnlineDocument, tenantId: string, invoiceType: "incoming" | "outgoing"): Partial<Invoice>
+// erp_document_id = doc.id.toString()
+// at_communicated = doc.communication_status === "sent"
+// erp_synced = true, source = "erp"
+Criar app/api/faturas/sync-toconline/route.ts:
+
+POST { month: number, year: number, type: "purchases"|"sales"|"both" }
+Buscar integração em tenant_integrations (type="erp", provider="toconline")
+Para cada documento: procurar por erp_document_id primeiro, depois por supplier_nif + invoice_number
+Se encontrar → UPDATE com erp_synced=true, erp_document_id, at_communicated, erp_synced_at=now()
+Se não encontrar → INSERT com mapTOCDocumentToInvoice
+Retornar { created: n, updated: n, errors: string[] }
+
+Implementar app/api/integracoes/toconline/route.ts:
+
+GET — testar ligação ao TOCONLINE
+POST { action: "sync", month?, year? } — trigger sync manual
+
+Actualizar em SIMULTÂNEO (compilação TypeScript):
+types/index.ts — adicionar | "reconciled" a InvoiceStatus
+components/faturas/status-badge.tsx:
+ts// STATUS_LABELS: reconciled: "Conciliada AT"
+// STATUS_CLASSES: reconciled: "bg-violet-100 text-violet-900 border-violet-200 dark:bg-violet-900/20 dark:text-violet-200 dark:border-violet-900/40"
+components/faturas/invoice-filters.tsx:
+tsx<SelectItem value="reconciled">Conciliada AT</SelectItem>
+// Adicionar após <SelectItem value="duplicate">
+components/configuracoes/erp-integration-card.tsx:
+
+Botão "Sincronizar TOCONLINE" → POST /api/faturas/sync-toconline
+Loading state + toast com resultado
+
+Criar supabase/migrations/014_toconline_indexes.sql:
+sql-- Actualizar CHECK constraint (status é text, não enum)
+ALTER TABLE invoices DROP CONSTRAINT IF EXISTS invoices_status_check;
+ALTER TABLE invoices ADD CONSTRAINT invoices_status_check
+  CHECK (status IN ('pending','processing','matched','paid','rejected','duplicate','reconciled'));
+
+-- Índices de performance
+CREATE INDEX IF NOT EXISTS idx_invoices_erp_document_id
+  ON invoices(tenant_id, erp_document_id) WHERE erp_document_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_invoices_type_date
+  ON invoices(tenant_id, type, invoice_date) WHERE status != 'rejected';
+
+Ordem de implementação
+
+supabase/migrations/014_toconline_indexes.sql — correr no Supabase primeiro
+types/index.ts + status-badge.tsx + invoice-filters.tsx — em simultâneo
+TASK 2 completa
+TASK 1
+TASK 3

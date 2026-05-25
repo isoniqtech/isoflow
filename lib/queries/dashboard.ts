@@ -6,6 +6,9 @@ export type DashboardKpis = {
   total_value_this_month: number
   matched_count: number
   matched_pct: number
+  revenue_this_month: number
+  expenses_this_month: number
+  net_this_month: number
 }
 
 export type RecentInvoice = {
@@ -39,7 +42,13 @@ export type DashboardAlert = {
   href?: string
 }
 
-export type ChartPoint = { month: string; count: number; value: number }
+export type ChartPoint = {
+  month: string
+  count: number
+  value: number
+  revenue: number
+  expenses: number
+}
 
 export type DashboardData = {
   kpis: DashboardKpis
@@ -85,7 +94,7 @@ export async function getDashboardData(
     await Promise.all([
       supabase
         .from("invoices")
-        .select("id, total, status, invoice_date, created_at")
+        .select("id, total, status, invoice_date, created_at, type")
         .eq("tenant_id", tenantId)
         .gte("created_at", startOfMonth.toISOString())
         .neq("status", "rejected"),
@@ -122,16 +131,26 @@ export async function getDashboardData(
       ? Math.round((matched / invoicesThisMonth) * 100)
       : 0
 
+  const revenue = monthList
+    .filter((i) => i.type === "outgoing")
+    .reduce((s, i) => s + Number(i.total ?? 0), 0)
+  const expenses = monthList
+    .filter((i) => i.type === "incoming")
+    .reduce((s, i) => s + Number(i.total ?? 0), 0)
+
   const kpis: DashboardKpis = {
     invoices_this_month: invoicesThisMonth,
     total_value_this_month: totalValue,
     matched_count: matched,
     matched_pct: matchedPct,
+    revenue_this_month: revenue,
+    expenses_this_month: expenses,
+    net_this_month: revenue - expenses,
   }
 
   const { data: chartRows } = await supabase
     .from("invoices")
-    .select("created_at, total")
+    .select("created_at, total, type")
     .eq("tenant_id", tenantId)
     .gte("created_at", sixMonthsAgo.toISOString())
     .neq("status", "rejected")
@@ -207,15 +226,15 @@ export async function getDashboardData(
 }
 
 function buildChart(
-  rows: Array<{ created_at: string | null; total: number | null }>,
+  rows: Array<{ created_at: string | null; total: number | null; type: string | null }>,
   startMonth: Date,
 ): ChartPoint[] {
-  const buckets = new Map<string, { count: number; value: number }>()
+  const buckets = new Map<string, { count: number; value: number; revenue: number; expenses: number }>()
 
   for (let i = 0; i < 6; i++) {
     const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-    buckets.set(key, { count: 0, value: 0 })
+    buckets.set(key, { count: 0, value: 0, revenue: 0, expenses: 0 })
   }
 
   for (const row of rows) {
@@ -224,14 +243,23 @@ function buildChart(
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
     const b = buckets.get(key)
     if (!b) continue
+    const amount = Number(row.total ?? 0)
     b.count += 1
-    b.value += Number(row.total ?? 0)
+    b.value += amount
+    if (row.type === "outgoing") b.revenue += amount
+    else b.expenses += amount
   }
 
   return Array.from(buckets.entries()).map(([key, v]) => {
     const [, monthStr] = key.split("-")
     const monthIdx = parseInt(monthStr, 10) - 1
-    return { month: PT_MONTHS[monthIdx] ?? monthStr, count: v.count, value: v.value }
+    return {
+      month: PT_MONTHS[monthIdx] ?? monthStr,
+      count: v.count,
+      value: v.value,
+      revenue: v.revenue,
+      expenses: v.expenses,
+    }
   })
 }
 
