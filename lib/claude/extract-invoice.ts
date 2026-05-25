@@ -119,17 +119,26 @@ function normaliseMediaType(fileType: InvoiceFileType): {
 
 type ImageMediaType = "image/jpeg" | "image/png" | "image/webp" | "image/gif"
 
+function detectImageMediaType(buf: Buffer): ImageMediaType {
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47)
+    return "image/png"
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff)
+    return "image/jpeg"
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46)
+    return "image/webp"
+  return "image/jpeg"
+}
+
 /**
  * Comprime imagens grandes para caber no limite da Claude API (5 MB).
- * Estratégia: tenta reduzir dimensão progressivamente até ficar abaixo
- * de CLAUDE_IMAGE_MAX_BYTES. Output sempre em JPEG (compressão melhor).
+ * Deteta o tipo real pelos magic bytes para evitar mismatch MIME/conteúdo.
  */
 async function compressImageForClaude(
   inputBase64: string,
 ): Promise<{ base64: string; mediaType: ImageMediaType }> {
   const input = Buffer.from(inputBase64, "base64")
   if (input.length <= CLAUDE_IMAGE_MAX_BYTES) {
-    return { base64: inputBase64, mediaType: "image/jpeg" }
+    return { base64: inputBase64, mediaType: detectImageMediaType(input) }
   }
   // Re-encode em JPEG com várias qualidades + downscales até caber.
   const widthSteps = [2400, 1800, 1400, 1100, 900]
