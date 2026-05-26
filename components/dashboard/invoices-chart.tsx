@@ -12,17 +12,11 @@ import { formatCurrency } from "@/lib/utils/portugal"
 import type { ChartPoint } from "@/lib/queries/dashboard"
 
 const chartConfig = {
-  revenue: {
-    label: "Receita",
-    color: "hsl(var(--chart-1))",
-  },
-  expenses: {
-    label: "Gastos",
-    color: "hsl(var(--chart-2))",
-  },
+  revenue: { label: "Receita", color: "hsl(var(--chart-1))" },
+  expenses: { label: "Gastos", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig
 
-export function InvoicesChart({ data }: { data: ChartPoint[] }) {
+export function InvoicesChart({ data, year }: { data: ChartPoint[]; year: number }) {
   const totalRevenue = data.reduce((s, d) => s + d.revenue, 0)
   const totalExpenses = data.reduce((s, d) => s + d.expenses, 0)
 
@@ -30,14 +24,14 @@ export function InvoicesChart({ data }: { data: ChartPoint[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-sm font-medium">
-          Receita vs Gastos — 6 meses
+          Receita vs Gastos — {year}
         </CardTitle>
         <CardDescription>
           Receita {formatCurrency(totalRevenue)} · Gastos {formatCurrency(totalExpenses)}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-56 w-full">
+        <ChartContainer config={chartConfig} className="h-64 w-full">
           <BarChart data={data} margin={{ left: 0, right: 0, top: 8, bottom: 0 }}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis

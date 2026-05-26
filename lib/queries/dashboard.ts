@@ -3,7 +3,7 @@ import type { InvoiceStatus, InvoiceSource } from "@/types"
 
 export type DashboardKpis = {
   invoices_this_month: number
-  total_value_this_month: number
+  pending_count: number
   matched_count: number
   matched_pct: number
   revenue_this_month: number
@@ -52,6 +52,7 @@ export type ChartPoint = {
 }
 
 export type DashboardData = {
+  year: number
   kpis: DashboardKpis
   chart: ChartPoint[]
   recent_invoices: RecentInvoice[]
@@ -60,18 +61,8 @@ export type DashboardData = {
 }
 
 const PT_MONTHS = [
-  "jan",
-  "fev",
-  "mar",
-  "abr",
-  "mai",
-  "jun",
-  "jul",
-  "ago",
-  "set",
-  "out",
-  "nov",
-  "dez",
+  "jan", "fev", "mar", "abr", "mai", "jun",
+  "jul", "ago", "set", "out", "nov", "dez",
 ] as const
 
 const PLAN_QUOTA: Record<string, number> = {
@@ -88,113 +79,123 @@ export async function getDashboardData(
   const supabase = createClient()
 
   const now = new Date()
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  const startOfMonth = new Date(currentYear, now.getMonth(), 1)
 
   const [
     { data: monthInvoices },
     { data: recentInvoicesData },
     { data: projectsData },
     { data: tenantCache },
+    { count: pendingCount },
+    { data: annualRows },
+    { data: snapshotRows },
   ] = await Promise.all([
-      supabase
-        .from("invoices")
-        .select("id, total, status, invoice_date, created_at, type")
-        .eq("tenant_id", tenantId)
-        .gte("created_at", startOfMonth.toISOString())
-        .neq("status", "rejected"),
-      supabase
-        .from("invoices")
-        .select(
-          "id, supplier_name, invoice_number, total, status, source, invoice_date, created_at",
-        )
-        .eq("tenant_id", tenantId)
-        .order("created_at", { ascending: false })
-        .limit(10),
-      supabase
-        .from("projects")
-        .select(
-          "id, name, type, status, color, budget, budget_alert_threshold, created_at",
-        )
-        .eq("tenant_id", tenantId)
-        .eq("status", "active")
-        .order("created_at", { ascending: false })
-        .limit(4),
-      supabase
-        .from("tenants")
-        .select("toconline_revenue_total, toconline_revenue_month, toconline_revenue_year")
-        .eq("id", tenantId)
-        .single(),
-    ])
+    supabase
+      .from("invoices")
+      .select("id, total, status, invoice_date, created_at, type")
+      .eq("tenant_id", tenantId)
+      .gte("created_at", startOfMonth.toISOString())
+      .neq("status", "rejected"),
+    supabase
+      .from("invoices")
+      .select("id, supplier_name, invoice_number, total, status, source, invoice_date, created_at")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("projects")
+      .select("id, name, type, status, color, budget, budget_alert_threshold, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(4),
+    supabase
+      .from("tenants")
+      .select("toconline_revenue_total, toconline_revenue_month, toconline_revenue_year")
+      .eq("id", tenantId)
+      .single(),
+    supabase
+      .from("invoices")
+      .select("*", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .in("status", ["pending", "processing"]),
+    supabase
+      .from("invoices")
+      .select("invoice_date, total, type")
+      .eq("tenant_id", tenantId)
+      .gte("invoice_date", `${currentYear}-01-01`)
+      .lte("invoice_date", `${currentYear}-12-31`)
+      .neq("status", "rejected"),
+    supabase
+      .from("monthly_snapshots")
+      .select("month, revenue")
+      .eq("tenant_id", tenantId)
+      .eq("year", currentYear),
+  ])
 
   const monthList = monthInvoices ?? []
   const invoicesThisMonth = monthList.length
-  const totalValue = monthList.reduce(
-    (sum, i) => sum + Number(i.total ?? 0),
-    0,
-  )
   const matched = monthList.filter(
     (i) => i.status === "matched" || i.status === "paid",
   ).length
   const matchedPct =
-    invoicesThisMonth > 0
-      ? Math.round((matched / invoicesThisMonth) * 100)
-      : 0
+    invoicesThisMonth > 0 ? Math.round((matched / invoicesThisMonth) * 100) : 0
 
-  const revenueFromInvoices = monthList
-    .filter((i) => i.type === "outgoing")
-    .reduce((s, i) => s + Number(i.total ?? 0), 0)
-  const expenses = monthList
+  const expensesThisMonth = monthList
     .filter((i) => i.type === "incoming")
     .reduce((s, i) => s + Number(i.total ?? 0), 0)
 
   const cachedRevenue = tenantCache
   const useToconlineCache =
     cachedRevenue &&
-    cachedRevenue.toconline_revenue_month === now.getMonth() + 1 &&
-    cachedRevenue.toconline_revenue_year === now.getFullYear() &&
+    cachedRevenue.toconline_revenue_month === currentMonth &&
+    cachedRevenue.toconline_revenue_year === currentYear &&
     cachedRevenue.toconline_revenue_total !== null
-  const revenue = useToconlineCache
+  const revenueThisMonth = useToconlineCache
     ? Number(cachedRevenue!.toconline_revenue_total)
-    : revenueFromInvoices
+    : monthList
+        .filter((i) => i.type === "outgoing")
+        .reduce((s, i) => s + Number(i.total ?? 0), 0)
 
   const kpis: DashboardKpis = {
     invoices_this_month: invoicesThisMonth,
-    total_value_this_month: totalValue,
+    pending_count: pendingCount ?? 0,
     matched_count: matched,
     matched_pct: matchedPct,
-    revenue_this_month: revenue,
-    expenses_this_month: expenses,
-    net_this_month: revenue - expenses,
+    revenue_this_month: revenueThisMonth,
+    expenses_this_month: expensesThisMonth,
+    net_this_month: revenueThisMonth - expensesThisMonth,
     revenue_source: useToconlineCache ? "toconline" : "invoices",
   }
 
-  const { data: chartRows } = await supabase
-    .from("invoices")
-    .select("created_at, total, type")
-    .eq("tenant_id", tenantId)
-    .gte("created_at", sixMonthsAgo.toISOString())
-    .neq("status", "rejected")
-
-  const chart = buildChart(chartRows ?? [], sixMonthsAgo)
-
-  const recent_invoices: RecentInvoice[] = (recentInvoicesData ?? []).map(
-    (row) => ({
-      id: row.id,
-      supplier_name: row.supplier_name,
-      invoice_number: row.invoice_number,
-      total: row.total !== null ? Number(row.total) : null,
-      status: (row.status ?? "pending") as InvoiceStatus,
-      source: (row.source ?? "manual") as InvoiceSource,
-      invoice_date: row.invoice_date,
-      created_at: row.created_at ?? new Date().toISOString(),
-    }),
+  const snapshotMap = new Map<number, number>(
+    (snapshotRows ?? []).map((s) => [s.month, Number(s.revenue)]),
   )
+
+  const chart = buildAnnualChart(
+    currentMonth,
+    annualRows ?? [],
+    snapshotMap,
+    revenueThisMonth,
+  )
+
+  const recent_invoices: RecentInvoice[] = (recentInvoicesData ?? []).map((row) => ({
+    id: row.id,
+    supplier_name: row.supplier_name,
+    invoice_number: row.invoice_number,
+    total: row.total !== null ? Number(row.total) : null,
+    status: (row.status ?? "pending") as InvoiceStatus,
+    source: (row.source ?? "manual") as InvoiceSource,
+    invoice_date: row.invoice_date,
+    created_at: row.created_at ?? new Date().toISOString(),
+  }))
 
   const projects = projectsData ?? []
   const projectIds = projects.map((p) => p.id)
+  const projectInvoiceTotals = new Map<string, { spent: number; count: number }>()
 
-  let projectInvoiceTotals = new Map<string, { spent: number; count: number }>()
   if (projectIds.length) {
     const { data: projInvoices } = await supabase
       .from("invoices")
@@ -205,10 +206,7 @@ export async function getDashboardData(
 
     for (const row of projInvoices ?? []) {
       if (!row.project_id) continue
-      const current = projectInvoiceTotals.get(row.project_id) ?? {
-        spent: 0,
-        count: 0,
-      }
+      const current = projectInvoiceTotals.get(row.project_id) ?? { spent: 0, count: 0 }
       current.spent += Number(row.total ?? 0)
       current.count += 1
       projectInvoiceTotals.set(row.project_id, current)
@@ -237,51 +235,44 @@ export async function getDashboardData(
     recentInvoices: recent_invoices,
   })
 
-  return {
-    kpis,
-    chart,
-    recent_invoices,
-    active_projects,
-    alerts,
-  }
+  return { year: currentYear, kpis, chart, recent_invoices, active_projects, alerts }
 }
 
-function buildChart(
-  rows: Array<{ created_at: string | null; total: number | null; type: string | null }>,
-  startMonth: Date,
+function buildAnnualChart(
+  currentMonth: number,
+  invoiceRows: Array<{ invoice_date: string | null; total: number | null; type: string | null }>,
+  snapshotRevenue: Map<number, number>,
+  currentMonthRevenue: number,
 ): ChartPoint[] {
-  const buckets = new Map<string, { count: number; value: number; revenue: number; expenses: number }>()
+  const result: ChartPoint[] = Array.from({ length: 12 }, (_, i) => ({
+    month: PT_MONTHS[i],
+    count: 0,
+    value: 0,
+    revenue: 0,
+    expenses: 0,
+  }))
 
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(startMonth.getFullYear(), startMonth.getMonth() + i, 1)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-    buckets.set(key, { count: 0, value: 0, revenue: 0, expenses: 0 })
-  }
-
-  for (const row of rows) {
-    if (!row.created_at) continue
-    const d = new Date(row.created_at)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
-    const b = buckets.get(key)
-    if (!b) continue
-    const amount = Number(row.total ?? 0)
-    b.count += 1
-    b.value += amount
-    if (row.type === "outgoing") b.revenue += amount
-    else b.expenses += amount
-  }
-
-  return Array.from(buckets.entries()).map(([key, v]) => {
-    const [, monthStr] = key.split("-")
-    const monthIdx = parseInt(monthStr, 10) - 1
-    return {
-      month: PT_MONTHS[monthIdx] ?? monthStr,
-      count: v.count,
-      value: v.value,
-      revenue: v.revenue,
-      expenses: v.expenses,
+  for (let m = 1; m <= 12; m++) {
+    if (m < currentMonth) {
+      result[m - 1].revenue = snapshotRevenue.get(m) ?? 0
+    } else if (m === currentMonth) {
+      result[m - 1].revenue = currentMonthRevenue
     }
-  })
+  }
+
+  for (const row of invoiceRows) {
+    if (!row.invoice_date) continue
+    const m = parseInt(row.invoice_date.slice(5, 7), 10)
+    if (m < 1 || m > 12) continue
+    const amount = Number(row.total ?? 0)
+    if (row.type === "incoming") {
+      result[m - 1].expenses += amount
+    }
+    result[m - 1].count += 1
+    result[m - 1].value += amount
+  }
+
+  return result
 }
 
 function buildAlerts(input: {
@@ -311,19 +302,6 @@ function buildAlerts(input: {
     })
   }
 
-  const noProject = input.recentInvoices.filter(
-    (i) => i.status !== "rejected" && !("project_id" in i),
-  )
-  if (noProject.length > 0) {
-    alerts.push({
-      id: "no-project",
-      level: "warn",
-      title: `${noProject.length} fatura(s) sem projeto`,
-      description: "Atribui um projeto para melhor controlo de custos.",
-      href: "/faturas",
-    })
-  }
-
   for (const project of input.activeProjects) {
     if (!project.budget) continue
     const pct = (project.total_spent / project.budget) * 100
@@ -349,7 +327,7 @@ function buildAlerts(input: {
         id: "low-credits",
         level: pct < 10 ? "danger" : "warn",
         title: `Créditos baixos (${Math.round(pct)}%)`,
-        description: `Restam ${input.creditsBalance.toLocaleString("pt-PT")} créditos. Considera recarregar.`,
+        description: `Restam ${input.creditsBalance.toLocaleString("pt-PT")} créditos.`,
         href: "/configuracoes/plano",
       })
     }

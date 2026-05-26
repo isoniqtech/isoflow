@@ -32,20 +32,28 @@ export async function POST(req: Request) {
   }
 
   const { tenant_id, month, year, total } = parsed
-
   const supabase = createServiceClient()
-  const { error } = await supabase
-    .from("tenants")
-    .update({
-      toconline_revenue_total: total,
-      toconline_revenue_month: month,
-      toconline_revenue_year: year,
-      toconline_revenue_cached_at: new Date().toISOString(),
-    })
-    .eq("id", tenant_id)
 
-  if (error) {
-    return Response.json({ error: error.message }, { status: 500 })
+  const now = new Date()
+  const isCurrentMonth = month === now.getMonth() + 1 && year === now.getFullYear()
+
+  // Guarda snapshot permanente por mês (upsert)
+  await supabase.from("monthly_snapshots").upsert(
+    { tenant_id, month, year, revenue: total, saved_at: now.toISOString() },
+    { onConflict: "tenant_id,month,year" },
+  )
+
+  // Atualiza cache no tenant apenas se for o mês corrente
+  if (isCurrentMonth) {
+    await supabase
+      .from("tenants")
+      .update({
+        toconline_revenue_total: total,
+        toconline_revenue_month: month,
+        toconline_revenue_year: year,
+        toconline_revenue_cached_at: now.toISOString(),
+      })
+      .eq("id", tenant_id)
   }
 
   return Response.json({ ok: true, tenant_id, month, year, total })
