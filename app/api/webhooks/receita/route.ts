@@ -10,7 +10,7 @@ const bodySchema = z.object({
 })
 
 function verifySecret(header: string | null): boolean {
-  const secret = process.env.N8N_WEBHOOK_SECRET
+  const secret = process.env.CRON_SECRET
   if (!secret || !header) return false
   try {
     return timingSafeEqual(Buffer.from(secret), Buffer.from(header))
