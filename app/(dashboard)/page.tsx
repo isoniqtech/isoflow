@@ -56,7 +56,7 @@ export default async function DashboardPage() {
           label="Receita este mês"
           value={formatCurrency(data.kpis.revenue_this_month)}
           icon={TrendingUp}
-          hint="Faturas emitidas"
+          hint={data.kpis.revenue_source === "toconline" ? "Fonte: Toconline" : "Faturas emitidas"}
         />
         <KpiCard
           label="Gastos este mês"

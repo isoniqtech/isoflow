@@ -9,6 +9,7 @@ export type DashboardKpis = {
   revenue_this_month: number
   expenses_this_month: number
   net_this_month: number
+  revenue_source: "toconline" | "invoices"
 }
 
 export type RecentInvoice = {
@@ -90,8 +91,12 @@ export async function getDashboardData(
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1)
 
-  const [{ data: monthInvoices }, { data: recentInvoicesData }, { data: projectsData }] =
-    await Promise.all([
+  const [
+    { data: monthInvoices },
+    { data: recentInvoicesData },
+    { data: projectsData },
+    { data: tenantCache },
+  ] = await Promise.all([
       supabase
         .from("invoices")
         .select("id, total, status, invoice_date, created_at, type")
@@ -115,6 +120,11 @@ export async function getDashboardData(
         .eq("status", "active")
         .order("created_at", { ascending: false })
         .limit(4),
+      supabase
+        .from("tenants")
+        .select("toconline_revenue_total, toconline_revenue_month, toconline_revenue_year")
+        .eq("id", tenantId)
+        .single(),
     ])
 
   const monthList = monthInvoices ?? []
@@ -131,12 +141,22 @@ export async function getDashboardData(
       ? Math.round((matched / invoicesThisMonth) * 100)
       : 0
 
-  const revenue = monthList
+  const revenueFromInvoices = monthList
     .filter((i) => i.type === "outgoing")
     .reduce((s, i) => s + Number(i.total ?? 0), 0)
   const expenses = monthList
     .filter((i) => i.type === "incoming")
     .reduce((s, i) => s + Number(i.total ?? 0), 0)
+
+  const cachedRevenue = tenantCache
+  const useToconlineCache =
+    cachedRevenue &&
+    cachedRevenue.toconline_revenue_month === now.getMonth() + 1 &&
+    cachedRevenue.toconline_revenue_year === now.getFullYear() &&
+    cachedRevenue.toconline_revenue_total !== null
+  const revenue = useToconlineCache
+    ? Number(cachedRevenue!.toconline_revenue_total)
+    : revenueFromInvoices
 
   const kpis: DashboardKpis = {
     invoices_this_month: invoicesThisMonth,
@@ -146,6 +166,7 @@ export async function getDashboardData(
     revenue_this_month: revenue,
     expenses_this_month: expenses,
     net_this_month: revenue - expenses,
+    revenue_source: useToconlineCache ? "toconline" : "invoices",
   }
 
   const { data: chartRows } = await supabase

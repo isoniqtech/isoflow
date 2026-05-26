@@ -1,0 +1,147 @@
+{
+  "name": "Receita Toconline → ISOFlow",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 1 * * *"
+            }
+          ]
+        }
+      },
+      "id": "a1b2c3d4-0001-0001-0001-a1b2c3d40001",
+      "name": "Schedule — diário 01h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Constrói o intervalo de datas para o mês corrente\nconst now = new Date();\nconst year = now.getFullYear();\nconst month = now.getMonth() + 1;\nconst dateFrom = `${year}-${String(month).padStart(2, '0')}-01`;\nconst dateTo = now.toISOString().slice(0, 10);\n\nreturn [{ json: { year, month, dateFrom, dateTo } }];"
+      },
+      "id": "a1b2c3d4-0002-0002-0002-a1b2c3d40002",
+      "name": "Build date range",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.TOCONLINE_BASE_URL }}/api/v1/commercial_sales_documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "date_from",
+              "value": "={{ $json.dateFrom }}"
+            },
+            {
+              "name": "date_to",
+              "value": "={{ $json.dateTo }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0003-0003-0003-a1b2c3d40003",
+      "name": "GET Toconline sales docs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "toconline-bearer",
+          "name": "Toconline Bearer Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Soma o gross_total de todos os documentos de venda\nconst items = $input.all();\nconst docs = items[0].json;\n\nconst docsArray = Array.isArray(docs) ? docs : (docs.data ?? docs.documents ?? []);\n\nconst total = docsArray.reduce((sum, doc) => {\n  const val = parseFloat(doc.gross_total ?? doc.total_amount ?? doc.total ?? 0);\n  return sum + (isNaN(val) ? 0 : val);\n}, 0);\n\n// Passa os dados para o nó seguinte via variáveis de n8n\nconst year = $('Build date range').item.json.year;\nconst month = $('Build date range').item.json.month;\nconst tenantId = $vars.ISOFLOW_TENANT_ID;\n\nreturn [{ json: { tenant_id: tenantId, year, month, total: Math.round(total * 100) / 100 } }];"
+      },
+      "id": "a1b2c3d4-0004-0004-0004-a1b2c3d40004",
+      "name": "Sum gross_total",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Gera HMAC-SHA256 do payload para autenticar o webhook ISOFlow\nconst crypto = require('crypto');\n\nconst payload = $json;\nconst body = JSON.stringify(payload);\nconst secret = $vars.ISOFLOW_WEBHOOK_SECRET;\n\nconst sig = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');\n\nreturn [{ json: { ...payload, _body: body, _sig: sig } }];"
+      },
+      "id": "a1b2c3d4-0005-0005-0005-a1b2c3d40005",
+      "name": "Sign payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.ISOFLOW_APP_URL }}/api/webhooks/receita",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-ISOFlow-Signature",
+              "value": "={{ $json._sig }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ $json._body }}",
+        "options": {}
+      },
+      "id": "a1b2c3d4-0006-0006-0006-a1b2c3d40006",
+      "name": "POST ISOFlow webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Schedule — diário 01h": {
+      "main": [
+        [{ "node": "Build date range", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build date range": {
+      "main": [
+        [{ "node": "GET Toconline sales docs", "type": "main", "index": 0 }]
+      ]
+    },
+    "GET Toconline sales docs": {
+      "main": [
+        [{ "node": "Sum gross_total", "type": "main", "index": 0 }]
+      ]
+    },
+    "Sum gross_total": {
+      "main": [
+        [{ "node": "Sign payload", "type": "main", "index": 0 }]
+      ]
+    },
+    "Sign payload": {
+      "main": [
+        [{ "node": "POST ISOFlow webhook", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
