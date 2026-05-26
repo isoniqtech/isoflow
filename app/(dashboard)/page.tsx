@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
-import { Activity, CheckCircle2, Clock, FileText, TrendingDown, TrendingUp } from "lucide-react"
+import { Activity, CheckCircle2, FileText, TrendingDown, TrendingUp } from "lucide-react"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { getDashboardData } from "@/lib/queries/dashboard"
 import { KpiCard } from "@/components/dashboard/kpi-card"
@@ -32,48 +32,50 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* KPIs (3+3) + Alertas */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
-        <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <KpiCard
-            label="Receita este mês"
-            value={formatCurrency(data.kpis.revenue_this_month)}
-            icon={TrendingUp}
-            hint={data.kpis.revenue_source === "toconline" ? "Fonte: Toconline" : "Faturas emitidas"}
-          />
-          <KpiCard
-            label="Gastos este mês"
-            value={formatCurrency(data.kpis.expenses_this_month)}
-            icon={TrendingDown}
-            hint="Faturas recebidas"
-          />
-          <KpiCard
-            label="EBITDA"
-            value={netLabel}
-            icon={Activity}
-            hint="Receita menos gastos"
-          />
-          <KpiCard
-            label="Faturas este mês"
-            value={data.kpis.invoices_this_month.toLocaleString("pt-PT")}
-            icon={FileText}
-            hint="Recebidas e processadas"
-          />
-          <KpiCard
-            label="% Conciliadas"
-            value={`${data.kpis.matched_pct}%`}
-            icon={CheckCircle2}
-            hint={`${data.kpis.matched_count} de ${data.kpis.invoices_this_month} faturas`}
-          />
-          <KpiCard
-            label="Pendentes"
-            value={data.kpis.pending_count.toLocaleString("pt-PT")}
-            icon={Clock}
-            hint="A aguardar processamento"
-          />
+      {/* KPIs (3 cima + 2 baixo) + Alertas */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
+        <div className="lg:col-span-3 flex flex-col gap-4">
+          {/* Linha 1 — 3 cards iguais */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <KpiCard
+              label="Receita este mês"
+              value={formatCurrency(data.kpis.revenue_this_month)}
+              icon={TrendingUp}
+              hint={data.kpis.revenue_source === "toconline" ? "Fonte: Toconline" : "Faturas emitidas"}
+            />
+            <KpiCard
+              label="Gastos este mês"
+              value={formatCurrency(data.kpis.expenses_this_month)}
+              icon={TrendingDown}
+              hint="Faturas recebidas"
+            />
+            <KpiCard
+              label="EBITDA"
+              value={netLabel}
+              icon={Activity}
+              hint="Receita menos gastos"
+            />
+          </div>
+          {/* Linha 2 — 2 cards mais largos */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <KpiCard
+              label="Faturas este mês"
+              value={data.kpis.invoices_this_month.toLocaleString("pt-PT")}
+              icon={FileText}
+              hint="Recebidas e processadas"
+            />
+            <KpiCard
+              label="% Conciliadas"
+              value={`${data.kpis.matched_pct}%`}
+              icon={CheckCircle2}
+              hint={`${data.kpis.matched_count} de ${data.kpis.invoices_this_month} faturas`}
+            />
+          </div>
         </div>
 
-        <AlertsPanel alerts={data.alerts} />
+        <div className="lg:col-span-2 h-full">
+          <AlertsPanel alerts={data.alerts} />
+        </div>
       </div>
 
       {/* Gráfico anual full-width */}
