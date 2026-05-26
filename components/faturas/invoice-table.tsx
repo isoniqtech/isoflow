@@ -144,14 +144,14 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                   <Link href={`/faturas/${inv.id}`} className="block">
                     {inv.at_communicated ? (
                       <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-                        Enviada
+                        Associada AT
                       </span>
-                    ) : inv.erp_synced ? (
+                    ) : inv.toconline_fc_id ? (
                       <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                        Pendente
+                        FC criada
                       </span>
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-xs text-muted-foreground">Sem FC</span>
                     )}
                   </Link>
                 </TableCell>

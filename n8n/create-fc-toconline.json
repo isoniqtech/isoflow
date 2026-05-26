@@ -1,0 +1,98 @@
+{
+  "name": "ISOFlow → Criar FC no TOConline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "create-fc-toconline",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "fc000000-0000-0000-0000-000000000001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-800, 0],
+      "webhookId": "create-fc-toconline"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "value": "3pQX40ef32zbyzQi",
+          "mode": "list",
+          "cachedResultName": "tokens",
+          "cachedResultUrl": "/projects/lMhHajg120YV0C9s/datatables/3pQX40ef32zbyzQi"
+        },
+        "limit": 1
+      },
+      "id": "fc000000-0000-0000-0000-000000000002",
+      "name": "Get Token",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [-580, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const token = $input.first().json.access_token;\nconst baseUrl = $input.first().json.base_url ?? 'https://api13.toconline.pt';\nconst body = $('Webhook').first().json.body;\nconst invoices = body.invoices ?? [];\n\nreturn invoices.map(inv => ({\n  json: {\n    access_token: token,\n    base_url: baseUrl,\n    isoflow_id: inv.id,\n    supplier_name: inv.supplier_name,\n    supplier_nif: inv.supplier_nif,\n    invoice_number: inv.invoice_number,\n    invoice_date: inv.invoice_date,\n    subtotal: inv.subtotal,\n    vat_rate: inv.vat_rate,\n    vat_amount: inv.vat_amount,\n    total: inv.total,\n    description: inv.description,\n    currency: inv.currency ?? 'EUR'\n  }\n}));"
+      },
+      "id": "fc000000-0000-0000-0000-000000000003",
+      "name": "Preparar faturas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-360, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.base_url.replace(/\\/$/, '') }}/api/v1/commercial_purchases_documents",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Accept", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ JSON.stringify({ document_type: 'FC', date: $json.invoice_date, document_number: $json.invoice_number, supplier_tax_registration_number: $json.supplier_nif, supplier_business_name: $json.supplier_name, subtotal: $json.subtotal, vat_total: $json.vat_amount, gross_total: $json.total, currency: $json.currency, description: $json.description, external_reference: $json.isoflow_id }) }}",
+        "options": {}
+      },
+      "id": "fc000000-0000-0000-0000-000000000004",
+      "name": "POST Toconline FC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-120, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst results = items.map(item => {\n  const body = item.json;\n  return {\n    isoflow_id: body.external_reference ?? null,\n    fc_id: body.id ? String(body.id) : null,\n    fc_number: body.document_number ?? body.number ?? null,\n    success: !!body.id\n  };\n});\n\nreturn [{ json: { results } }];"
+      },
+      "id": "fc000000-0000-0000-0000-000000000005",
+      "name": "Montar resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [120, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Get Token", "type": "main", "index": 0 }]]
+    },
+    "Get Token": {
+      "main": [[{ "node": "Preparar faturas", "type": "main", "index": 0 }]]
+    },
+    "Preparar faturas": {
+      "main": [[{ "node": "POST Toconline FC", "type": "main", "index": 0 }]]
+    },
+    "POST Toconline FC": {
+      "main": [[{ "node": "Montar resposta", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "instanceId": "4aa773b91b59ca9f2eced25298cdec6833b91019f700a4c2009065664a19d917"
+  }
+}

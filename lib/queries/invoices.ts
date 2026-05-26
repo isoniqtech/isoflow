@@ -24,6 +24,7 @@ export type InvoiceListItem = {
   at_communicated: boolean
   erp_synced: boolean
   erp_document_id: string | null
+  toconline_fc_id: string | null
   project: { id: string; name: string; color: string } | null
   created_at: string
 }
@@ -54,7 +55,7 @@ export type ProjectOption = {
 }
 
 const SELECT_FIELDS =
-  "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, type, category, needs_review, at_communicated, erp_synced, erp_document_id, project_id, created_at"
+  "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, type, category, needs_review, at_communicated, erp_synced, erp_document_id, toconline_fc_id, project_id, created_at"
 
 const PAGE_SIZE = 50
 
@@ -80,6 +81,7 @@ function mapRow(
     at_communicated: (r.at_communicated as boolean) ?? false,
     erp_synced: (r.erp_synced as boolean) ?? false,
     erp_document_id: (r.erp_document_id as string | null) ?? null,
+    toconline_fc_id: (r.toconline_fc_id as string | null) ?? null,
     project: projectId ? (projectMap.get(projectId) ?? null) : null,
     created_at: (r.created_at as string) ?? new Date().toISOString(),
   }
