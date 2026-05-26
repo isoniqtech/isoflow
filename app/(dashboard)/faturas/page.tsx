@@ -7,39 +7,20 @@ import { InvoiceFilters } from "@/components/faturas/invoice-filters"
 import { InvoicesRealtime } from "@/components/faturas/invoices-realtime"
 import { InvoicesPagination } from "./invoices-pagination"
 import { EFaturaTab } from "@/components/faturas/efatura-tab"
-import { PorConciliarTab } from "@/components/faturas/por-conciliar-tab"
 import { getCurrentSession } from "@/lib/queries/current-session"
-import {
-  listInvoices,
-  listProjectOptions,
-  listEFaturaInvoices,
-  listPorConciliarInvoices,
-  type InvoicesFilter,
-} from "@/lib/queries/invoices"
+import { listInvoices, listProjectOptions, type InvoicesFilter } from "@/lib/queries/invoices"
+import { listEFaturaPageData } from "@/lib/queries/efatura-documents"
 import { hasPermission } from "@/lib/utils/permissions"
 import { cn } from "@/lib/utils"
 import type { InvoiceSource, InvoiceStatus } from "@/types"
 
 const VALID_STATUS: Array<InvoiceStatus | "all"> = [
-  "all",
-  "pending",
-  "processing",
-  "matched",
-  "paid",
-  "rejected",
-  "duplicate",
+  "all", "pending", "processing", "matched", "paid", "rejected", "duplicate",
 ]
-
 const VALID_SOURCE: Array<InvoiceSource | "all"> = [
-  "all",
-  "manual",
-  "whatsapp",
-  "email",
-  "api",
-  "erp",
+  "all", "manual", "whatsapp", "email", "api", "erp",
 ]
-
-const VALID_TABS = ["todas", "conciliar", "efatura"] as const
+const VALID_TABS = ["todas", "efatura"] as const
 type Tab = (typeof VALID_TABS)[number]
 
 export default async function FaturasPage({
@@ -59,9 +40,7 @@ export default async function FaturasPage({
   const session = await getCurrentSession()
   if (!session) redirect("/login")
 
-  const activeTab: Tab = (VALID_TABS as readonly string[]).includes(
-    searchParams.tab ?? "",
-  )
+  const activeTab: Tab = (VALID_TABS as readonly string[]).includes(searchParams.tab ?? "")
     ? (searchParams.tab as Tab)
     : "todas"
 
@@ -78,38 +57,26 @@ export default async function FaturasPage({
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1)
 
   const filter: InvoicesFilter = {
-    status,
-    source,
-    project_id,
-    needs_review,
+    status, source, project_id, needs_review,
     date_from: date_from || undefined,
     date_to: date_to || undefined,
   }
 
-  const [todasResult, projects, eFaturaData, porConciliarData] = await Promise.all([
-    listInvoices(session.tenant.id, {
-      role: session.role,
-      userId: session.user.id,
-      filter,
-      page,
-    }),
+  const [todasResult, projects, eFaturaPageData] = await Promise.all([
+    listInvoices(session.tenant.id, { role: session.role, userId: session.user.id, filter, page }),
     listProjectOptions(session.tenant.id),
-    listEFaturaInvoices(session.tenant.id, session.role, session.user.id),
-    listPorConciliarInvoices(session.tenant.id, session.role, session.user.id),
+    listEFaturaPageData(session.tenant.id, session.role, session.user.id),
   ])
 
   const { invoices, total, page_size } = todasResult
   const canCreate = hasPermission(session.role, "faturas", "create")
   const totalPages = Math.max(1, Math.ceil(total / page_size))
 
+  const eFaturaPending = eFaturaPageData.sem_fc.length + eFaturaPageData.com_fc.length
+
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "todas", label: "Todas", count: total },
-    { id: "conciliar", label: "Por Conciliar", count: porConciliarData.length },
-    {
-      id: "efatura",
-      label: "e-Fatura",
-      count: eFaturaData.por_enviar.length || undefined,
-    },
+    { id: "efatura", label: "e-Fatura", count: eFaturaPending || undefined },
   ]
 
   return (
@@ -120,23 +87,20 @@ export default async function FaturasPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Faturas</h1>
           <p className="text-muted-foreground text-sm">
-            {total.toLocaleString("pt-PT")}{" "}
-            {total === 1 ? "fatura" : "faturas"}
+            {total.toLocaleString("pt-PT")} {total === 1 ? "fatura" : "faturas"}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {hasPermission(session.role, "relatorios", "view_all") && total > 0 && (
             <Button variant="outline" asChild>
-              <a
-                href={`/api/faturas/export?${new URLSearchParams({
-                  ...(status !== "all" ? { status } : {}),
-                  ...(source !== "all" ? { source } : {}),
-                  ...(project_id !== "all" ? { project: project_id } : {}),
-                  ...(needs_review ? { review: "1" } : {}),
-                  ...(date_from ? { from: date_from } : {}),
-                  ...(date_to ? { to: date_to } : {}),
-                }).toString()}`}
-              >
+              <a href={`/api/faturas/export?${new URLSearchParams({
+                ...(status !== "all" ? { status } : {}),
+                ...(source !== "all" ? { source } : {}),
+                ...(project_id !== "all" ? { project: project_id } : {}),
+                ...(needs_review ? { review: "1" } : {}),
+                ...(date_from ? { from: date_from } : {}),
+                ...(date_to ? { to: date_to } : {}),
+              }).toString()}`}>
                 <Download className="mr-2 h-4 w-4" />
                 Exportar CSV
               </a>
@@ -168,15 +132,11 @@ export default async function FaturasPage({
           >
             {tab.label}
             {tab.count !== undefined && tab.count > 0 && (
-              <span
-                className={cn(
-                  "text-xs rounded-full px-1.5 py-0.5 font-medium",
-                  activeTab === tab.id
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground",
-                  tab.id === "efatura" && "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
-                )}
-              >
+              <span className={cn(
+                "text-xs rounded-full px-1.5 py-0.5 font-medium",
+                activeTab === tab.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                tab.id === "efatura" && "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
+              )}>
                 {tab.count}
               </span>
             )}
@@ -184,7 +144,6 @@ export default async function FaturasPage({
         ))}
       </div>
 
-      {/* Tab content */}
       {activeTab === "todas" && (
         <>
           <InvoiceFilters
@@ -193,22 +152,13 @@ export default async function FaturasPage({
           />
           <InvoiceTable invoices={invoices} />
           {totalPages > 1 && (
-            <InvoicesPagination
-              page={page}
-              totalPages={totalPages}
-              total={total}
-              pageSize={page_size}
-            />
+            <InvoicesPagination page={page} totalPages={totalPages} total={total} pageSize={page_size} />
           )}
         </>
       )}
 
-      {activeTab === "conciliar" && (
-        <PorConciliarTab invoices={porConciliarData} />
-      )}
-
       {activeTab === "efatura" && (
-        <EFaturaTab data={eFaturaData} />
+        <EFaturaTab data={eFaturaPageData} />
       )}
     </div>
   )

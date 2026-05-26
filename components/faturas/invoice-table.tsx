@@ -31,6 +31,39 @@ const SOURCE_LABELS: Record<InvoiceSource, string> = {
   erp: "ERP",
 }
 
+function BankBadge({ inv }: { inv: InvoiceListItem }) {
+  if (inv.bank_transaction_id) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+        Conciliada
+      </span>
+    )
+  }
+  return (
+    <span className="text-xs text-muted-foreground">Por conciliar</span>
+  )
+}
+
+function ATBadge({ inv }: { inv: InvoiceListItem }) {
+  if (inv.at_communicated) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+        Compra Registada
+      </span>
+    )
+  }
+  if (inv.toconline_fc_id) {
+    return (
+      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+        Sem associação
+      </span>
+    )
+  }
+  return (
+    <span className="text-xs text-muted-foreground">Sem FC</span>
+  )
+}
+
 export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
   if (invoices.length === 0) {
     return (
@@ -54,10 +87,12 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
             <TableHead>Fornecedor</TableHead>
             <TableHead className="hidden md:table-cell">Nº Fatura</TableHead>
             <TableHead className="hidden lg:table-cell">Data</TableHead>
+            <TableHead className="hidden lg:table-cell">FC TOC Online</TableHead>
             <TableHead className="hidden md:table-cell">Projeto</TableHead>
             <TableHead className="text-right">Valor</TableHead>
             <TableHead>Estado</TableHead>
-            <TableHead className="hidden lg:table-cell">AT</TableHead>
+            <TableHead className="hidden xl:table-cell">Bancário</TableHead>
+            <TableHead className="hidden xl:table-cell">AT</TableHead>
             <TableHead className="hidden sm:table-cell">Origem</TableHead>
           </TableRow>
         </TableHeader>
@@ -72,11 +107,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
             return (
               <TableRow key={inv.id} className="cursor-pointer">
                 <TableCell className="p-0">
-                  <Link
-                    href={`/faturas/${inv.id}`}
-                    className="block px-2 py-3 h-full"
-                    aria-label="Ver fatura"
-                  >
+                  <Link href={`/faturas/${inv.id}`} className="block px-2 py-3 h-full" aria-label="Ver fatura">
                     <SourceIcon className="h-4 w-4 text-muted-foreground" />
                   </Link>
                 </TableCell>
@@ -87,16 +118,11 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                         {inv.supplier_name ?? "Fornecedor desconhecido"}
                       </span>
                       {inv.needs_review && (
-                        <AlertTriangle
-                          className="h-3.5 w-3.5 text-amber-600 shrink-0"
-                          aria-label="Necessita revisão"
-                        />
+                        <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" aria-label="Necessita revisão" />
                       )}
                     </div>
                     {inv.supplier_nif && (
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {inv.supplier_nif}
-                      </p>
+                      <p className="text-xs text-muted-foreground font-mono">{inv.supplier_nif}</p>
                     )}
                   </Link>
                 </TableCell>
@@ -112,17 +138,19 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                     </span>
                   </Link>
                 </TableCell>
+                <TableCell className="hidden lg:table-cell font-mono text-sm">
+                  <Link href={`/faturas/${inv.id}`} className="block">
+                    {inv.toconline_fc_id ? (
+                      <span className="text-foreground">{inv.toconline_fc_id}</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </Link>
+                </TableCell>
                 <TableCell className="hidden md:table-cell">
                   <Link href={`/faturas/${inv.id}`} className="block">
                     {inv.project ? (
-                      <Badge
-                        variant="outline"
-                        className="font-normal"
-                        style={{
-                          borderColor: inv.project.color,
-                          color: inv.project.color,
-                        }}
-                      >
+                      <Badge variant="outline" className="font-normal" style={{ borderColor: inv.project.color, color: inv.project.color }}>
                         {inv.project.name}
                       </Badge>
                     ) : (
@@ -140,19 +168,14 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                     <StatusBadge status={inv.status} />
                   </Link>
                 </TableCell>
-                <TableCell className="hidden lg:table-cell">
+                <TableCell className="hidden xl:table-cell">
                   <Link href={`/faturas/${inv.id}`} className="block">
-                    {inv.at_communicated ? (
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-                        Associada AT
-                      </span>
-                    ) : inv.toconline_fc_id ? (
-                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-                        FC criada
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Sem FC</span>
-                    )}
+                    <BankBadge inv={inv} />
+                  </Link>
+                </TableCell>
+                <TableCell className="hidden xl:table-cell">
+                  <Link href={`/faturas/${inv.id}`} className="block">
+                    <ATBadge inv={inv} />
                   </Link>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
