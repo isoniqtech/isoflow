@@ -1,0 +1,203 @@
+{
+  "name": "Backfill Receita 2026 → ISOFlow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "b0000000-0000-0000-0000-000000000001",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-800, 0]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": { "__rl": true, "value": "3pQX40ef32zbyzQi", "mode": "list", "cachedResultName": "tokens", "cachedResultUrl": "/projects/lMhHajg120YV0C9s/datatables/3pQX40ef32zbyzQi" },
+        "limit": 1
+      },
+      "id": "b0000000-0000-0000-0000-000000000002",
+      "name": "Get Token",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1,
+      "position": [-580, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api13.toconline.pt/api/v1/commercial_sales_documents/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" }] },
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "date_from", "value": "2026-01-01" }, { "name": "date_to", "value": "2026-01-31" }] },
+        "options": {}
+      },
+      "id": "b0000000-0000-0000-0001-000000000001",
+      "name": "GET Jan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, -1000]
+    },
+    {
+      "parameters": {
+        "url": "https://api13.toconline.pt/api/v1/commercial_sales_documents/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" }] },
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "date_from", "value": "2026-02-01" }, { "name": "date_to", "value": "2026-02-28" }] },
+        "options": {}
+      },
+      "id": "b0000000-0000-0000-0002-000000000001",
+      "name": "GET Fev",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, -600]
+    },
+    {
+      "parameters": {
+        "url": "https://api13.toconline.pt/api/v1/commercial_sales_documents/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" }] },
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "date_from", "value": "2026-03-01" }, { "name": "date_to", "value": "2026-03-31" }] },
+        "options": {}
+      },
+      "id": "b0000000-0000-0000-0003-000000000001",
+      "name": "GET Mar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, -200]
+    },
+    {
+      "parameters": {
+        "url": "https://api13.toconline.pt/api/v1/commercial_sales_documents/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" }] },
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "date_from", "value": "2026-04-01" }, { "name": "date_to", "value": "2026-04-30" }] },
+        "options": {}
+      },
+      "id": "b0000000-0000-0000-0004-000000000001",
+      "name": "GET Abr",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api13.toconline.pt/api/v1/commercial_sales_documents/",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $json.access_token }}" }] },
+        "sendQuery": true,
+        "queryParameters": { "parameters": [{ "name": "date_from", "value": "2026-05-01" }, { "name": "date_to", "value": "2026-05-26" }] },
+        "options": {}
+      },
+      "id": "b0000000-0000-0000-0005-000000000001",
+      "name": "GET Mai",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, 600]
+    },
+    {
+      "parameters": { "jsCode": "const items = $input.all();\nlet total = 0;\nfor (const item of items) {\n  const gross = parseFloat(item.json.gross_total ?? item.json.total ?? 0);\n  total += isNaN(gross) ? 0 : gross;\n}\nreturn [{ json: { tenant_id: \"0a2a1285-b878-4a9a-9ba4-1c799d8daeb9\", year: 2026, month: 1, total: Math.round(total * 100) / 100 } }];" },
+      "id": "b0000000-0000-0000-0001-000000000002",
+      "name": "Sum Jan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -1000]
+    },
+    {
+      "parameters": { "jsCode": "const items = $input.all();\nlet total = 0;\nfor (const item of items) {\n  const gross = parseFloat(item.json.gross_total ?? item.json.total ?? 0);\n  total += isNaN(gross) ? 0 : gross;\n}\nreturn [{ json: { tenant_id: \"0a2a1285-b878-4a9a-9ba4-1c799d8daeb9\", year: 2026, month: 2, total: Math.round(total * 100) / 100 } }];" },
+      "id": "b0000000-0000-0000-0002-000000000002",
+      "name": "Sum Fev",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -600]
+    },
+    {
+      "parameters": { "jsCode": "const items = $input.all();\nlet total = 0;\nfor (const item of items) {\n  const gross = parseFloat(item.json.gross_total ?? item.json.total ?? 0);\n  total += isNaN(gross) ? 0 : gross;\n}\nreturn [{ json: { tenant_id: \"0a2a1285-b878-4a9a-9ba4-1c799d8daeb9\", year: 2026, month: 3, total: Math.round(total * 100) / 100 } }];" },
+      "id": "b0000000-0000-0000-0003-000000000002",
+      "name": "Sum Mar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, -200]
+    },
+    {
+      "parameters": { "jsCode": "const items = $input.all();\nlet total = 0;\nfor (const item of items) {\n  const gross = parseFloat(item.json.gross_total ?? item.json.total ?? 0);\n  total += isNaN(gross) ? 0 : gross;\n}\nreturn [{ json: { tenant_id: \"0a2a1285-b878-4a9a-9ba4-1c799d8daeb9\", year: 2026, month: 4, total: Math.round(total * 100) / 100 } }];" },
+      "id": "b0000000-0000-0000-0004-000000000002",
+      "name": "Sum Abr",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 200]
+    },
+    {
+      "parameters": { "jsCode": "const items = $input.all();\nlet total = 0;\nfor (const item of items) {\n  const gross = parseFloat(item.json.gross_total ?? item.json.total ?? 0);\n  total += isNaN(gross) ? 0 : gross;\n}\nreturn [{ json: { tenant_id: \"0a2a1285-b878-4a9a-9ba4-1c799d8daeb9\", year: 2026, month: 5, total: Math.round(total * 100) / 100 } }];" },
+      "id": "b0000000-0000-0000-0005-000000000002",
+      "name": "Sum Mai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [0, 600]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://isoflow-seven.vercel.app/api/webhooks/receita", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "X-ISOFlow-Secret", "value": "76332201ba4a68178e87a923f5d903a61503cb0cb1cfd37d59219aca8bb49dda" }] }, "sendBody": true, "specifyBody": "string", "body": "={{ JSON.stringify({ tenant_id: $json.tenant_id, year: $json.year, month: $json.month, total: $json.total }) }}", "options": {} },
+      "id": "b0000000-0000-0000-0001-000000000003",
+      "name": "POST Jan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, -1000]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://isoflow-seven.vercel.app/api/webhooks/receita", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "X-ISOFlow-Secret", "value": "76332201ba4a68178e87a923f5d903a61503cb0cb1cfd37d59219aca8bb49dda" }] }, "sendBody": true, "specifyBody": "string", "body": "={{ JSON.stringify({ tenant_id: $json.tenant_id, year: $json.year, month: $json.month, total: $json.total }) }}", "options": {} },
+      "id": "b0000000-0000-0000-0002-000000000003",
+      "name": "POST Fev",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, -600]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://isoflow-seven.vercel.app/api/webhooks/receita", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "X-ISOFlow-Secret", "value": "76332201ba4a68178e87a923f5d903a61503cb0cb1cfd37d59219aca8bb49dda" }] }, "sendBody": true, "specifyBody": "string", "body": "={{ JSON.stringify({ tenant_id: $json.tenant_id, year: $json.year, month: $json.month, total: $json.total }) }}", "options": {} },
+      "id": "b0000000-0000-0000-0003-000000000003",
+      "name": "POST Mar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, -200]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://isoflow-seven.vercel.app/api/webhooks/receita", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "X-ISOFlow-Secret", "value": "76332201ba4a68178e87a923f5d903a61503cb0cb1cfd37d59219aca8bb49dda" }] }, "sendBody": true, "specifyBody": "string", "body": "={{ JSON.stringify({ tenant_id: $json.tenant_id, year: $json.year, month: $json.month, total: $json.total }) }}", "options": {} },
+      "id": "b0000000-0000-0000-0004-000000000003",
+      "name": "POST Abr",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, 200]
+    },
+    {
+      "parameters": { "method": "POST", "url": "https://isoflow-seven.vercel.app/api/webhooks/receita", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Content-Type", "value": "application/json" }, { "name": "X-ISOFlow-Secret", "value": "76332201ba4a68178e87a923f5d903a61503cb0cb1cfd37d59219aca8bb49dda" }] }, "sendBody": true, "specifyBody": "string", "body": "={{ JSON.stringify({ tenant_id: $json.tenant_id, year: $json.year, month: $json.month, total: $json.total }) }}", "options": {} },
+      "id": "b0000000-0000-0000-0005-000000000003",
+      "name": "POST Mai",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [300, 600]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": { "main": [[{ "node": "Get Token", "type": "main", "index": 0 }]] },
+    "Get Token": { "main": [[
+      { "node": "GET Jan", "type": "main", "index": 0 },
+      { "node": "GET Fev", "type": "main", "index": 0 },
+      { "node": "GET Mar", "type": "main", "index": 0 },
+      { "node": "GET Abr", "type": "main", "index": 0 },
+      { "node": "GET Mai", "type": "main", "index": 0 }
+    ]] },
+    "GET Jan": { "main": [[{ "node": "Sum Jan", "type": "main", "index": 0 }]] },
+    "GET Fev": { "main": [[{ "node": "Sum Fev", "type": "main", "index": 0 }]] },
+    "GET Mar": { "main": [[{ "node": "Sum Mar", "type": "main", "index": 0 }]] },
+    "GET Abr": { "main": [[{ "node": "Sum Abr", "type": "main", "index": 0 }]] },
+    "GET Mai": { "main": [[{ "node": "Sum Mai", "type": "main", "index": 0 }]] },
+    "Sum Jan": { "main": [[{ "node": "POST Jan", "type": "main", "index": 0 }]] },
+    "Sum Fev": { "main": [[{ "node": "POST Fev", "type": "main", "index": 0 }]] },
+    "Sum Mar": { "main": [[{ "node": "POST Mar", "type": "main", "index": 0 }]] },
+    "Sum Abr": { "main": [[{ "node": "POST Abr", "type": "main", "index": 0 }]] },
+    "Sum Mai": { "main": [[{ "node": "POST Mai", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "meta": { "instanceId": "4aa773b91b59ca9f2eced25298cdec6833b91019f700a4c2009065664a19d917" }
+}

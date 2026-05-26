@@ -33,7 +33,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* KPIs (3+3) + Alertas */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-stretch">
         <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KpiCard
             label="Receita este mês"
