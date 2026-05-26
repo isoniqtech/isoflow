@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "crypto"
-import { createClient } from "@/lib/supabase/server"
+import { createServiceClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
 const bodySchema = z.object({
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
 
   const { tenant_id, month, year, total } = parsed
 
-  const supabase = createClient()
+  const supabase = createServiceClient()
   const { error } = await supabase
     .from("tenants")
     .update({
