@@ -68,6 +68,29 @@ export async function fetchSalesDocuments(
   )
 }
 
+export async function sendDocumentToAT(
+  accessToken: string,
+  baseUrl: string,
+  documentId: string,
+  invoiceType: "incoming" | "outgoing",
+): Promise<void> {
+  const segment =
+    invoiceType === "incoming"
+      ? "commercial_purchases_documents"
+      : "commercial_sales_documents"
+  const url = `${baseUrl.replace(/\/$/, "")}/api/v1/${segment}/${documentId}/send_document_at_webservice`
+  const res = await fetch(url, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  })
+  if (!res.ok) {
+    throw new Error(`TOConline AT error ${res.status}: ${await res.text()}`)
+  }
+}
+
 export function mapTOCDocumentToInvoice(
   doc: TOCOnlineDocument,
   tenantId: string,

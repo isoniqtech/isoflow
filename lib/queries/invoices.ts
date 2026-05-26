@@ -18,8 +18,12 @@ export type InvoiceListItem = {
   currency: string
   status: InvoiceStatus
   source: InvoiceSource
+  type: "incoming" | "outgoing"
   category: string | null
   needs_review: boolean
+  at_communicated: boolean
+  erp_synced: boolean
+  erp_document_id: string | null
   project: { id: string; name: string; color: string } | null
   created_at: string
 }
@@ -49,7 +53,56 @@ export type ProjectOption = {
   status: ProjectStatus
 }
 
+const SELECT_FIELDS =
+  "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, type, category, needs_review, at_communicated, erp_synced, erp_document_id, project_id, created_at"
+
 const PAGE_SIZE = 50
+
+function mapRow(
+  r: Record<string, unknown>,
+  projectMap: Map<string, { id: string; name: string; color: string }>,
+): InvoiceListItem {
+  const projectId = r.project_id as string | null
+  return {
+    id: r.id as string,
+    supplier_name: (r.supplier_name as string | null) ?? null,
+    supplier_nif: (r.supplier_nif as string | null) ?? null,
+    invoice_number: (r.invoice_number as string | null) ?? null,
+    invoice_date: (r.invoice_date as string | null) ?? null,
+    due_date: (r.due_date as string | null) ?? null,
+    total: r.total !== null ? Number(r.total) : null,
+    currency: (r.currency as string) ?? "EUR",
+    status: ((r.status as string) ?? "pending") as InvoiceStatus,
+    source: ((r.source as string) ?? "manual") as InvoiceSource,
+    type: ((r.type as string) ?? "incoming") as "incoming" | "outgoing",
+    category: (r.category as string | null) ?? null,
+    needs_review: (r.needs_review as boolean) ?? false,
+    at_communicated: (r.at_communicated as boolean) ?? false,
+    erp_synced: (r.erp_synced as boolean) ?? false,
+    erp_document_id: (r.erp_document_id as string | null) ?? null,
+    project: projectId ? (projectMap.get(projectId) ?? null) : null,
+    created_at: (r.created_at as string) ?? new Date().toISOString(),
+  }
+}
+
+async function fetchProjectMap(
+  supabase: ReturnType<typeof createClient>,
+  rows: Array<{ project_id?: string | null }>,
+): Promise<Map<string, { id: string; name: string; color: string }>> {
+  const projectIds = Array.from(
+    new Set(rows.map((r) => r.project_id).filter((p): p is string => Boolean(p))),
+  )
+  const map = new Map<string, { id: string; name: string; color: string }>()
+  if (!projectIds.length) return map
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name, color")
+    .in("id", projectIds)
+  for (const p of projects ?? []) {
+    map.set(p.id, { id: p.id, name: p.name, color: p.color ?? "#2563EB" })
+  }
+  return map
+}
 
 export async function listInvoices(
   tenantId: string,
@@ -66,94 +119,114 @@ export async function listInvoices(
 
   let query = supabase
     .from("invoices")
-    .select(
-      "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, category, needs_review, project_id, created_at",
-      { count: "exact" },
-    )
+    .select(SELECT_FIELDS, { count: "exact" })
     .eq("tenant_id", tenantId)
 
-  if (role === "member") {
-    query = query.eq("created_by", userId)
-  }
-
-  if (filter?.status && filter.status !== "all") {
-    query = query.eq("status", filter.status)
-  }
-  if (filter?.source && filter.source !== "all") {
-    query = query.eq("source", filter.source)
-  }
+  if (role === "member") query = query.eq("created_by", userId)
+  if (filter?.status && filter.status !== "all") query = query.eq("status", filter.status)
+  if (filter?.source && filter.source !== "all") query = query.eq("source", filter.source)
   if (filter?.project_id) {
-    if (filter.project_id === "none") {
-      query = query.is("project_id", null)
-    } else if (filter.project_id !== "all") {
-      query = query.eq("project_id", filter.project_id)
-    }
+    if (filter.project_id === "none") query = query.is("project_id", null)
+    else if (filter.project_id !== "all") query = query.eq("project_id", filter.project_id)
   }
-  if (filter?.category && filter.category !== "all") {
-    query = query.eq("category", filter.category)
-  }
-  if (filter?.needs_review) {
-    query = query.eq("needs_review", true)
-  }
-  if (filter?.date_from) {
-    query = query.gte("invoice_date", filter.date_from)
-  }
-  if (filter?.date_to) {
-    query = query.lte("invoice_date", filter.date_to)
-  }
+  if (filter?.category && filter.category !== "all") query = query.eq("category", filter.category)
+  if (filter?.needs_review) query = query.eq("needs_review", true)
+  if (filter?.date_from) query = query.gte("invoice_date", filter.date_from)
+  if (filter?.date_to) query = query.lte("invoice_date", filter.date_to)
 
   const { data, count } = await query
     .order("created_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 
-  const rows = data ?? []
-  const projectIds = Array.from(
-    new Set(rows.map((r) => r.project_id).filter((p): p is string => Boolean(p))),
-  )
-
-  let projectMap = new Map<string, { id: string; name: string; color: string }>()
-  if (projectIds.length > 0) {
-    const { data: projects } = await supabase
-      .from("projects")
-      .select("id, name, color")
-      .in("id", projectIds)
-    for (const p of projects ?? []) {
-      projectMap.set(p.id, {
-        id: p.id,
-        name: p.name,
-        color: p.color ?? "#2563EB",
-      })
-    }
-  }
-
-  const invoices: InvoiceListItem[] = rows.map((r) => ({
-    id: r.id,
-    supplier_name: r.supplier_name,
-    supplier_nif: r.supplier_nif,
-    invoice_number: r.invoice_number,
-    invoice_date: r.invoice_date,
-    due_date: r.due_date,
-    total: r.total !== null ? Number(r.total) : null,
-    currency: r.currency ?? "EUR",
-    status: (r.status ?? "pending") as InvoiceStatus,
-    source: (r.source ?? "manual") as InvoiceSource,
-    category: r.category,
-    needs_review: r.needs_review ?? false,
-    project: r.project_id ? projectMap.get(r.project_id) ?? null : null,
-    created_at: r.created_at ?? new Date().toISOString(),
-  }))
+  const rows = (data ?? []) as Array<Record<string, unknown>>
+  const projectMap = await fetchProjectMap(supabase, rows as Array<{ project_id?: string | null }>)
 
   return {
-    invoices,
+    invoices: rows.map((r) => mapRow(r, projectMap)),
     total: count ?? 0,
     page,
     page_size: PAGE_SIZE,
   }
 }
 
-export async function listProjectOptions(
+export type EFaturaData = {
+  por_enviar: InvoiceListItem[]
+  enviadas: InvoiceListItem[]
+}
+
+export async function listEFaturaInvoices(
   tenantId: string,
-): Promise<ProjectOption[]> {
+  role: UserRole,
+  userId: string,
+): Promise<EFaturaData> {
+  const supabase = createClient()
+
+  const baseQuery = () => {
+    let q = supabase
+      .from("invoices")
+      .select(SELECT_FIELDS)
+      .eq("tenant_id", tenantId)
+      .eq("erp_synced", true)
+    if (role === "member") q = q.eq("created_by", userId)
+    return q
+  }
+
+  const [{ data: porEnviarRaw }, { data: enviadasRaw }] = await Promise.all([
+    baseQuery()
+      .eq("at_communicated", false)
+      .neq("status", "rejected")
+      .order("invoice_date", { ascending: false })
+      .limit(100),
+    baseQuery()
+      .eq("at_communicated", true)
+      .order("at_communicated_at", { ascending: false })
+      .limit(50),
+  ])
+
+  const allRows = [
+    ...((porEnviarRaw ?? []) as Array<Record<string, unknown>>),
+    ...((enviadasRaw ?? []) as Array<Record<string, unknown>>),
+  ]
+  const projectMap = await fetchProjectMap(
+    supabase,
+    allRows as Array<{ project_id?: string | null }>,
+  )
+
+  return {
+    por_enviar: (porEnviarRaw ?? []).map((r) =>
+      mapRow(r as Record<string, unknown>, projectMap),
+    ),
+    enviadas: (enviadasRaw ?? []).map((r) =>
+      mapRow(r as Record<string, unknown>, projectMap),
+    ),
+  }
+}
+
+export async function listPorConciliarInvoices(
+  tenantId: string,
+  role: UserRole,
+  userId: string,
+): Promise<InvoiceListItem[]> {
+  const supabase = createClient()
+
+  let query = supabase
+    .from("invoices")
+    .select(SELECT_FIELDS)
+    .eq("tenant_id", tenantId)
+    .is("bank_transaction_id", null)
+    .not("status", "in", '("rejected","paid","matched","reconciled")')
+    .order("invoice_date", { ascending: false })
+    .limit(100)
+
+  if (role === "member") query = query.eq("created_by", userId)
+
+  const { data } = await query
+  const rows = (data ?? []) as Array<Record<string, unknown>>
+  const projectMap = await fetchProjectMap(supabase, rows as Array<{ project_id?: string | null }>)
+  return rows.map((r) => mapRow(r, projectMap))
+}
+
+export async function listProjectOptions(tenantId: string): Promise<ProjectOption[]> {
   const supabase = createClient()
   const { data } = await supabase
     .from("projects")

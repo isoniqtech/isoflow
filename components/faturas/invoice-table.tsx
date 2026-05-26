@@ -57,6 +57,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
             <TableHead className="hidden md:table-cell">Projeto</TableHead>
             <TableHead className="text-right">Valor</TableHead>
             <TableHead>Estado</TableHead>
+            <TableHead className="hidden lg:table-cell">AT</TableHead>
             <TableHead className="hidden sm:table-cell">Origem</TableHead>
           </TableRow>
         </TableHeader>
@@ -137,6 +138,21 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                 <TableCell>
                   <Link href={`/faturas/${inv.id}`} className="block">
                     <StatusBadge status={inv.status} />
+                  </Link>
+                </TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  <Link href={`/faturas/${inv.id}`} className="block">
+                    {inv.at_communicated ? (
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                        Enviada
+                      </span>
+                    ) : inv.erp_synced ? (
+                      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
+                        Pendente
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </Link>
                 </TableCell>
                 <TableCell className="hidden sm:table-cell">
