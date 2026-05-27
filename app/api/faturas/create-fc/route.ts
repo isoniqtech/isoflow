@@ -98,7 +98,11 @@ export async function POST(request: Request) {
       )
     }
 
-    n8nResponse = await res.json()
+    const raw = await res.json()
+    // n8n "When Last Node Finishes" devolve array; fallback para { results: [] }
+    n8nResponse = Array.isArray(raw)
+      ? { results: raw.map((item: Record<string, unknown>) => item.json ?? item) }
+      : raw
   } catch (err) {
     return NextResponse.json(
       { error: `Falha na ligação ao n8n: ${err instanceof Error ? err.message : String(err)}` },
