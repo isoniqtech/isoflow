@@ -26,9 +26,9 @@ export async function POST(request: Request) {
   if (!parsed.success)
     return NextResponse.json({ error: "Invalid body" }, { status: 400 })
 
-  const n8nUrl = process.env.N8N_CREATE_FC_WEBHOOK_URL
+  const n8nUrl = process.env.N8N_WEBHOOK_URL
   if (!n8nUrl)
-    return NextResponse.json({ error: "N8N_CREATE_FC_WEBHOOK_URL não configurado" }, { status: 503 })
+    return NextResponse.json({ error: "N8N_WEBHOOK_URL não configurado" }, { status: 503 })
 
   const supabase = createClient()
 
