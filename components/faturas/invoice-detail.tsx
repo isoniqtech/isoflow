@@ -254,14 +254,6 @@ export function InvoiceDetail({
               Não comunicado AT
             </Badge>
           )}
-          {invoice.needs_review && (
-            <Badge
-              variant="outline"
-              className="bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40"
-            >
-              Precisa Revisão
-            </Badge>
-          )}
         </div>
 
         {editing ? (
