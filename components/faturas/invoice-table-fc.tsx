@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react"
 import Link from "next/link"
-import { AlertTriangle, FileText, FilePlus, Loader2, Mail, MessageCircle, Send, Upload } from "lucide-react"
+import { AlertTriangle, FileText, Loader2, Mail, MessageCircle, Send, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -43,7 +43,6 @@ function ATBadge({ inv }: { inv: InvoiceListItem }) {
 export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
-  const [isSendingErp, startErpTransition] = useTransition()
 
   // Apenas faturas incoming sem FC são elegíveis
   const eligible = invoices.filter(i => i.type === "incoming" && !i.toconline_fc_id)
@@ -59,26 +58,6 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
       const n = new Set(prev)
       v ? n.add(id) : n.delete(id)
       return n
-    })
-  }
-
-  function handleSendErp() {
-    if (!selected.size) return
-    startErpTransition(async () => {
-      try {
-        const res = await fetch("/api/faturas/send-erp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invoice_ids: Array.from(selected) }),
-        })
-        const json = await res.json()
-        if (!res.ok) { toast.error(json.error ?? "Erro ao enviar para ERP"); return }
-        const { sent, skipped, errors } = json as { sent: number; skipped: number; errors: string[] }
-        if (errors.length) toast.warning(`${sent} enviadas, ${errors.length} erros: ${errors[0]}`)
-        else toast.success(`${sent} fatura${sent !== 1 ? "s" : ""} enviada${sent !== 1 ? "s" : ""} ao ERP${skipped ? ` (${skipped} ignoradas)` : ""}`)
-        setSelected(new Set())
-        window.location.reload()
-      } catch { toast.error("Erro de ligação ao servidor") }
     })
   }
 
@@ -116,21 +95,15 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
 
   return (
     <div className="space-y-2">
-      {selected.size > 0 && (
-        <div className="flex items-center justify-between px-1">
-          <p className="text-sm text-muted-foreground">{selected.size} selecionada{selected.size !== 1 ? "s" : ""}</p>
-          <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" onClick={handleSendErp} disabled={isSendingErp || isPending}>
-              {isSendingErp ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              Enviar ao ERP ({selected.size})
-            </Button>
-            <Button size="sm" onClick={handleCreateFC} disabled={isPending || isSendingErp}>
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FilePlus className="mr-2 h-4 w-4" />}
-              Criar FC no Toconline ({selected.size})
-            </Button>
-          </div>
-        </div>
-      )}
+      <div className="flex items-center justify-between px-1 min-h-[32px]">
+        <p className="text-sm text-muted-foreground">
+          {selected.size > 0 ? `${selected.size} selecionada${selected.size !== 1 ? "s" : ""}` : ""}
+        </p>
+        <Button size="sm" onClick={handleCreateFC} disabled={isPending || selected.size === 0}>
+          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+          Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
+        </Button>
+      </div>
 
       <div className="rounded-lg border bg-background overflow-x-auto">
         <Table>
