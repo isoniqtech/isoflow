@@ -26,11 +26,21 @@ export async function POST(request: Request) {
   if (!parsed.success)
     return NextResponse.json({ error: "Invalid body" }, { status: 400 })
 
-  const n8nUrl = process.env.N8N_WEBHOOK_URL
-  if (!n8nUrl)
-    return NextResponse.json({ error: "N8N_WEBHOOK_URL não configurado" }, { status: 503 })
-
   const supabase = createClient()
+
+  // Buscar URL do webhook n8n da integração do tenant (igual ao forwardInvoiceToN8N)
+  const { data: integration } = await supabase
+    .from("tenant_integrations")
+    .select("config")
+    .eq("tenant_id", session.tenant.id)
+    .eq("type", "erp")
+    .eq("provider", "n8n")
+    .eq("is_active", true)
+    .maybeSingle()
+
+  const n8nUrl = (integration?.config as { url?: string } | null)?.url || process.env.N8N_WEBHOOK_URL
+  if (!n8nUrl)
+    return NextResponse.json({ error: "Integração ERP não configurada" }, { status: 503 })
 
   // Fetch invoice data (only invoices that don't have FC yet)
   const { data: invoices, error } = await supabase
