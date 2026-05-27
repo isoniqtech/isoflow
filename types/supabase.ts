@@ -283,6 +283,7 @@ export type Database = {
           erp_document_id: string | null
           erp_synced: boolean | null
           erp_synced_at: string | null
+          toconline_fc_id: string | null
           external_id: string | null
           file_hash: string | null
           file_name: string | null
@@ -334,6 +335,7 @@ export type Database = {
           erp_document_id?: string | null
           erp_synced?: boolean | null
           erp_synced_at?: string | null
+          toconline_fc_id?: string | null
           external_id?: string | null
           file_hash?: string | null
           file_name?: string | null
@@ -385,6 +387,7 @@ export type Database = {
           erp_document_id?: string | null
           erp_synced?: boolean | null
           erp_synced_at?: string | null
+          toconline_fc_id?: string | null
           external_id?: string | null
           file_hash?: string | null
           file_name?: string | null

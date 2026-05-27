@@ -15,6 +15,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/cron") ||
     pathname === "/api/efatura/sync" ||
+    pathname.includes("/update-fc") ||
     pathname.startsWith("/auth/callback") ||
     pathname === "/reset-password"
   ) {

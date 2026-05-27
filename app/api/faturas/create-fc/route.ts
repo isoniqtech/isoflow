@@ -8,13 +8,6 @@ const bodySchema = z.object({
   invoice_ids: z.array(z.string().uuid()).min(1).max(50),
 })
 
-type N8NResult = {
-  isoflow_id: string | null
-  fc_id: string | null
-  fc_number: string | null
-  success: boolean
-}
-
 export async function POST(request: Request) {
   const session = await getCurrentSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
@@ -28,7 +21,6 @@ export async function POST(request: Request) {
 
   const supabase = createClient()
 
-  // Buscar URL do webhook n8n da integração do tenant (igual ao forwardInvoiceToN8N)
   const { data: integration } = await supabase
     .from("tenant_integrations")
     .select("config")
@@ -42,100 +34,47 @@ export async function POST(request: Request) {
   if (!n8nUrl)
     return NextResponse.json({ error: "Integração ERP não configurada" }, { status: 503 })
 
-  // Fetch invoice data (only invoices that don't have FC yet)
   const { data: invoices, error } = await supabase
     .from("invoices")
-    .select(
-      "id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id",
-    )
+    .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id")
     .eq("tenant_id", session.tenant.id)
     .in("id", parsed.data.invoice_ids)
 
   if (error || !invoices?.length)
     return NextResponse.json({ error: "Faturas não encontradas" }, { status: 404 })
 
-  // Filter out invoices that already have a FC
   const pending = invoices.filter((inv) => !inv.toconline_fc_id)
   const alreadyDone = invoices.length - pending.length
 
   if (!pending.length)
-    return NextResponse.json({
-      created: 0,
-      skipped: alreadyDone,
-      errors: [],
-    })
+    return NextResponse.json({ queued: 0, skipped: alreadyDone })
 
-  // Call n8n webhook (synchronous — n8n responds after creating FCs)
-  let n8nResponse: { results: N8NResult[] }
-  try {
-    const res = await fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tenant_id: session.tenant.id,
-        invoices: pending.map((inv) => ({
-          id: inv.id,
-          supplier_name: inv.supplier_name,
-          supplier_nif: inv.supplier_nif,
-          invoice_number: inv.invoice_number,
-          invoice_date: inv.invoice_date,
-          subtotal: inv.subtotal,
-          vat_rate: inv.vat_rate,
-          vat_amount: inv.vat_amount,
-          total: inv.total,
-          description: inv.description,
-          currency: inv.currency ?? "EUR",
-        })),
-      }),
-      signal: AbortSignal.timeout(30_000),
-    })
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://isoflow-seven.vercel.app"
+  const cronSecret = process.env.CRON_SECRET ?? ""
 
-    if (!res.ok) {
-      const text = await res.text()
-      return NextResponse.json(
-        { error: `Erro n8n: ${res.status} — ${text.slice(0, 200)}` },
-        { status: 502 },
-      )
-    }
+  // Fire and forget — n8n chama /api/faturas/{id}/update-fc quando terminar
+  fetch(n8nUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      tenant_id: session.tenant.id,
+      callback_url: `${appUrl}/api/faturas`,
+      callback_secret: cronSecret,
+      invoices: pending.map((inv) => ({
+        id: inv.id,
+        supplier_name: inv.supplier_name,
+        supplier_nif: inv.supplier_nif,
+        invoice_number: inv.invoice_number,
+        invoice_date: inv.invoice_date,
+        subtotal: inv.subtotal,
+        vat_rate: inv.vat_rate,
+        vat_amount: inv.vat_amount,
+        total: inv.total,
+        description: inv.description,
+        currency: inv.currency ?? "EUR",
+      })),
+    }),
+  }).catch(() => null)
 
-    const raw = await res.json()
-    // n8n "When Last Node Finishes" devolve array; fallback para { results: [] }
-    n8nResponse = Array.isArray(raw)
-      ? { results: raw.map((item: Record<string, unknown>) => item.json ?? item) }
-      : raw
-  } catch (err) {
-    return NextResponse.json(
-      { error: `Falha na ligação ao n8n: ${err instanceof Error ? err.message : String(err)}` },
-      { status: 502 },
-    )
-  }
-
-  const results = n8nResponse.results ?? []
-  const errors: string[] = []
-  let created = 0
-
-  for (const result of results) {
-    if (!result.success || !result.fc_id || !result.isoflow_id) {
-      errors.push(`Fatura ${result.isoflow_id ?? "?"}: FC não criada`)
-      continue
-    }
-
-    const { error: updateError } = await supabase
-      .from("invoices")
-      .update({ toconline_fc_id: result.fc_id })
-      .eq("id", result.isoflow_id)
-      .eq("tenant_id", session.tenant.id)
-
-    if (updateError) {
-      errors.push(`Fatura ${result.isoflow_id}: erro ao guardar FC (${updateError.message})`)
-    } else {
-      created++
-    }
-  }
-
-  return NextResponse.json({
-    created,
-    skipped: alreadyDone,
-    errors,
-  })
+  return NextResponse.json({ queued: pending.length, skipped: alreadyDone })
 }
