@@ -13,14 +13,14 @@ export async function POST(request: Request) {
   const tenantId = session.tenant.id
   const now = new Date().toISOString()
 
-  // Buscar faturas incoming com invoice_number preenchido
+  // Buscar faturas incoming com FC do Toconline atribuída
   const { data: invoices } = await supabase
     .from("invoices")
     .select("id, invoice_number, toconline_fc_id")
     .eq("tenant_id", tenantId)
     .eq("type", "incoming")
     .neq("status", "rejected")
-    .not("invoice_number", "is", null)
+    .not("toconline_fc_id", "is", null)
 
   // Buscar docs e-Fatura ainda não associados
   const { data: efaturaDocs } = await supabase
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ matched: 0, message: "Nada para conciliar" })
   }
 
-  // Índice: document_number → efatura_doc id
+  // Índice: document_number (número FC) → efatura_doc id
   const docMap = new Map<string, string>()
   for (const doc of efaturaDocs) {
     if (doc.document_number) docMap.set(doc.document_number.trim(), doc.id)
@@ -43,7 +43,8 @@ export async function POST(request: Request) {
   const errors: string[] = []
 
   for (const inv of invoices) {
-    const efaturaDocId = docMap.get((inv.invoice_number ?? "").trim())
+    // Corresponder pelo número FC do Toconline (toconline_fc_id === document_number)
+    const efaturaDocId = docMap.get((inv.toconline_fc_id ?? "").trim())
     if (!efaturaDocId) continue
 
     const [r1, r2] = await Promise.all([
