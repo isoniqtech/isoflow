@@ -2,7 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Download, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { InvoiceTable } from "@/components/faturas/invoice-table"
+import { InvoiceTableFC } from "@/components/faturas/invoice-table-fc"
 import { InvoiceFilters } from "@/components/faturas/invoice-filters"
 import { InvoicesRealtime } from "@/components/faturas/invoices-realtime"
 import { InvoicesPagination } from "./invoices-pagination"
@@ -15,7 +15,9 @@ import { cn } from "@/lib/utils"
 import type { InvoiceSource, InvoiceStatus } from "@/types"
 
 const VALID_STATUS: Array<InvoiceStatus | "all"> = [
-  "all", "pending", "processing", "matched", "paid", "rejected", "duplicate",
+  "all", "em_sistema", "necessita_revisao", "enviada_erp", "rejected", "duplicate",
+  // legacy
+  "pending", "processing", "matched", "paid", "reconciled",
 ]
 const VALID_SOURCE: Array<InvoiceSource | "all"> = [
   "all", "manual", "whatsapp", "email", "api", "erp",
@@ -72,7 +74,7 @@ export default async function FaturasPage({
   const canCreate = hasPermission(session.role, "faturas", "create")
   const totalPages = Math.max(1, Math.ceil(total / page_size))
 
-  const eFaturaPending = eFaturaPageData.sem_fc.length + eFaturaPageData.com_fc.length
+  const eFaturaPending = eFaturaPageData.invoices.filter(i => !i.efatura_doc_id).length
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "todas", label: "Todas", count: total },
@@ -150,7 +152,7 @@ export default async function FaturasPage({
             value={{ status, source, project_id, needs_review, date_from, date_to }}
             projects={projects}
           />
-          <InvoiceTable invoices={invoices} />
+          <InvoiceTableFC invoices={invoices} />
           {totalPages > 1 && (
             <InvoicesPagination page={page} totalPages={totalPages} total={total} pageSize={page_size} />
           )}

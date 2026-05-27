@@ -40,7 +40,7 @@ export const NAV_ITEMS: NavItem[] = [
   },
   {
     href: "/conciliacao",
-    label: "Conciliação",
+    label: "Conciliação Bancária",
     icon: GitMerge,
     requires: [{ resource: "conciliacao", action: "view_all" }],
   },

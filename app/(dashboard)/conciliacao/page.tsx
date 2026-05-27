@@ -133,7 +133,7 @@ export default async function ConciliacaoPage() {
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Conciliação</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Conciliação Bancária</h1>
           <p className="text-muted-foreground text-sm">
             {invoices.length} faturas sem match · {txs.length} movimentos sem match
             {invoices.length > 0 && (

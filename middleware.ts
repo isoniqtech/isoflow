@@ -14,6 +14,7 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith("/api/webhooks") ||
     pathname.startsWith("/api/cron") ||
+    pathname === "/api/efatura/sync" ||
     pathname.startsWith("/auth/callback") ||
     pathname === "/reset-password"
   ) {

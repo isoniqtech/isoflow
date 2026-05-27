@@ -23,13 +23,16 @@ const VALID_SOURCE: Array<InvoiceSource | "all"> = [
 ]
 
 const STATUS_LABELS: Record<InvoiceStatus, string> = {
-  pending: "Pendente",
-  processing: "A processar",
-  matched: "Conciliada",
-  paid: "Paga",
+  em_sistema: "Em Sistema",
+  necessita_revisao: "Necessita Revisão",
+  enviada_erp: "Enviada ERP",
   rejected: "Rejeitada",
   duplicate: "Duplicada",
-  reconciled: "Conciliada AT",
+  pending: "Em Sistema",
+  processing: "Em Sistema",
+  matched: "Em Sistema",
+  paid: "Em Sistema",
+  reconciled: "Em Sistema",
 }
 
 const SOURCE_LABELS: Record<InvoiceSource, string> = {

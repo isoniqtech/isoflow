@@ -1,12 +1,12 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2, Upload, FileText, X, Sparkles } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -88,6 +88,10 @@ export function InvoiceForm({
 }) {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
+  const [extracting, setExtracting] = useState(false)
+  const [uploadedFile, setUploadedFile] = useState<{ name: string; path: string; type: string } | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -126,6 +130,41 @@ export function InvoiceForm({
     }
   }, [subtotalValue, vatRateValue, totalValue, form])
 
+  async function handleFile(file: File) {
+    if (!file) return
+    setExtracting(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      const res = await fetch("/api/faturas/process", { method: "POST", body: fd })
+      const json = await res.json()
+      if (!res.ok) { toast.error(json.error ?? "Erro no upload"); return }
+
+      setUploadedFile({ name: json.file_name, path: json.file_path, type: json.file_type })
+
+      if (json.ai_error) {
+        toast.warning("Ficheiro guardado mas extração IA falhou. Preenche manualmente.")
+      }
+
+      if (json.extraction) {
+        const e = json.extraction
+        if (e.supplier_name) form.setValue("supplier_name", e.supplier_name)
+        if (e.supplier_nif)  form.setValue("supplier_nif", e.supplier_nif)
+        if (e.invoice_number) form.setValue("invoice_number", e.invoice_number)
+        if (e.invoice_date)  form.setValue("invoice_date", e.invoice_date)
+        if (e.due_date)      form.setValue("due_date", e.due_date)
+        if (e.subtotal != null) form.setValue("subtotal", String(e.subtotal))
+        if (e.vat_rate != null) form.setValue("vat_rate", String(e.vat_rate))
+        if (e.total != null) form.setValue("total", String(e.total))
+        if (e.category)      form.setValue("category", e.category)
+        if (e.description)   form.setValue("description", e.description)
+        if (e.notes)         form.setValue("notes", e.notes)
+        toast.success("Dados extraídos com IA. Revê e confirma.")
+      }
+    } catch { toast.error("Erro de ligação ao servidor") }
+    finally { setExtracting(false) }
+  }
+
   async function onSubmit(values: FormValues) {
     setSubmitting(true)
 
@@ -156,6 +195,11 @@ export function InvoiceForm({
       description: values.description || null,
       notes: values.notes || null,
       needs_review: false,
+      ...(uploadedFile ? {
+        file_path: uploadedFile.path,
+        file_name: uploadedFile.name,
+        file_type: uploadedFile.type,
+      } : {}),
     }
 
     const res = await fetch("/api/faturas", {
@@ -191,6 +235,54 @@ export function InvoiceForm({
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+
+        {/* ── Zona de upload ──────────────────────────────── */}
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f) }}
+          />
+          {!uploadedFile ? (
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f) }}
+              className={`border-2 border-dashed rounded-lg p-8 flex flex-col items-center gap-2 cursor-pointer transition-colors
+                ${dragOver ? "border-primary bg-primary/5" : "border-muted-foreground/30 hover:border-primary/50 hover:bg-muted/30"}`}
+            >
+              {extracting ? (
+                <>
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                  <p className="text-sm font-medium">A extrair dados com IA...</p>
+                </>
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm font-medium">Arrasta ou clica para carregar fatura</p>
+                  <p className="text-xs text-muted-foreground">PDF, JPG, PNG ou WEBP — máx 20MB</p>
+                </>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+              <FileText className="h-5 w-5 text-primary shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{uploadedFile.name}</p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" /> Dados extraídos com IA
+                </p>
+              </div>
+              <button type="button" onClick={() => setUploadedFile(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
         <section className="space-y-4">
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
             Fornecedor

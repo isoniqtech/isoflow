@@ -22,12 +22,16 @@ export type ProjectStatus = "active" | "completed" | "paused" | "cancelled"
 
 export type InvoiceType = "incoming" | "outgoing"
 export type InvoiceStatus =
+  | "em_sistema"
+  | "necessita_revisao"
+  | "enviada_erp"
+  | "rejected"
+  | "duplicate"
+  // legacy (mantidos para compatibilidade com dados antigos)
   | "pending"
   | "processing"
   | "matched"
   | "paid"
-  | "rejected"
-  | "duplicate"
   | "reconciled"
 export type InvoiceSource = "whatsapp" | "email" | "manual" | "api" | "erp"
 export type InvoiceFileType = "pdf" | "jpg" | "jpeg" | "png"

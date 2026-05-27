@@ -74,13 +74,11 @@ export function InvoiceFilters({
         </SelectTrigger>
         <SelectContent>
           <SelectItem value="all">Todos os estados</SelectItem>
-          <SelectItem value="pending">Pendente</SelectItem>
-          <SelectItem value="processing">A processar</SelectItem>
-          <SelectItem value="matched">Conciliada</SelectItem>
-          <SelectItem value="paid">Paga</SelectItem>
+          <SelectItem value="em_sistema">Em Sistema</SelectItem>
+          <SelectItem value="necessita_revisao">Necessita Revisão</SelectItem>
+          <SelectItem value="enviada_erp">Enviada ERP</SelectItem>
           <SelectItem value="rejected">Rejeitada</SelectItem>
           <SelectItem value="duplicate">Duplicada</SelectItem>
-          <SelectItem value="reconciled">Conciliada AT</SelectItem>
         </SelectContent>
       </Select>
 

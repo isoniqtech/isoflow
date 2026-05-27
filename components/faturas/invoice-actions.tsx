@@ -9,6 +9,7 @@ import {
   Send,
   Trash2,
   XCircle,
+  RefreshCw,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -111,18 +112,50 @@ export function InvoiceActions({
     router.refresh()
   }
 
+  async function handleReviewOk() {
+    setBusy(true)
+    const res = await fetch(`/api/faturas/${invoiceId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "em_sistema", needs_review: false }),
+    })
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}))
+      toast.error("Falha ao atualizar estado", { description: errBody.error ?? `HTTP ${res.status}` })
+      setBusy(false)
+      return
+    }
+    toast.success("Fatura revista — volta a Em Sistema")
+    setBusy(false)
+    router.refresh()
+  }
+
   if (!canEdit && !canDelete) return null
 
-  const canMarkPaid = canEdit && status !== "paid" && status !== "rejected"
+  const needsReview = status === "necessita_revisao"
   const canMarkRejected = canEdit && status !== "rejected"
 
   return (
     <div className="flex items-center gap-2">
-      {canMarkPaid && (
+      {canEdit && (
         <Button
           variant="outline"
           size="sm"
-          onClick={() => changeStatus("paid")}
+          onClick={handleResendErp}
+          disabled={resending}
+        >
+          {resending
+            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            : erpSynced ? <RefreshCw className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />
+          }
+          {erpSynced ? "Re-enviar ao ERP" : "Enviar ao ERP"}
+        </Button>
+      )}
+      {needsReview && canEdit && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleReviewOk}
           disabled={busy}
         >
           {busy ? (
@@ -130,7 +163,7 @@ export function InvoiceActions({
           ) : (
             <CheckCircle2 className="mr-2 h-4 w-4" />
           )}
-          Marcar como paga
+          Fatura corrigida
         </Button>
       )}
 
@@ -153,30 +186,13 @@ export function InvoiceActions({
           )}
           {canEdit && status === "rejected" && (
             <DropdownMenuItem
-              onClick={() => changeStatus("pending")}
+              onClick={() => changeStatus("em_sistema")}
               disabled={busy}
               className="cursor-pointer"
             >
               <CheckCircle2 className="mr-2 h-4 w-4" />
-              Reabrir (pendente)
+              Reabrir
             </DropdownMenuItem>
-          )}
-          {canEdit && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={handleResendErp}
-                disabled={resending}
-                className="cursor-pointer"
-              >
-                {resending ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="mr-2 h-4 w-4" />
-                )}
-                {erpSynced ? "Re-enviar para ERP" : "Enviar para ERP"}
-              </DropdownMenuItem>
-            </>
           )}
           {canDelete && (
             <>

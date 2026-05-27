@@ -8,12 +8,15 @@ const invoiceUpdateSchema = z
   .object({
     project_id: z.string().uuid().nullable(),
     status: z.enum([
+      "em_sistema",
+      "necessita_revisao",
+      "enviada_erp",
+      "rejected",
+      "duplicate",
       "pending",
       "processing",
       "matched",
       "paid",
-      "rejected",
-      "duplicate",
       "reconciled",
     ]),
     supplier_name: z.string().trim().max(200).nullable(),
