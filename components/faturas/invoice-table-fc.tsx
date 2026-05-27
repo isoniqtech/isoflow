@@ -72,11 +72,9 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
         })
         const json = await res.json()
         if (!res.ok) { toast.error(json.error ?? "Erro ao criar FC"); return }
-        const { created, skipped, errors } = json as { created: number; skipped: number; errors: string[] }
-        if (errors.length) toast.warning(`${created} FCs criadas, ${errors.length} erros: ${errors[0]}`)
-        else toast.success(`${created} FC${created !== 1 ? "s" : ""} criada${created !== 1 ? "s" : ""} no Toconline${skipped ? ` (${skipped} já tinham FC)` : ""}`)
+        const { queued, skipped } = json as { queued: number; skipped: number }
+        toast.success(`${queued} fatura${queued !== 1 ? "s" : ""} enviada${queued !== 1 ? "s" : ""} ao ERP${skipped ? ` (${skipped} já processadas)` : ""}`)
         setSelected(new Set())
-        window.location.reload()
       } catch { toast.error("Erro de ligação ao servidor") }
     })
   }
