@@ -27,7 +27,7 @@ export async function POST(
   const now = new Date().toISOString()
   const { error } = await admin.from("invoices")
     .update({
-      toconline_fc_id: parsed.data.fc_id,
+      toconline_fc_id: parsed.data.fc_number ?? parsed.data.fc_id,
       erp_synced: true,
       erp_synced_at: now,
       updated_at: now,
