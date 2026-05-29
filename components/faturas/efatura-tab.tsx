@@ -1,12 +1,11 @@
 "use client"
 
 import { useState, useTransition, useMemo } from "react"
-import { CheckCircle2, FileText, Loader2, Link2, Zap } from "lucide-react"
+import { CheckCircle2, FileText, Loader2, Link2, Zap, ChevronDown, Check } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Checkbox } from "@/components/ui/checkbox"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -14,12 +13,9 @@ import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import type { EFaturaPageData, EFaturaDocument, EFaturaInvoiceItem } from "@/lib/queries/efatura-documents"
 import type { InvoiceStatus } from "@/types"
 
-// ── Filtros possíveis para a esquerda ───────────────────────────────────────
-
 type LeftFilter = "sem_at" | "sem_fc" | "todas"
 
-const STATUS_FILTER_OPTIONS: { value: InvoiceStatus | "todas"; label: string }[] = [
-  { value: "todas",             label: "Todos os estados" },
+const STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
   { value: "em_sistema",        label: "Em Sistema" },
   { value: "necessita_revisao", label: "Necessita Revisão" },
   { value: "enviada_erp",       label: "Enviada ERP" },
@@ -27,37 +23,101 @@ const STATUS_FILTER_OPTIONS: { value: InvoiceStatus | "todas"; label: string }[]
   { value: "duplicate",         label: "Duplicada" },
 ]
 
-const AT_STATUS_OPTIONS = [
-  { value: "todas",               label: "Todos os estados" },
-  { value: "Pendente",            label: "Pendente" },
-  { value: "Associada",           label: "Compra Registada" },
-  { value: "compra_registada",    label: "Compra Registada (AT)" },
-  { value: "doc_contabilidade",   label: "Doc. Contabilidade" },
-  { value: "nao_considerado",     label: "Não Considerado" },
+const AT_STATUS_OPTIONS: { value: string; label: string }[] = [
+  { value: "Pendente",          label: "Pendente" },
+  { value: "Associada",         label: "Compra Registada" },
+  { value: "compra_registada",  label: "Compra Registada (AT)" },
+  { value: "doc_contabilidade", label: "Doc. Contabilidade" },
+  { value: "nao_considerado",   label: "Não Considerado" },
 ]
 
-// ── AT status badge ──────────────────────────────────────────────────────────
+// ── Multi-select dropdown ────────────────────────────────────────────────────
+
+function MultiSelectFilter<T extends string>({
+  options,
+  selected,
+  onChange,
+  placeholder,
+}: {
+  options: { value: T; label: string }[]
+  selected: T[]
+  onChange: (next: T[]) => void
+  placeholder: string
+}) {
+  function toggle(value: T) {
+    onChange(
+      selected.includes(value)
+        ? selected.filter(v => v !== value)
+        : [...selected, value]
+    )
+  }
+
+  const label = selected.length === 0
+    ? placeholder
+    : selected.length === 1
+    ? options.find(o => o.value === selected[0])?.label ?? placeholder
+    : `${selected.length} estados`
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium bg-background hover:bg-muted transition-colors">
+          {selected.length > 0 && (
+            <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-primary text-primary-foreground text-[10px] px-1">
+              {selected.length}
+            </span>
+          )}
+          <span className="max-w-32 truncate">{label}</span>
+          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-52 p-1" align="end">
+        {selected.length > 0 && (
+          <>
+            <button
+              onClick={() => onChange([])}
+              className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
+            >
+              Limpar filtros
+            </button>
+            <div className="my-1 border-t" />
+          </>
+        )}
+        {options.map(o => (
+          <label
+            key={o.value}
+            className="flex items-center gap-2.5 px-3 py-1.5 text-xs rounded hover:bg-muted cursor-pointer"
+          >
+            <Checkbox
+              checked={selected.includes(o.value)}
+              onCheckedChange={() => toggle(o.value)}
+              className="h-3.5 w-3.5"
+            />
+            {o.label}
+          </label>
+        ))}
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+// ── Status badges ────────────────────────────────────────────────────────────
 
 function ATStatusBadge({ status }: { status: string | null }) {
-  if (status === "compra_registada" || status === "Associada") {
+  if (status === "compra_registada" || status === "Associada")
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Compra Registada</span>
-  }
-  if (status === "doc_contabilidade") {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">Doc. na Contabilidade</span>
-  }
-  if (status === "nao_considerado") {
+  if (status === "doc_contabilidade")
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">Doc. Contabilidade</span>
+  if (status === "nao_considerado")
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Não considerado</span>
-  }
   return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">{status === "Pendente" ? "Pendente" : "Sem associação"}</span>
 }
 
 function FCBadge({ inv }: { inv: EFaturaInvoiceItem }) {
-  if (inv.efatura_doc_number) {
+  if (inv.efatura_doc_number)
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300 font-mono">{inv.efatura_doc_number}</span>
-  }
-  if (!inv.toconline_fc_id) {
+  if (!inv.toconline_fc_id)
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">FC por criar</span>
-  }
   return <span className="text-xs text-muted-foreground font-mono">FC {inv.toconline_fc_id}</span>
 }
 
@@ -67,8 +127,8 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const { invoices, efatura_docs, efatura_docs_matched } = data
 
   const [leftFilter, setLeftFilter] = useState<LeftFilter>("sem_at")
-  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "todas">("todas")
-  const [docAtFilter, setDocAtFilter] = useState<string>("todas")
+  const [statusFilters, setStatusFilters] = useState<InvoiceStatus[]>([])
+  const [atFilters, setAtFilters] = useState<string[]>([])
   const [showMatched, setShowMatched] = useState(false)
   const [selectedInv, setSelectedInv] = useState<string | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
@@ -79,14 +139,14 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
     let list = invoices
     if (leftFilter === "sem_at") list = list.filter(i => !i.efatura_doc_id)
     else if (leftFilter === "sem_fc") list = list.filter(i => !i.toconline_fc_id)
-    if (statusFilter !== "todas") list = list.filter(i => i.status === statusFilter)
+    if (statusFilters.length > 0) list = list.filter(i => statusFilters.includes(i.status))
     return list
-  }, [invoices, leftFilter, statusFilter])
+  }, [invoices, leftFilter, statusFilters])
 
   const filteredDocs = useMemo(() => {
-    if (docAtFilter === "todas") return efatura_docs
-    return efatura_docs.filter(d => d.at_status === docAtFilter)
-  }, [efatura_docs, docAtFilter])
+    if (atFilters.length === 0) return efatura_docs
+    return efatura_docs.filter(d => d.at_status !== null && atFilters.includes(d.at_status))
+  }, [efatura_docs, atFilters])
 
   function handleAutoMatch() {
     startAuto(async () => {
@@ -122,12 +182,11 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const canMatch = selectedInv !== null && selectedDoc !== null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Filtros esquerda — tipo */}
           {(["sem_at", "sem_fc", "todas"] as LeftFilter[]).map((f) => (
             <button
               key={f}
@@ -148,17 +207,6 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
               </span>
             </button>
           ))}
-          {/* Filtro por estado da fatura */}
-          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as InvoiceStatus | "todas")}>
-            <SelectTrigger className="h-8 text-xs w-44">
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              {STATUS_FILTER_OPTIONS.map(o => (
-                <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -180,9 +228,17 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
 
         {/* Esquerda — faturas */}
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            Faturas ({filteredInvoices.length})
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Faturas ({filteredInvoices.length}{filteredInvoices.length !== invoices.length ? `/${invoices.length}` : ""})
+            </p>
+            <MultiSelectFilter
+              options={STATUS_OPTIONS}
+              selected={statusFilters}
+              onChange={setStatusFilters}
+              placeholder="Estado"
+            />
+          </div>
           {filteredInvoices.length === 0 ? (
             <EmptyState icon={CheckCircle2} title="Tudo conciliado" description="Todas as faturas têm correspondência no e-Fatura." />
           ) : (
@@ -216,18 +272,14 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Documentos e-Fatura AT — por conciliar ({filteredDocs.length}{filteredDocs.length !== efatura_docs.length ? `/${efatura_docs.length}` : ""})
+              Documentos AT ({filteredDocs.length}{filteredDocs.length !== efatura_docs.length ? `/${efatura_docs.length}` : ""})
             </p>
-            <Select value={docAtFilter} onValueChange={setDocAtFilter}>
-              <SelectTrigger className="h-7 text-xs w-44">
-                <SelectValue placeholder="Estado AT" />
-              </SelectTrigger>
-              <SelectContent>
-                {AT_STATUS_OPTIONS.map(o => (
-                  <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <MultiSelectFilter
+              options={AT_STATUS_OPTIONS}
+              selected={atFilters}
+              onChange={setAtFilters}
+              placeholder="Estado AT"
+            />
           </div>
           {filteredDocs.length === 0 ? (
             <EmptyState icon={FileText} title="Sem documentos pendentes" description="Todos os documentos AT já estão conciliados." />
