@@ -1,18 +1,40 @@
 "use client"
 
 import { useState, useTransition, useMemo } from "react"
-import { CheckCircle2, FileText, Loader2, Link2, Zap, FilePlus } from "lucide-react"
+import { CheckCircle2, FileText, Loader2, Link2, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import type { EFaturaPageData, EFaturaDocument, EFaturaInvoiceItem } from "@/lib/queries/efatura-documents"
+import type { InvoiceStatus } from "@/types"
 
 // ── Filtros possíveis para a esquerda ───────────────────────────────────────
 
 type LeftFilter = "sem_at" | "sem_fc" | "todas"
+
+const STATUS_FILTER_OPTIONS: { value: InvoiceStatus | "todas"; label: string }[] = [
+  { value: "todas",             label: "Todos os estados" },
+  { value: "em_sistema",        label: "Em Sistema" },
+  { value: "necessita_revisao", label: "Necessita Revisão" },
+  { value: "enviada_erp",       label: "Enviada ERP" },
+  { value: "rejected",          label: "Rejeitada" },
+  { value: "duplicate",         label: "Duplicada" },
+]
+
+const AT_STATUS_OPTIONS = [
+  { value: "todas",               label: "Todos os estados" },
+  { value: "Pendente",            label: "Pendente" },
+  { value: "Associada",           label: "Compra Registada" },
+  { value: "compra_registada",    label: "Compra Registada (AT)" },
+  { value: "doc_contabilidade",   label: "Doc. Contabilidade" },
+  { value: "nao_considerado",     label: "Não Considerado" },
+]
 
 // ── AT status badge ──────────────────────────────────────────────────────────
 
@@ -45,6 +67,8 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const { invoices, efatura_docs, efatura_docs_matched } = data
 
   const [leftFilter, setLeftFilter] = useState<LeftFilter>("sem_at")
+  const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "todas">("todas")
+  const [docAtFilter, setDocAtFilter] = useState<string>("todas")
   const [showMatched, setShowMatched] = useState(false)
   const [selectedInv, setSelectedInv] = useState<string | null>(null)
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
@@ -52,10 +76,17 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const [isPendingAuto, startAuto] = useTransition()
 
   const filteredInvoices = useMemo(() => {
-    if (leftFilter === "sem_at") return invoices.filter(i => !i.efatura_doc_id)
-    if (leftFilter === "sem_fc") return invoices.filter(i => !i.toconline_fc_id)
-    return invoices
-  }, [invoices, leftFilter])
+    let list = invoices
+    if (leftFilter === "sem_at") list = list.filter(i => !i.efatura_doc_id)
+    else if (leftFilter === "sem_fc") list = list.filter(i => !i.toconline_fc_id)
+    if (statusFilter !== "todas") list = list.filter(i => i.status === statusFilter)
+    return list
+  }, [invoices, leftFilter, statusFilter])
+
+  const filteredDocs = useMemo(() => {
+    if (docAtFilter === "todas") return efatura_docs
+    return efatura_docs.filter(d => d.at_status === docAtFilter)
+  }, [efatura_docs, docAtFilter])
 
   function handleAutoMatch() {
     startAuto(async () => {
@@ -95,8 +126,8 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {/* Filtros esquerda */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filtros esquerda — tipo */}
           {(["sem_at", "sem_fc", "todas"] as LeftFilter[]).map((f) => (
             <button
               key={f}
@@ -117,6 +148,17 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
               </span>
             </button>
           ))}
+          {/* Filtro por estado da fatura */}
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as InvoiceStatus | "todas")}>
+            <SelectTrigger className="h-8 text-xs w-44">
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATUS_FILTER_OPTIONS.map(o => (
+                <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -172,14 +214,26 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
 
         {/* Direita — documentos e-Fatura não conciliados */}
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-            Documentos e-Fatura AT — por conciliar ({efatura_docs.length})
-          </p>
-          {efatura_docs.length === 0 ? (
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              Documentos e-Fatura AT — por conciliar ({filteredDocs.length}{filteredDocs.length !== efatura_docs.length ? `/${efatura_docs.length}` : ""})
+            </p>
+            <Select value={docAtFilter} onValueChange={setDocAtFilter}>
+              <SelectTrigger className="h-7 text-xs w-44">
+                <SelectValue placeholder="Estado AT" />
+              </SelectTrigger>
+              <SelectContent>
+                {AT_STATUS_OPTIONS.map(o => (
+                  <SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {filteredDocs.length === 0 ? (
             <EmptyState icon={FileText} title="Sem documentos pendentes" description="Todos os documentos AT já estão conciliados." />
           ) : (
             <div className="rounded-lg border bg-background divide-y overflow-hidden">
-              {efatura_docs.map((doc) => (
+              {filteredDocs.map((doc) => (
                 <button
                   key={doc.id}
                   onClick={() => setSelectedDoc(selectedDoc === doc.id ? null : doc.id)}
