@@ -122,7 +122,7 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
               <TableHead>Fornecedor</TableHead>
               <TableHead className="hidden md:table-cell">Nº Fatura</TableHead>
               <TableHead className="hidden lg:table-cell">Data</TableHead>
-              <TableHead className="hidden lg:table-cell">FC TOC Online</TableHead>
+              <TableHead className="hidden lg:table-cell">FC ERP</TableHead>
               <TableHead className="hidden md:table-cell">Projeto</TableHead>
               <TableHead className="text-right">Valor</TableHead>
               <TableHead>Estado</TableHead>
