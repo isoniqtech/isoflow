@@ -18,14 +18,13 @@ export async function POST(request: Request) {
 
   const formData = await request.formData()
   const file = formData.get("file") as File | null
-  const accountId = formData.get("account_id") as string | null  // ID da conta configurada
+  const accountId = formData.get("account_id") as string | null
 
   if (!file) return NextResponse.json({ error: "Ficheiro obrigatório" }, { status: 400 })
 
   const fileName = file.name.toLowerCase()
   const buffer = await file.arrayBuffer()
 
-  // Parse conforme o tipo de ficheiro
   let parseResult
   if (fileName.endsWith(".xlsx") || fileName.endsWith(".xls")) {
     parseResult = await parseExcel(buffer)
@@ -35,7 +34,6 @@ export async function POST(request: Request) {
   } else if (fileName.endsWith(".pdf")) {
     parseResult = await parsePdf(buffer)
   } else {
-    // Tenta como CSV se não reconhecer extensão
     const text = new TextDecoder("utf-8").decode(buffer)
     parseResult = await parseCsv(text)
   }
@@ -44,6 +42,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       imported: 0,
       skipped: 0,
+      total: 0,
       errors: parseResult.errors,
       format: parseResult.format,
       rowsScanned: parseResult.rowsScanned,
@@ -77,57 +76,73 @@ export async function POST(request: Request) {
     }
   }
 
-  // Construir registos a inserir com external_id para deduplicação
-  const toInsert = parseResult.transactions.map((tx) => {
-    const externalId = makeExternalId(session.tenant.id, tx.date, tx.amount, tx.description)
-    return {
-      tenant_id: session.tenant.id,
-      account_id: accountId ?? "manual",
-      account_name: accountName,
-      bank_name: bankName,
-      iban,
-      external_id: externalId,
-      date: tx.date,
-      amount: tx.amount,
-      currency: "EUR",
-      description: tx.description,
-      type: tx.amount < 0 ? "debit" : "credit",
-      external_status: "BOOKED",  // importados = definitivos
-    }
-  })
+  // Gerar external_ids para todas as transações parseadas
+  const candidatos = parseResult.transactions.map((tx) => ({
+    externalId: makeExternalId(session.tenant.id, tx.date, tx.amount, tx.description),
+    tx,
+  }))
 
-  // Inserir com upsert — conflito em external_id → ignorar (deduplicação)
+  const allExternalIds = candidatos.map((c) => c.externalId)
+
+  // Verificar quais já existem na DB (deduplicação explícita)
+  const { data: existing } = await supabase
+    .from("bank_transactions")
+    .select("external_id")
+    .eq("tenant_id", session.tenant.id)
+    .in("external_id", allExternalIds)
+
+  const existingSet = new Set((existing ?? []).map((r) => r.external_id))
+
+  const novos = candidatos.filter((c) => !existingSet.has(c.externalId))
+  const skipped = candidatos.length - novos.length
+
+  if (novos.length === 0) {
+    return NextResponse.json({
+      imported: 0,
+      skipped,
+      total: candidatos.length,
+      errors: parseResult.errors,
+      format: parseResult.format,
+      rowsScanned: parseResult.rowsScanned,
+    })
+  }
+
+  // Construir registos para inserir
+  const toInsert = novos.map(({ externalId, tx }) => ({
+    tenant_id: session.tenant.id,
+    account_id: accountId ?? "manual",
+    account_name: accountName,
+    bank_name: bankName,
+    iban,
+    external_id: externalId,
+    date: tx.date,
+    amount: tx.amount,
+    currency: "EUR",
+    description: tx.description,
+    type: tx.amount < 0 ? "debit" : "credit",
+    external_status: "BOOKED",
+  }))
+
+  // Inserir em lotes de 50
   let imported = 0
-  let skipped = 0
   const insertErrors: string[] = [...parseResult.errors]
 
-  // Processar em lotes de 50 para não exceder limites
   const BATCH = 50
   for (let i = 0; i < toInsert.length; i += BATCH) {
     const batch = toInsert.slice(i, i + BATCH)
-    const { data, error } = await supabase
-      .from("bank_transactions")
-      .upsert(batch, {
-        onConflict: "tenant_id,external_id",
-        ignoreDuplicates: true,
-      })
-      .select("id")
+    const { error } = await supabase.from("bank_transactions").insert(batch)
 
     if (error) {
       insertErrors.push(`Erro ao guardar lote ${Math.floor(i / BATCH) + 1}: ${error.message}`)
     } else {
-      // Supabase com ignoreDuplicates não diz quantos foram ignorados,
-      // mas os inseridos são os que voltam no data
-      imported += (data ?? []).length
+      imported += batch.length
     }
   }
-
-  skipped = toInsert.length - imported
 
   return NextResponse.json({
     imported,
     skipped,
-    total: toInsert.length,
+    total: candidatos.length,
     errors: insertErrors,
     format: parseResult.format,
     rowsScanned: parseResult.rowsScanned,
