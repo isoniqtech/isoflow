@@ -218,7 +218,6 @@ export default async function BancoPage({
           counterparty_name: t.counterparty_name,
           counterparty_iban: t.counterparty_iban,
           bank_reference: t.bank_reference,
-          external_status: t.external_status,
         }))}
       />
 

@@ -46,7 +46,6 @@ export type BankTxRow = {
   counterparty_name: string | null
   counterparty_iban: string | null
   bank_reference: string | null
-  external_status: string | null
 }
 
 type SortKey = "date" | "amount" | "description"
@@ -328,28 +327,18 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
                       {formatCurrency(Math.abs(tx.amount))}
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1 items-start">
-                        {tx.invoice_id ? (
-                          <Badge
-                            variant="outline"
-                            className="bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40"
-                          >
-                            Conciliado
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary" className="text-xs">
-                            Por conciliar
-                          </Badge>
-                        )}
-                        {tx.external_status === "PENDING" && (
-                          <Badge
-                            variant="outline"
-                            className="text-[10px] bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40"
-                          >
-                            Pendente
-                          </Badge>
-                        )}
-                      </div>
+                      {tx.invoice_id ? (
+                        <Badge
+                          variant="outline"
+                          className="bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40"
+                        >
+                          Conciliado
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="text-xs">
+                          Por conciliar
+                        </Badge>
+                      )}
                     </TableCell>
                   </TableRow>
                 )
