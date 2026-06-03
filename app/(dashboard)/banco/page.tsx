@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { TransactionTable } from "@/components/banco/transaction-table"
+import { BancoPeriodControls } from "@/components/banco/banco-period-controls"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
 import { AutoReconcileButton } from "@/components/banco/auto-reconcile-button"
 import { getCurrentSession } from "@/lib/queries/current-session"
@@ -13,25 +14,63 @@ import { createClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
 import type { BankTransaction } from "@/types"
 import type { BankAccountConfig } from "@/app/api/integracoes/banco/route"
+import type { BancoPeriod } from "@/components/banco/banco-period-controls"
 
-export default async function BancoPage() {
+const PT_MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
+function getPeriodRange(
+  period: BancoPeriod,
+  month: number,
+  quarter: number,
+  year: number,
+): { start: string; end: string; label: string } {
+  if (period === "mensal") {
+    const lastDay = new Date(year, month, 0).getDate()
+    return {
+      start: `${year}-${String(month).padStart(2, "0")}-01`,
+      end: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+      label: `${PT_MONTHS_SHORT[month - 1]} ${year}`,
+    }
+  }
+  // Trimestral
+  const startMonth = (quarter - 1) * 3 + 1
+  const endMonth = quarter * 3
+  const lastDay = new Date(year, endMonth, 0).getDate()
+  const quarterLabels = ["Jan–Mar", "Abr–Jun", "Jul–Set", "Out–Dez"]
+  return {
+    start: `${year}-${String(startMonth).padStart(2, "0")}-01`,
+    end: `${year}-${String(endMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+    label: `T${quarter} ${year} (${quarterLabels[quarter - 1]})`,
+  }
+}
+
+export default async function BancoPage({
+  searchParams,
+}: {
+  searchParams: { period?: string; month?: string; quarter?: string; year?: string }
+}) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
   if (!hasPermission(session.role, "banco", "view_all")) {
     redirect("/")
   }
 
-  const supabase = createClient()
-
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth() + 1
-  const monthStart = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`
-  const lastDay = new Date(currentYear, currentMonth, 0).getDate()
-  const monthEnd = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+  const currentQuarter = Math.ceil(currentMonth / 3)
+
+  const period: BancoPeriod =
+    searchParams.period === "trimestral" ? "trimestral" : "mensal"
+  const year = parseInt(searchParams.year ?? String(currentYear), 10) || currentYear
+  const month = Math.min(12, Math.max(1, parseInt(searchParams.month ?? String(currentMonth), 10) || currentMonth))
+  const quarter = Math.min(4, Math.max(1, parseInt(searchParams.quarter ?? String(currentQuarter), 10) || currentQuarter))
+
+  const { start, end, label } = getPeriodRange(period, month, quarter, year)
+
+  const supabase = createClient()
 
   const [{ data: bankingIntegration }, { data: transactions }] = await Promise.all([
-    // Ler contas manuais configuradas em Integrações
     supabase
       .from("tenant_integrations")
       .select("config, is_active")
@@ -47,7 +86,7 @@ export default async function BancoPage() {
       .limit(1000),
   ])
 
-  // Contas configuradas manualmente em Configurações → Integrações
+  // Contas configuradas em Integrações
   const configuredAccounts: BankAccountConfig[] = Array.isArray(
     (bankingIntegration?.config as Record<string, unknown> | null)?.accounts,
   )
@@ -58,15 +97,13 @@ export default async function BancoPage() {
 
   const txList = (transactions ?? []) as BankTransaction[]
 
-  // KPIs: mês atual
-  const monthTx = txList.filter((t) => t.date >= monthStart && t.date <= monthEnd)
-  const monthTotal = monthTx.length
-  const monthMatched = monthTx.filter((t) => t.invoice_id).length
-  const monthUnmatched = monthTotal - monthMatched
-  const matchedPct = monthTotal > 0 ? Math.round((monthMatched / monthTotal) * 100) : 0
-  const unmatchedPct = monthTotal > 0 ? Math.round((monthUnmatched / monthTotal) * 100) : 0
-
-  const PT_MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+  // KPIs para o período selecionado
+  const periodTx = txList.filter((t) => t.date >= start && t.date <= end)
+  const periodTotal = periodTx.length
+  const periodMatched = periodTx.filter((t) => t.invoice_id).length
+  const periodUnmatched = periodTotal - periodMatched
+  const matchedPct = periodTotal > 0 ? Math.round((periodMatched / periodTotal) * 100) : 0
+  const unmatchedPct = periodTotal > 0 ? Math.round((periodUnmatched / periodTotal) * 100) : 0
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -79,7 +116,7 @@ export default async function BancoPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Banco</h1>
           <p className="text-muted-foreground text-sm">
-            {monthTotal.toLocaleString("pt-PT")} movimentos em {PT_MONTHS[currentMonth - 1]} · {monthMatched} conciliados
+            {periodTotal.toLocaleString("pt-PT")} movimentos · {periodMatched} conciliados — {label}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -91,7 +128,7 @@ export default async function BancoPage() {
         </div>
       </div>
 
-      {/* Empty state — sem bancos configurados */}
+      {/* Empty state */}
       {!hasConfiguredAccounts && (
         <Card>
           <CardContent className="p-6 flex flex-col items-center text-center">
@@ -102,48 +139,55 @@ export default async function BancoPage() {
               a importar extratos e conciliar movimentos.
             </p>
             <Button asChild size="sm">
-              <Link href="/configuracoes/integracoes">
-                Ir para Integrações
-              </Link>
+              <Link href="/configuracoes/integracoes">Ir para Integrações</Link>
             </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* KPI cards — só quando há contas configuradas */}
+      {/* KPIs com selector de período */}
       {hasConfiguredAccounts && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Movimentos</p>
-              <p className="text-2xl font-semibold tabular-nums">{monthTotal}</p>
-              <p className="text-xs text-muted-foreground">
-                {PT_MONTHS[currentMonth - 1]} {currentYear}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Conciliados</p>
-              <p className="text-2xl font-semibold tabular-nums">{monthMatched}</p>
-              <p className="text-xs text-muted-foreground">
-                {monthTotal > 0 ? `${matchedPct}% do total` : "—"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">Por conciliar</p>
-              <p className="text-2xl font-semibold tabular-nums">{monthUnmatched}</p>
-              <p className="text-xs text-muted-foreground">
-                {monthTotal > 0 ? `${unmatchedPct}% do total` : "—"}
-              </p>
-            </CardContent>
-          </Card>
+        <div className="space-y-3">
+          <Suspense>
+            <BancoPeriodControls
+              period={period}
+              month={month}
+              quarter={quarter}
+              year={year}
+            />
+          </Suspense>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Movimentos</p>
+                <p className="text-2xl font-semibold tabular-nums">{periodTotal}</p>
+                <p className="text-xs text-muted-foreground">{label}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Conciliados</p>
+                <p className="text-2xl font-semibold tabular-nums">{periodMatched}</p>
+                <p className="text-xs text-muted-foreground">
+                  {periodTotal > 0 ? `${matchedPct}% do total` : "—"}
+                </p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <p className="text-xs text-muted-foreground uppercase tracking-wide">Por conciliar</p>
+                <p className="text-2xl font-semibold tabular-nums">{periodUnmatched}</p>
+                <p className="text-xs text-muted-foreground">
+                  {periodTotal > 0 ? `${unmatchedPct}% do total` : "—"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
-      {/* Contas ligadas — vindas das Integrações */}
+      {/* Contas configuradas */}
       {hasConfiguredAccounts && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-muted-foreground">Contas configuradas:</span>
@@ -160,7 +204,7 @@ export default async function BancoPage() {
         </div>
       )}
 
-      {/* Tabela de transações */}
+      {/* Tabela de transações (filtros próprios independentes) */}
       <TransactionTable
         rows={txList.map((t) => ({
           id: t.id,
