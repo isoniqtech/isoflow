@@ -205,9 +205,9 @@ export default async function BancoPage({
         )}
       </div>
 
-      {/* Tabela de transações — único elemento com scroll */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-6 lg:px-8 py-4">
-        <div className="max-w-7xl mx-auto space-y-3">
+      {/* Tabela de transações — flex-1 passa a altura ao componente */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 md:px-6 lg:px-8 py-4">
+        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full">
           <TransactionTable
             rows={txList.map((t) => ({
               id: t.id,
@@ -226,7 +226,7 @@ export default async function BancoPage({
             }))}
           />
 
-          <p className="text-xs text-muted-foreground">
+          <p className="flex-shrink-0 pt-2 text-xs text-muted-foreground">
             <Link href="/conciliacao" className="hover:underline">
               Ir para a página de conciliação →
             </Link>

@@ -162,9 +162,9 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
   }
 
   return (
-    <div className="space-y-3">
-      {/* ── Filters ── */}
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex-1 min-h-0 flex flex-col">
+      {/* ── Filters — estáticos ── */}
+      <div className="flex-shrink-0 flex flex-wrap items-center gap-2 pb-3">
         {/* Year */}
         <Select value={filterYear} onValueChange={setFilterYear} disabled={hasDateRangeFilter}>
           <SelectTrigger className="h-8 w-24 text-xs">
@@ -232,15 +232,15 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
         </span>
       </div>
 
-      {/* ── Table ── */}
+      {/* ── Table — só o tbody faz scroll ── */}
       {filtered.length === 0 ? (
-        <div className="border rounded-lg p-8 flex flex-col items-center text-center bg-background">
+        <div className="flex-1 border rounded-lg p-8 flex flex-col items-center text-center bg-background">
           <p className="text-sm text-muted-foreground">Sem movimentos para os filtros selecionados.</p>
         </div>
       ) : (
-        <div className="rounded-lg border bg-background overflow-x-auto">
+        <div className="flex-1 min-h-0 rounded-lg border bg-background overflow-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-10" />
                 <TableHead
