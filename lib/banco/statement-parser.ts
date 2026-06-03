@@ -220,10 +220,12 @@ export async function parseCsv(text: string): Promise<ParseResult> {
 
 export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string }>
-    const data = await pdfParse(Buffer.from(buffer))
-    const text = data.text
+    const { PDFParse } = await import("pdf-parse")
+    /* eslint-disable */
+    const parser = new (PDFParse as any)({ buffer: Buffer.from(buffer) })
+    const result = await parser.getText()
+    const text = (result as { text: string }).text
+    /* eslint-enable */
 
     // Split by lines and try to find transaction rows
     const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean)
