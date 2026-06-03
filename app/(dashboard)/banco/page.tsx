@@ -8,15 +8,39 @@ import { Card, CardContent } from "@/components/ui/card"
 import { TransactionTable } from "@/components/banco/transaction-table"
 import {
   BankConnectButton,
-  BankSyncButton,
   BankCallbackToast,
 } from "@/components/banco/bank-connect"
 import { AutoReconcileButton } from "@/components/banco/auto-reconcile-button"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { createClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
-import { formatCurrency, formatDate } from "@/lib/utils/portugal"
+import { formatDate } from "@/lib/utils/portugal"
 import type { BankTransaction } from "@/types"
+
+const ACCOUNT_NAME_PT: Record<string, string> = {
+  "current account": "Ordem",
+  "checking account": "Ordem",
+  "checking": "Ordem",
+  "savings account": "Poupança",
+  "savings": "Poupança",
+  "credit card": "Cartão",
+  "business current account": "Empresarial",
+  "business account": "Empresarial",
+}
+
+function formatAccountLabel(
+  bankName: string | null,
+  accountName: string | null,
+  existingLabels: string[],
+): string {
+  const bank = bankName?.trim() || "Banco"
+  const normalized = (accountName ?? "").trim().toLowerCase()
+  const translated = ACCOUNT_NAME_PT[normalized] ?? accountName?.trim() ?? "Conta"
+  const label = `${bank} ${translated}`
+  // If this exact label already exists, append a counter
+  const count = existingLabels.filter((l) => l === label || l.startsWith(label + " ")).length
+  return count > 0 ? `${label} ${count + 1}` : label
+}
 
 export default async function BancoPage() {
   const session = await getCurrentSession()
@@ -26,6 +50,13 @@ export default async function BancoPage() {
   }
 
   const supabase = createClient()
+
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1
+  const monthStart = `${currentYear}-${String(currentMonth).padStart(2, "0")}-01`
+  const lastDay = new Date(currentYear, currentMonth, 0).getDate()
+  const monthEnd = `${currentYear}-${String(currentMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
 
   const [{ data: integrationRow }, { data: transactions }] = await Promise.all([
     supabase
@@ -39,25 +70,44 @@ export default async function BancoPage() {
       .select("*")
       .eq("tenant_id", session.tenant.id)
       .order("date", { ascending: false })
-      .limit(200),
+      .limit(1000),
   ])
 
   const txList = (transactions ?? []) as BankTransaction[]
-  const totalCount = txList.length
-  const matchedCount = txList.filter((t) => t.invoice_id).length
-  const unmatchedCount = totalCount - matchedCount
-  const unmatchedSum = txList
-    .filter((t) => !t.invoice_id)
-    .reduce((sum, t) => sum + Math.abs(Number(t.amount ?? 0)), 0)
 
-  const config = (integrationRow?.config ?? {}) as
-    | { accounts?: Array<{ id: string; name: string; iban?: string | null }> }
-    | null
+  // KPIs: current month only
+  const monthTx = txList.filter((t) => t.date >= monthStart && t.date <= monthEnd)
+  const monthTotal = monthTx.length
+  const monthMatched = monthTx.filter((t) => t.invoice_id).length
+  const monthUnmatched = monthTotal - monthMatched
+  const matchedPct = monthTotal > 0 ? Math.round((monthMatched / monthTotal) * 100) : 0
+  const unmatchedPct = monthTotal > 0 ? Math.round((monthUnmatched / monthTotal) * 100) : 0
 
-  const accounts = config?.accounts ?? []
+  // Derive unique connected accounts from transactions
+  const seenAccounts = new Map<string, { bank_name: string | null; account_name: string | null; iban: string | null }>()
+  for (const t of txList) {
+    const key = `${t.account_id ?? t.iban ?? t.account_name}`
+    if (!seenAccounts.has(key)) {
+      seenAccounts.set(key, {
+        bank_name: t.bank_name,
+        account_name: t.account_name,
+        iban: t.iban,
+      })
+    }
+  }
+
+  const accountLabels: string[] = []
+  const accountsDisplay = Array.from(seenAccounts.values()).map((a) => {
+    const label = formatAccountLabel(a.bank_name, a.account_name, accountLabels)
+    accountLabels.push(label)
+    return { label, iban: a.iban }
+  })
+
   const isConnected = Boolean(
     integrationRow?.is_active && !integrationRow?.sync_error,
   )
+
+  const PT_MONTHS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
@@ -69,8 +119,7 @@ export default async function BancoPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Banco</h1>
           <p className="text-muted-foreground text-sm">
-            {totalCount.toLocaleString("pt-PT")} movimentos · {matchedCount}{" "}
-            conciliados
+            {monthTotal.toLocaleString("pt-PT")} movimentos em {PT_MONTHS[currentMonth - 1]} · {monthMatched} conciliados
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -79,11 +128,7 @@ export default async function BancoPage() {
             Importar Extrato
           </Button>
           {isConnected ? (
-            <>
-              <BankSyncButton />
-              <AutoReconcileButton />
-              <BankConnectButton variant="outline" label="Religar" />
-            </>
+            <AutoReconcileButton />
           ) : (
             <>
               <BankConnectButton label="Ligar banco PT" market="PT" />
@@ -126,57 +171,43 @@ export default async function BancoPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                Movimentos
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {totalCount}
-              </p>
-              <p className="text-xs text-muted-foreground">Últimos 90 dias</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                Conciliados
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {matchedCount}
-              </p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Movimentos</p>
+              <p className="text-2xl font-semibold tabular-nums">{monthTotal}</p>
               <p className="text-xs text-muted-foreground">
-                {totalCount > 0
-                  ? `${Math.round((matchedCount / totalCount) * 100)}% do total`
-                  : "—"}
+                {PT_MONTHS[currentMonth - 1]} {currentYear}
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="p-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                Sem match
-              </p>
-              <p className="text-2xl font-semibold tabular-nums">
-                {unmatchedCount}
-              </p>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Conciliados</p>
+              <p className="text-2xl font-semibold tabular-nums">{monthMatched}</p>
               <p className="text-xs text-muted-foreground">
-                {formatCurrency(unmatchedSum)}
+                {monthTotal > 0 ? `${matchedPct}% do total` : "—"}
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">Por conciliar</p>
+              <p className="text-2xl font-semibold tabular-nums">{monthUnmatched}</p>
+              <p className="text-xs text-muted-foreground">
+                {monthTotal > 0 ? `${unmatchedPct}% do total` : "—"}
               </p>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {accounts.length > 0 && (
+      {accountsDisplay.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">
-            Contas ligadas:
-          </span>
-          {accounts.map((a) => (
-            <Badge key={a.id} variant="secondary" className="font-normal">
-              {a.name}
+          <span className="text-xs text-muted-foreground">Contas ligadas:</span>
+          {accountsDisplay.map((a, i) => (
+            <Badge key={i} variant="secondary" className="font-normal">
+              {a.label}
               {a.iban && (
-                <span className="ml-2 font-mono text-muted-foreground">
-                  {a.iban}
+                <span className="ml-2 font-mono text-muted-foreground text-[10px]">
+                  {a.iban.slice(-8)}
                 </span>
               )}
             </Badge>
@@ -195,6 +226,7 @@ export default async function BancoPage() {
           date: t.date,
           description: t.description,
           account_name: t.account_name,
+          bank_name: t.bank_name,
           iban: t.iban,
           amount: Number(t.amount ?? 0),
           currency: t.currency ?? "EUR",
