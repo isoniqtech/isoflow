@@ -13,7 +13,7 @@ export function Sidebar({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        "h-full w-60 border-r bg-background flex flex-col",
+        "fixed inset-y-0 left-0 z-30 w-60 border-r bg-background flex flex-col",
         className,
       )}
     >

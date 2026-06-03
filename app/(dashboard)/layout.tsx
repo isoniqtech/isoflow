@@ -15,12 +15,10 @@ export default async function DashboardLayout({
 
   return (
     <TenantProvider value={session}>
-      <div className="h-dvh flex overflow-hidden">
-        <Sidebar className="hidden md:flex" />
-        <div className="flex-1 flex flex-col min-w-0">
-          <Header />
-          <main className="flex-1 overflow-auto bg-muted/30">{children}</main>
-        </div>
+      <Sidebar className="hidden md:flex" />
+      <div className="flex flex-col min-h-dvh md:pl-60">
+        <Header />
+        <main className="flex-1 overflow-auto bg-muted/30">{children}</main>
       </div>
     </TenantProvider>
   )
