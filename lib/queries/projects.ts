@@ -3,6 +3,7 @@ import type {
   ProjectStatus,
   ProjectType,
   UserRole,
+  VatRegime,
 } from "@/types"
 
 export type ProjectListItem = {
@@ -33,10 +34,11 @@ export async function listProjects(
     role: UserRole
     userId: string
     filter?: ProjectsFilter
+    vatRegime?: VatRegime
   },
 ): Promise<ProjectListItem[]> {
   const supabase = createClient()
-  const { role, userId, filter } = options
+  const { role, userId, filter, vatRegime = "normal" } = options
 
   let query = supabase
     .from("projects")
@@ -70,7 +72,7 @@ export async function listProjects(
   const ids = list.map((p) => p.id)
   const { data: invoices } = await supabase
     .from("invoices")
-    .select("project_id, total")
+    .select("project_id, total, subtotal")
     .eq("tenant_id", tenantId)
     .in("project_id", ids)
     .neq("status", "rejected")
@@ -79,7 +81,11 @@ export async function listProjects(
   for (const row of invoices ?? []) {
     if (!row.project_id) continue
     const t = totals.get(row.project_id) ?? { spent: 0, count: 0 }
-    t.spent += Number(row.total ?? 0)
+    // VAT-aware: if company is exempt, use subtotal (exclude VAT from cost)
+    const amount = vatRegime === "isento"
+      ? Number(row.subtotal ?? row.total ?? 0)
+      : Number(row.total ?? 0)
+    t.spent += amount
     t.count += 1
     totals.set(row.project_id, t)
   }

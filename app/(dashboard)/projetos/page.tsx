@@ -42,10 +42,13 @@ export default async function ProjetosPage({
       ? (searchParams.type as ProjectType | "all")
       : "all"
 
+  const vatRegime = ((session.tenant as Record<string, unknown>).vat_regime as import("@/types").VatRegime) ?? "normal"
+
   const projects = await listProjects(session.tenant.id, {
     role: session.role,
     userId: session.user.id,
     filter: { status: statusFilter, type: typeFilter },
+    vatRegime,
   })
 
   const canCreate = hasPermission(session.role, "projetos", "create")

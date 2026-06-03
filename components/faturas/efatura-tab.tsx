@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useTransition, useMemo } from "react"
-import { CheckCircle2, FileText, Loader2, Link2, Zap, ChevronDown, Check } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { FileText, Loader2, RefreshCw, ChevronDown } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -10,18 +11,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
-import type { EFaturaPageData, EFaturaDocument, EFaturaInvoiceItem } from "@/lib/queries/efatura-documents"
-import type { InvoiceStatus } from "@/types"
-
-type LeftFilter = "sem_at" | "sem_fc" | "todas"
-
-const STATUS_OPTIONS: { value: InvoiceStatus; label: string }[] = [
-  { value: "em_sistema",        label: "Em Sistema" },
-  { value: "necessita_revisao", label: "Necessita Revisão" },
-  { value: "enviada_erp",       label: "Enviada ERP" },
-  { value: "rejected",          label: "Rejeitada" },
-  { value: "duplicate",         label: "Duplicada" },
-]
+import type { EFaturaPageData, EFaturaDocument } from "@/lib/queries/efatura-documents"
 
 const AT_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "Pendente",          label: "Pendente" },
@@ -30,8 +20,6 @@ const AT_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "doc_contabilidade", label: "Doc. Contabilidade" },
   { value: "nao_considerado",   label: "Não Considerado" },
 ]
-
-// ── Multi-select dropdown ────────────────────────────────────────────────────
 
 function MultiSelectFilter<T extends string>({
   options,
@@ -101,8 +89,6 @@ function MultiSelectFilter<T extends string>({
   )
 }
 
-// ── Status badges ────────────────────────────────────────────────────────────
-
 function ATStatusBadge({ status }: { status: string | null }) {
   if (status === "compra_registada" || status === "Associada")
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Compra Registada</span>
@@ -113,208 +99,94 @@ function ATStatusBadge({ status }: { status: string | null }) {
   return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">{status === "Pendente" ? "Pendente" : "Sem associação"}</span>
 }
 
-function FCBadge({ inv }: { inv: EFaturaInvoiceItem }) {
-  if (inv.efatura_doc_number)
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300 font-mono">{inv.efatura_doc_number}</span>
-  if (!inv.toconline_fc_id)
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">FC por criar</span>
-  return <span className="text-xs text-muted-foreground font-mono">FC {inv.toconline_fc_id}</span>
-}
-
-// ── Main component ───────────────────────────────────────────────────────────
-
 export function EFaturaTab({ data }: { data: EFaturaPageData }) {
-  const { invoices, efatura_docs, efatura_docs_matched } = data
+  const { efatura_docs, efatura_docs_matched } = data
+  const router = useRouter()
 
-  const [leftFilter, setLeftFilter] = useState<LeftFilter>("sem_at")
-  const [statusFilters, setStatusFilters] = useState<InvoiceStatus[]>([])
   const [atFilters, setAtFilters] = useState<string[]>([])
   const [showMatched, setShowMatched] = useState(false)
-  const [selectedInv, setSelectedInv] = useState<string | null>(null)
-  const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
-  const [isPendingMatch, startMatch] = useTransition()
-  const [isPendingAuto, startAuto] = useTransition()
-
-  const filteredInvoices = useMemo(() => {
-    let list = invoices
-    if (leftFilter === "sem_at") list = list.filter(i => !i.efatura_doc_id)
-    else if (leftFilter === "sem_fc") list = list.filter(i => !i.toconline_fc_id)
-    if (statusFilters.length > 0) list = list.filter(i => statusFilters.includes(i.status))
-    return list
-  }, [invoices, leftFilter, statusFilters])
+  const [isPendingRefresh, startRefresh] = useTransition()
 
   const filteredDocs = useMemo(() => {
     if (atFilters.length === 0) return efatura_docs
     return efatura_docs.filter(d => d.at_status !== null && atFilters.includes(d.at_status))
   }, [efatura_docs, atFilters])
 
-  function handleAutoMatch() {
-    startAuto(async () => {
+  function handleRefresh() {
+    startRefresh(async () => {
       try {
-        const res = await fetch("/api/efatura/auto-match", { method: "POST" })
+        const res = await fetch("/api/efatura/sync", { method: "POST" })
         const json = await res.json()
-        if (!res.ok) { toast.error(json.error ?? "Erro ao auto-conciliar"); return }
-        toast.success(`${json.matched} fatura${json.matched !== 1 ? "s" : ""} conciliada${json.matched !== 1 ? "s" : ""} automaticamente`)
-        window.location.reload()
-      } catch { toast.error("Erro de ligação ao servidor") }
-    })
-  }
-
-  function handleMatch() {
-    if (!selectedInv || !selectedDoc) return
-    startMatch(async () => {
-      try {
-        const res = await fetch("/api/efatura/match", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invoice_id: selectedInv, efatura_doc_id: selectedDoc }),
+        if (!res.ok) {
+          toast.error(json.error ?? "Erro ao atualizar e-Fatura")
+          return
+        }
+        toast.success("e-Fatura atualizada", {
+          description: json.synced !== undefined ? `${json.synced} documento(s) sincronizado(s)` : undefined,
         })
-        const json = await res.json()
-        if (!res.ok) { toast.error(json.error ?? "Erro ao associar"); return }
-        toast.success("Associação guardada.")
-        setSelectedInv(null)
-        setSelectedDoc(null)
-        window.location.reload()
-      } catch { toast.error("Erro de ligação ao servidor") }
+        router.refresh()
+      } catch {
+        toast.error("Erro de ligação ao servidor")
+      }
     })
   }
-
-  const canMatch = selectedInv !== null && selectedDoc !== null
 
   return (
     <div className="space-y-4">
 
       {/* ── Toolbar ──────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          {(["sem_at", "sem_fc", "todas"] as LeftFilter[]).map((f) => (
-            <button
-              key={f}
-              onClick={() => setLeftFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                leftFilter === f
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {f === "sem_at" ? "Sem AT" : f === "sem_fc" ? "Sem FC" : "Todas"}
-              <span className="ml-1.5 opacity-70">
-                ({f === "sem_at"
-                  ? invoices.filter(i => !i.efatura_doc_id).length
-                  : f === "sem_fc"
-                  ? invoices.filter(i => !i.toconline_fc_id).length
-                  : invoices.length})
-              </span>
-            </button>
-          ))}
-        </div>
-
+        <p className="text-sm text-muted-foreground">
+          {filteredDocs.length} documento{filteredDocs.length !== 1 ? "s" : ""} AT pendente{filteredDocs.length !== 1 ? "s" : ""}
+          {filteredDocs.length !== efatura_docs.length && ` (${efatura_docs.length} total)`}
+        </p>
         <div className="flex items-center gap-2">
-          {canMatch && (
-            <Button size="sm" onClick={handleMatch} disabled={isPendingMatch}>
-              {isPendingMatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Link2 className="mr-2 h-4 w-4" />}
-              Associar
-            </Button>
-          )}
-          <Button size="sm" variant="outline" onClick={handleAutoMatch} disabled={isPendingAuto}>
-            {isPendingAuto ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
-            Auto-conciliar
+          <MultiSelectFilter
+            options={AT_STATUS_OPTIONS}
+            selected={atFilters}
+            onChange={setAtFilters}
+            placeholder="Estado AT"
+          />
+          <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isPendingRefresh}>
+            {isPendingRefresh
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              : <RefreshCw className="mr-2 h-4 w-4" />
+            }
+            Atualizar
           </Button>
         </div>
       </div>
 
-      {/* ── Split view ───────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-
-        {/* Esquerda — faturas */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Faturas ({filteredInvoices.length}{filteredInvoices.length !== invoices.length ? `/${invoices.length}` : ""})
-            </p>
-            <MultiSelectFilter
-              options={STATUS_OPTIONS}
-              selected={statusFilters}
-              onChange={setStatusFilters}
-              placeholder="Estado"
-            />
-          </div>
-          {filteredInvoices.length === 0 ? (
-            <EmptyState icon={CheckCircle2} title="Tudo conciliado" description="Todas as faturas têm correspondência no e-Fatura." />
-          ) : (
-            <div className="rounded-lg border bg-background divide-y overflow-hidden">
-              {filteredInvoices.map((inv) => (
-                <button
-                  key={inv.id}
-                  onClick={() => setSelectedInv(selectedInv === inv.id ? null : inv.id)}
-                  className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors ${selectedInv === inv.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{inv.supplier_name ?? "Fornecedor desconhecido"}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{inv.invoice_number ?? "—"}</p>
-                    </div>
-                    <div className="text-right shrink-0 space-y-1">
-                      <p className="text-sm font-medium tabular-nums">{inv.total !== null ? formatCurrency(inv.total) : "—"}</p>
-                      <FCBadge inv={inv} />
-                    </div>
-                  </div>
-                  {inv.invoice_date && (
-                    <p className="text-xs text-muted-foreground mt-1">{formatDate(inv.invoice_date)}</p>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Direita — documentos e-Fatura não conciliados */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              Documentos AT ({filteredDocs.length}{filteredDocs.length !== efatura_docs.length ? `/${efatura_docs.length}` : ""})
-            </p>
-            <MultiSelectFilter
-              options={AT_STATUS_OPTIONS}
-              selected={atFilters}
-              onChange={setAtFilters}
-              placeholder="Estado AT"
-            />
-          </div>
-          {filteredDocs.length === 0 ? (
-            <EmptyState icon={FileText} title="Sem documentos pendentes" description="Todos os documentos AT já estão conciliados." />
-          ) : (
-            <div className="rounded-lg border bg-background divide-y overflow-hidden">
+      {/* ── Documentos AT ──────────────────────────────────── */}
+      {filteredDocs.length === 0 ? (
+        <EmptyState icon={FileText} title="Sem documentos pendentes" description="Todos os documentos AT já estão associados a faturas." />
+      ) : (
+        <div className="rounded-lg border bg-background overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fornecedor</TableHead>
+                <TableHead className="hidden md:table-cell">Nº Documento</TableHead>
+                <TableHead className="hidden md:table-cell">Data</TableHead>
+                <TableHead className="text-right">Valor</TableHead>
+                <TableHead>Estado AT</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredDocs.map((doc) => (
-                <button
-                  key={doc.id}
-                  onClick={() => setSelectedDoc(selectedDoc === doc.id ? null : doc.id)}
-                  className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors ${selectedDoc === doc.id ? "bg-primary/5 border-l-2 border-l-primary" : ""}`}
-                >
-                  <div className="flex justify-between items-start gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-sm truncate">{doc.supplier_name ?? "Fornecedor desconhecido"}</p>
-                      <p className="text-xs text-muted-foreground font-mono">{doc.document_number ?? "—"}</p>
-                    </div>
-                    <div className="text-right shrink-0 space-y-1">
-                      <p className="text-sm font-medium tabular-nums">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</p>
-                      <ATStatusBadge status={doc.at_status} />
-                    </div>
-                  </div>
-                  {doc.document_date && (
-                    <p className="text-xs text-muted-foreground mt-1">{formatDate(doc.document_date)}</p>
-                  )}
-                </button>
+                <TableRow key={doc.id}>
+                  <TableCell>
+                    <p className="font-medium truncate">{doc.supplier_name ?? "Fornecedor desconhecido"}</p>
+                    {doc.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{doc.supplier_nif}</p>}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
+                  <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
+                  <TableCell><ATStatusBadge status={doc.at_status} /></TableCell>
+                </TableRow>
               ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {canMatch && (
-        <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/10 text-sm text-amber-900 dark:text-amber-200 flex items-center gap-2">
-          <Link2 className="h-4 w-4 shrink-0" />
-          <span>Após associar, lembra-te de registar a compra manualmente no Toconline.</span>
+            </TableBody>
+          </Table>
         </div>
       )}
 

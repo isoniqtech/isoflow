@@ -7,6 +7,7 @@
 
 export type TenantPlan = "starter" | "business" | "pro" | "enterprise"
 export type TenantStatus = "trial" | "active" | "suspended" | "cancelled"
+export type VatRegime = "isento" | "reduzido" | "intermedio" | "normal"
 
 export type UserRole = "owner" | "admin" | "accountant" | "member"
 
@@ -93,6 +94,7 @@ export interface Tenant {
   favicon_path: string | null
   primary_color: string
   app_name: string
+  vat_regime: VatRegime
   created_at: string
   updated_at: string
 }

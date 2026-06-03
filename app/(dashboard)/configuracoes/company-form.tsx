@@ -19,8 +19,23 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
 import { validateNIF } from "@/lib/utils/portugal"
+import type { VatRegime } from "@/types"
+
+const VAT_REGIME_OPTIONS: { value: VatRegime; label: string }[] = [
+  { value: "normal",    label: "Taxa Normal (23%)" },
+  { value: "intermedio", label: "Taxa Intermédia (13%)" },
+  { value: "reduzido",  label: "Taxa Reduzida (6%)" },
+  { value: "isento",    label: "Isento (0%)" },
+]
 
 const formSchema = z.object({
   name: z.string().trim().min(2, "Nome muito curto").max(100),
@@ -33,6 +48,7 @@ const formSchema = z.object({
   phone: z.string().trim().max(50),
   address: z.string().trim().max(500),
   primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Cor hex inválida"),
+  vat_regime: z.enum(["isento", "reduzido", "intermedio", "normal"]),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -48,6 +64,7 @@ export function CompanyForm({
     app_name: string
     phone: string | null
     address: string | null
+    vat_regime: VatRegime
   }
 }) {
   const router = useRouter()
@@ -62,6 +79,7 @@ export function CompanyForm({
       phone: tenant.phone ?? "",
       address: tenant.address ?? "",
       primary_color: tenant.primary_color,
+      vat_regime: tenant.vat_regime,
     },
   })
 
@@ -78,6 +96,7 @@ export function CompanyForm({
         phone: values.phone || null,
         address: values.address || null,
         primary_color: values.primary_color,
+        vat_regime: values.vat_regime,
         updated_at: new Date().toISOString(),
       })
       .eq("id", tenant.id)
@@ -168,6 +187,34 @@ export function CompanyForm({
             )}
           />
         </div>
+
+        <FormField
+          control={form.control}
+          name="vat_regime"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Regime de IVA</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleciona o regime" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {VAT_REGIME_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Usado nos cálculos de projetos e na estimativa de IVA do dashboard.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

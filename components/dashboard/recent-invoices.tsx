@@ -4,8 +4,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { StatusBadge } from "@/components/faturas/status-badge"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
-import type { RecentInvoice } from "@/lib/queries/dashboard"
-import type { InvoiceSource } from "@/types"
+import type { InvoiceSource, InvoiceStatus } from "@/types"
+
+type RecentInvoice = {
+  id: string
+  supplier_name: string | null
+  invoice_number: string | null
+  total: number | null
+  status: InvoiceStatus
+  source: InvoiceSource
+  invoice_date: string | null
+  created_at: string
+}
 
 const SOURCE_ICONS: Record<InvoiceSource, typeof FileText> = {
   whatsapp: MessageCircle,

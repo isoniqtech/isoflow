@@ -2,8 +2,8 @@ import Link from "next/link"
 import { FolderKanban } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { BudgetProgress } from "@/components/projetos/budget-progress"
 import { cn } from "@/lib/utils"
+import { formatCurrency } from "@/lib/utils/portugal"
 import type { RecentProject } from "@/lib/queries/dashboard"
 
 export function ActiveProjects({ projects }: { projects: RecentProject[] }) {
@@ -31,29 +31,61 @@ export function ActiveProjects({ projects }: { projects: RecentProject[] }) {
 }
 
 function ProjectItem({ project }: { project: RecentProject }) {
+  const hasBudget = project.budget !== null && project.budget > 0
+  const pct = hasBudget ? Math.min(100, Math.round((project.total_spent / project.budget!) * 100)) : null
+  const isOver = pct !== null && pct >= 100
+  const isWarn = pct !== null && !isOver && pct >= project.budget_alert_threshold
+
   return (
     <li>
       <Link
         href={`/projetos/${project.id}`}
         className="block rounded-md border p-3 hover:bg-muted/40 transition-colors"
       >
-        <div className="flex items-center gap-3 mb-2">
-          <div
-            className={cn("h-2 w-2 rounded-full shrink-0")}
+        <div className="flex items-center gap-2 mb-2">
+          <span
+            className="h-2 w-2 rounded-full shrink-0"
             style={{ backgroundColor: project.color }}
           />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{project.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">
-              {project.type} · {project.invoice_count} faturas
-            </p>
-          </div>
+          <p className="text-sm font-medium truncate flex-1">{project.name}</p>
+          <span className="text-xs text-muted-foreground shrink-0">{project.invoice_count} fat.</span>
         </div>
-        <BudgetProgress
-          spent={project.total_spent}
-          budget={project.budget}
-          threshold={project.budget_alert_threshold}
-        />
+
+        {hasBudget ? (
+          <>
+            {/* Progress bar */}
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mb-2">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  isOver ? "bg-destructive" : isWarn ? "bg-amber-500" : "bg-primary",
+                )}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-1 text-xs">
+              <div>
+                <p className="text-muted-foreground">Gasto</p>
+                <p className="font-medium tabular-nums">{formatCurrency(project.total_spent)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-muted-foreground">Restante</p>
+                <p className={cn("font-medium tabular-nums", isOver && "text-destructive")}>
+                  {formatCurrency(project.remaining!)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-muted-foreground">Orçamento</p>
+                <p className="font-medium tabular-nums">{formatCurrency(project.budget!)}</p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Gasto: <span className="font-medium text-foreground">{formatCurrency(project.total_spent)}</span>
+            {" · "}sem orçamento definido
+          </p>
+        )}
       </Link>
     </li>
   )

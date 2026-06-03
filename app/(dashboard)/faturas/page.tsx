@@ -108,7 +108,7 @@ export default async function FaturasPage({
               </a>
             </Button>
           )}
-          {canCreate && (
+          {canCreate && activeTab !== "efatura" && (
             <Button asChild>
               <Link href="/faturas/nova">
                 <Plus className="mr-2 h-4 w-4" />
