@@ -15,7 +15,7 @@ export default async function DashboardLayout({
 
   return (
     <TenantProvider value={session}>
-      <div className="min-h-screen flex">
+      <div className="h-dvh flex overflow-hidden">
         <Sidebar className="hidden md:flex" />
         <div className="flex-1 flex flex-col min-w-0">
           <Header />
