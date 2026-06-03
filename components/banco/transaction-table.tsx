@@ -12,7 +12,6 @@ import {
   X,
 } from "lucide-react"
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -239,7 +238,7 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
         </div>
       ) : (
         <div className="flex-1 min-h-0 rounded-lg border bg-background overflow-auto">
-          <Table>
+          <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 <TableHead className="w-10" />
@@ -344,7 +343,7 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
                 )
               })}
             </TableBody>
-          </Table>
+          </table>
         </div>
       )}
     </div>
