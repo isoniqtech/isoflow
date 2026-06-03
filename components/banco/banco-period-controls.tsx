@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useRef } from "react"
 import { useRouter, usePathname, useSearchParams } from "next/navigation"
 import {
   Select,
@@ -17,6 +18,15 @@ const PT_MONTHS = [
 
 export type BancoPeriod = "mensal" | "trimestral"
 
+const STORAGE_KEY = "banco-period-filters"
+
+type SavedFilters = {
+  period: BancoPeriod
+  month: number
+  quarter: number
+  year: number
+}
+
 export function BancoPeriodControls({
   period,
   month,
@@ -31,17 +41,72 @@ export function BancoPeriodControls({
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const restoredRef = useRef(false)
 
-  function navigate(updates: Partial<{ period: BancoPeriod; month: number; quarter: number; year: number }>) {
-    const next = new URLSearchParams(searchParams.toString())
+  // On mount: if URL has no period param, try to restore from localStorage
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+
+    if (searchParams.has("period")) {
+      // URL already has explicit params — save them
+      saveToStorage({ period, month, quarter, year })
+      return
+    }
+
+    // No URL params — try to restore saved preference
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const saved: SavedFilters = JSON.parse(raw)
+        if (saved.period && saved.year) {
+          const next = new URLSearchParams()
+          next.set("period", saved.period)
+          next.set("year", String(saved.year))
+          if (saved.period === "mensal") {
+            next.set("month", String(saved.month))
+          } else {
+            next.set("quarter", String(saved.quarter))
+          }
+          router.replace(`${pathname}?${next.toString()}`)
+        }
+      }
+    } catch {
+      // localStorage not available (SSR guard, private mode, etc.)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  function saveToStorage(filters: SavedFilters) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(filters))
+    } catch {
+      // ignore
+    }
+  }
+
+  function navigate(updates: Partial<SavedFilters>) {
     const newPeriod = updates.period ?? period
+    const newYear = updates.year ?? year
+    const newMonth = updates.month ?? month
+    const newQuarter = updates.quarter ?? quarter
+
+    const filters: SavedFilters = {
+      period: newPeriod,
+      year: newYear,
+      month: newMonth,
+      quarter: newQuarter,
+    }
+    saveToStorage(filters)
+
+    const next = new URLSearchParams(searchParams.toString())
     next.set("period", newPeriod)
-    next.set("year", String(updates.year ?? year))
+    next.set("year", String(newYear))
     if (newPeriod === "mensal") {
-      next.set("month", String(updates.month ?? month))
+      next.set("month", String(newMonth))
       next.delete("quarter")
     } else {
-      next.set("quarter", String(updates.quarter ?? quarter))
+      next.set("quarter", String(newQuarter))
       next.delete("month")
     }
     router.push(`${pathname}?${next.toString()}`)
@@ -84,7 +149,7 @@ export function BancoPeriodControls({
         </Select>
       ) : (
         <Select value={String(quarter)} onValueChange={(v) => navigate({ quarter: Number(v) })}>
-          <SelectTrigger className="h-8 text-sm w-24">
+          <SelectTrigger className="h-8 text-sm w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
