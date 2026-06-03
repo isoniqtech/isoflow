@@ -1,7 +1,7 @@
 import Link from "next/link"
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
-import { Landmark, Upload } from "lucide-react"
+import { Landmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,6 +9,7 @@ import { TransactionTable } from "@/components/banco/transaction-table"
 import { BancoPeriodControls } from "@/components/banco/banco-period-controls"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
 import { AutoReconcileButton } from "@/components/banco/auto-reconcile-button"
+import { ImportStatementModal } from "@/components/banco/import-statement-modal"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { createClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
@@ -120,10 +121,7 @@ export default async function BancoPage({
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <Button variant="outline" disabled title="Em breve">
-            <Upload className="mr-2 h-4 w-4" />
-            Importar Extrato
-          </Button>
+          <ImportStatementModal accounts={configuredAccounts} />
           {hasConfiguredAccounts && <AutoReconcileButton />}
         </div>
       </div>
