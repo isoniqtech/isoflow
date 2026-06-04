@@ -1,5 +1,4 @@
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { reconcileInvoiceWithEFatura } from "@/lib/efatura/reconcile"
 import type { ParsedMail } from "mailparser"
 import type { Database } from "@/types/supabase"
 import {
@@ -398,13 +397,6 @@ export async function processEmailInvoice(
       } catch (e) {
         console.warn("n8n forward failed:", e)
       }
-
-      // Reconciliar com e-Fatura (fire-and-forget)
-      void reconcileInvoiceWithEFatura(
-        supabase,
-        { id: inserted.id, supplier_nif: inserted.supplier_nif, invoice_number: inserted.invoice_number, total: inserted.total !== null ? Number(inserted.total) : null },
-        tenantId,
-      ).catch(() => null)
 
       result.invoicesCreated += 1
       result.attachmentsProcessed += 1
