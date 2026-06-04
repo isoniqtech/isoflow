@@ -93,7 +93,8 @@ export async function GET(req: Request) {
     const ws = XLSX.utils.json_to_sheet(rows, { header: COLUMNS.map((c) => c.header) })
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Faturas")
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer
+    const raw = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Uint8Array
+    const buf = Buffer.from(raw)
     return new Response(buf, {
       status: 200,
       headers: {
@@ -119,7 +120,8 @@ export async function GET(req: Request) {
     if (date_to) filterParts.push(`Até: ${date_to}`)
 
     const buf = await renderToBuffer(
-      createElement(FaturasReport, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      createElement(FaturasReport as any, {
         invoices: all,
         tenantName,
         generatedAt,
