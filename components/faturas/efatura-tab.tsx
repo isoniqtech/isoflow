@@ -107,7 +107,6 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const router = useRouter()
 
   const [atFilters, setAtFilters] = useState<string[]>([])
-  const [showMatched, setShowMatched] = useState(false)
   const [isPendingRefresh, startRefresh] = useTransition()
 
   const filteredDocs = useMemo(() => {
@@ -238,46 +237,6 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
           </div>
         )}
 
-        {/* Compras Registadas (arquivo) */}
-        {efatura_docs_matched.length > 0 && (
-          <section className="pb-4">
-            <button
-              onClick={() => setShowMatched(v => !v)}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showMatched ? "▲" : "▶"} Compras Registadas ({efatura_docs_matched.length})
-            </button>
-            {showMatched && (
-              <div className="mt-3 rounded-lg border bg-background">
-                <table className="w-full caption-bottom text-sm">
-                  <TableHeader className="sticky top-0 z-10 bg-background">
-                    <TableRow>
-                      <TableHead>Fornecedor</TableHead>
-                      <TableHead className="hidden md:table-cell">Nº e-Fatura</TableHead>
-                      <TableHead className="hidden md:table-cell">Data</TableHead>
-                      <TableHead className="text-right">Valor</TableHead>
-                      <TableHead>Estado AT</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {efatura_docs_matched.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell>
-                          <p className="font-medium truncate">{doc.supplier_name ?? "—"}</p>
-                          {doc.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{doc.supplier_nif}</p>}
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
-                        <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
-                        <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
-                        <TableCell><ATStatusBadge status={doc.at_status} /></TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </table>
-              </div>
-            )}
-          </section>
-        )}
       </div>
     </div>
   )
