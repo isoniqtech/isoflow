@@ -192,7 +192,7 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isPendingRefresh}>
+          <Button size="sm" onClick={handleRefresh} disabled={isPendingRefresh}>
             {isPendingRefresh
               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               : <RefreshCw className="mr-2 h-4 w-4" />

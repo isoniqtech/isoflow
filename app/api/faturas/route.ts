@@ -6,6 +6,70 @@ import { hasPermission } from "@/lib/utils/permissions"
 import { log } from "@/lib/utils/audit"
 import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
 
+async function autoSendToERP(invoiceId: string, tenantId: string) {
+  try {
+    const admin = createAdminClient()
+
+    const { data: tenant } = await admin
+      .from("tenants")
+      .select("auto_erp_send")
+      .eq("id", tenantId)
+      .maybeSingle()
+
+    if (!tenant?.auto_erp_send) return
+
+    const { data: integration } = await admin
+      .from("tenant_integrations")
+      .select("config")
+      .eq("tenant_id", tenantId)
+      .eq("type", "erp")
+      .eq("provider", "n8n")
+      .eq("is_active", true)
+      .maybeSingle()
+
+    const n8nUrl = (integration?.config as { url?: string } | null)?.url || process.env.N8N_WEBHOOK_URL
+    if (!n8nUrl) return
+
+    const { data: inv } = await admin
+      .from("invoices")
+      .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id")
+      .eq("id", invoiceId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle()
+
+    if (!inv || inv.toconline_fc_id) return // já enviada
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://isoflow-seven.vercel.app"
+    const cronSecret = process.env.CRON_SECRET ?? ""
+
+    await fetch(n8nUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenant_id: tenantId,
+        callback_url: `${appUrl}/api/faturas`,
+        callback_secret: cronSecret,
+        invoices: [{
+          id: inv.id,
+          supplier_name: inv.supplier_name,
+          supplier_nif: inv.supplier_nif,
+          invoice_number: inv.invoice_number,
+          invoice_date: inv.invoice_date,
+          subtotal: inv.subtotal,
+          vat_rate: inv.vat_rate,
+          vat_amount: inv.vat_amount,
+          total: inv.total,
+          description: inv.description,
+          currency: inv.currency ?? "EUR",
+        }],
+        auto_sent: true,
+      }),
+    }).catch(() => null)
+  } catch (e) {
+    console.warn("auto ERP send failed:", e)
+  }
+}
+
 const invoiceInputSchema = z.object({
   type: z.enum(["incoming", "outgoing"]).default("incoming"),
   project_id: z.string().uuid().optional().nullable(),
@@ -156,6 +220,11 @@ export async function POST(req: Request) {
     void forwardInvoiceToN8N(admin, invoice.id, ctx.tenantId)
   } catch (e) {
     console.warn("n8n forward (manual upload) failed:", e)
+  }
+
+  // Auto-send ao ERP se tenant tiver a opção activada e fatura não precisar revisão
+  if (!invoice.needs_review && invoice.type === "incoming") {
+    void autoSendToERP(invoice.id, ctx.tenantId)
   }
 
   return Response.json({ data: invoice }, { status: 201 })

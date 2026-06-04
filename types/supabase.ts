@@ -934,6 +934,7 @@ export type Database = {
         Row: {
           address: string | null
           app_name: string | null
+          auto_erp_send: boolean
           created_at: string | null
           credits_balance: number | null
           credits_used_this_month: number | null
@@ -953,10 +954,12 @@ export type Database = {
           stripe_subscription_id: string | null
           trial_ends_at: string | null
           updated_at: string | null
+          vat_regime: string | null
         }
         Insert: {
           address?: string | null
           app_name?: string | null
+          auto_erp_send?: boolean
           created_at?: string | null
           credits_balance?: number | null
           credits_used_this_month?: number | null
@@ -976,10 +979,12 @@ export type Database = {
           stripe_subscription_id?: string | null
           trial_ends_at?: string | null
           updated_at?: string | null
+          vat_regime?: string | null
         }
         Update: {
           address?: string | null
           app_name?: string | null
+          auto_erp_send?: boolean
           created_at?: string | null
           credits_balance?: number | null
           credits_used_this_month?: number | null
@@ -990,6 +995,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           nif?: string | null
+          vat_regime?: string | null
           onboarding_completed?: boolean | null
           phone?: string | null
           plan?: string | null

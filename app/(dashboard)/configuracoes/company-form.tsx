@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { createClient } from "@/lib/supabase/client"
 import { validateNIF } from "@/lib/utils/portugal"
 import type { VatRegime } from "@/types"
@@ -49,6 +50,7 @@ const formSchema = z.object({
   address: z.string().trim().max(500),
   primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, "Cor hex inválida"),
   vat_regime: z.enum(["isento", "reduzido", "intermedio", "normal"]),
+  auto_erp_send: z.boolean(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -65,6 +67,7 @@ export function CompanyForm({
     phone: string | null
     address: string | null
     vat_regime: VatRegime
+    auto_erp_send: boolean
   }
 }) {
   const router = useRouter()
@@ -80,6 +83,7 @@ export function CompanyForm({
       address: tenant.address ?? "",
       primary_color: tenant.primary_color,
       vat_regime: tenant.vat_regime,
+      auto_erp_send: tenant.auto_erp_send,
     },
   })
 
@@ -97,6 +101,7 @@ export function CompanyForm({
         address: values.address || null,
         primary_color: values.primary_color,
         vat_regime: values.vat_regime,
+        auto_erp_send: values.auto_erp_send,
         updated_at: new Date().toISOString(),
       })
       .eq("id", tenant.id)
@@ -240,6 +245,32 @@ export function CompanyForm({
                 <Textarea rows={3} {...field} />
               </FormControl>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="auto_erp_send"
+          render={({ field }) => (
+            <FormItem className="rounded-lg border p-4">
+              <div className="flex items-start gap-3">
+                <FormControl>
+                  <Checkbox
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                    className="mt-0.5"
+                  />
+                </FormControl>
+                <div>
+                  <FormLabel className="font-medium cursor-pointer">
+                    Envio automático ao ERP
+                  </FormLabel>
+                  <FormDescription className="mt-0.5">
+                    Quando chega uma nova fatura em estado &quot;Em Sistema&quot; sem necessitar de revisão, é enviada automaticamente ao ERP (TOConline).
+                  </FormDescription>
+                </div>
+              </div>
             </FormItem>
           )}
         />
