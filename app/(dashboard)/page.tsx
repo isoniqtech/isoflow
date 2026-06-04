@@ -58,6 +58,14 @@ export default async function DashboardPage({
     ? `+${formatCurrency(data.kpis.ebitda)}`
     : formatCurrency(data.kpis.ebitda)
 
+  // Prazo IVA: 15 do 2º mês após o fim do período
+  const vatEndMonth = mode === "mensal" ? month : mode === "trimestral" ? quarter * 3 : 12
+  const vatDeadlineMonth = vatEndMonth + 2 > 12 ? vatEndMonth + 2 - 12 : vatEndMonth + 2
+  const vatDeadlineYear = vatEndMonth + 2 > 12 ? year + 1 : year
+  const vatDeadlineLabel = new Intl.DateTimeFormat("pt-PT", { day: "numeric", month: "long", year: "numeric" })
+    .format(new Date(vatDeadlineYear, vatDeadlineMonth - 1, 15))
+  const vatDirection = data.kpis.vat_estimate > 0 ? "a pagar" : data.kpis.vat_estimate < 0 ? "a receber" : "equilibrado"
+
   const periodLabel = mode === "mensal"
     ? `mês ${String(month).padStart(2, "0")}/${year}`
     : mode === "trimestral"
@@ -116,10 +124,10 @@ export default async function DashboardPage({
               hint={`${data.kpis.efatura_pending_count} de ${data.kpis.efatura_total_count} docs AT`}
             />
             <KpiCard
-              label="Estimativa IVA"
+              label={`Estimativa IVA (${vatDirection})`}
               value={formatCurrency(Math.abs(data.kpis.vat_estimate))}
               icon={Calculator}
-              hint={data.kpis.vat_estimate > 0 ? "a pagar à AT" : data.kpis.vat_estimate < 0 ? "a receber da AT" : "equilibrado"}
+              hint={`Prazo: ${vatDeadlineLabel}`}
             />
           </div>
         </div>
