@@ -267,7 +267,7 @@ export function CompanyForm({
                     Envio automático ao ERP
                   </FormLabel>
                   <FormDescription className="mt-0.5">
-                    Quando chega uma nova fatura em estado &quot;Em Sistema&quot; sem necessitar de revisão, é enviada automaticamente ao ERP (TOConline).
+                    Quando chega uma nova fatura em estado &quot;Em Sistema&quot; sem necessitar de revisão, é enviada automaticamente ao ERP.
                   </FormDescription>
                 </div>
               </div>
