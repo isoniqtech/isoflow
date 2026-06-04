@@ -16,7 +16,6 @@ import type { InvoiceSource, InvoiceStatus } from "@/types"
 
 const VALID_STATUS: Array<InvoiceStatus | "all"> = [
   "all", "em_sistema", "necessita_revisao", "enviada_erp", "rejected", "duplicate",
-  // legacy
   "pending", "processing", "matched", "paid", "reconciled",
 ]
 const VALID_SOURCE: Array<InvoiceSource | "all"> = [
@@ -82,85 +81,93 @@ export default async function FaturasPage({
   ]
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-4 max-w-7xl mx-auto">
+    <div className="h-full flex flex-col overflow-hidden">
       <InvoicesRealtime tenantId={session.tenant.id} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Faturas</h1>
-          <p className="text-muted-foreground text-sm">
-            {total.toLocaleString("pt-PT")} {total === 1 ? "fatura" : "faturas"}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {hasPermission(session.role, "relatorios", "view_all") && total > 0 && (
-            <Button variant="outline" asChild>
-              <a href={`/api/faturas/export?${new URLSearchParams({
-                ...(status !== "all" ? { status } : {}),
-                ...(source !== "all" ? { source } : {}),
-                ...(project_id !== "all" ? { project: project_id } : {}),
-                ...(needs_review ? { review: "1" } : {}),
-                ...(date_from ? { from: date_from } : {}),
-                ...(date_to ? { to: date_to } : {}),
-              }).toString()}`}>
-                <Download className="mr-2 h-4 w-4" />
-                Exportar CSV
-              </a>
-            </Button>
-          )}
-          {canCreate && activeTab !== "efatura" && (
-            <Button asChild>
-              <Link href="/faturas/nova">
-                <Plus className="mr-2 h-4 w-4" />
-                Nova fatura
-              </Link>
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-b flex gap-0">
-        {tabs.map((tab) => (
-          <Link
-            key={tab.id}
-            href={`/faturas?tab=${tab.id}`}
-            className={cn(
-              "px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5",
-              activeTab === tab.id
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground",
+      {/* Secção estática — header + tabs + filtros */}
+      <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8 space-y-4 max-w-7xl mx-auto w-full">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Faturas</h1>
+            <p className="text-muted-foreground text-sm">
+              {total.toLocaleString("pt-PT")} {total === 1 ? "fatura" : "faturas"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {hasPermission(session.role, "relatorios", "view_all") && total > 0 && (
+              <Button variant="outline" asChild>
+                <a href={`/api/faturas/export?${new URLSearchParams({
+                  ...(status !== "all" ? { status } : {}),
+                  ...(source !== "all" ? { source } : {}),
+                  ...(project_id !== "all" ? { project: project_id } : {}),
+                  ...(needs_review ? { review: "1" } : {}),
+                  ...(date_from ? { from: date_from } : {}),
+                  ...(date_to ? { to: date_to } : {}),
+                }).toString()}`}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar CSV
+                </a>
+              </Button>
             )}
-          >
-            {tab.label}
-            {tab.count !== undefined && tab.count > 0 && (
-              <span className={cn(
-                "text-xs rounded-full px-1.5 py-0.5 font-medium",
-                activeTab === tab.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-                tab.id === "efatura" && "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
-              )}>
-                {tab.count}
-              </span>
+            {canCreate && activeTab !== "efatura" && (
+              <Button asChild>
+                <Link href="/faturas/nova">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nova fatura
+                </Link>
+              </Button>
             )}
-          </Link>
-        ))}
-      </div>
+          </div>
+        </div>
 
-      {activeTab === "todas" && (
-        <>
+        {/* Tabs */}
+        <div className="border-b flex gap-0">
+          {tabs.map((tab) => (
+            <Link
+              key={tab.id}
+              href={`/faturas?tab=${tab.id}`}
+              className={cn(
+                "px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5",
+                activeTab === tab.id
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground",
+              )}
+            >
+              {tab.label}
+              {tab.count !== undefined && tab.count > 0 && (
+                <span className={cn(
+                  "text-xs rounded-full px-1.5 py-0.5 font-medium",
+                  activeTab === tab.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
+                  tab.id === "efatura" && "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
+                )}>
+                  {tab.count}
+                </span>
+              )}
+            </Link>
+          ))}
+        </div>
+
+        {activeTab === "todas" && (
           <InvoiceFilters
             value={{ status, source, project_id, needs_review, date_from, date_to }}
             projects={projects}
           />
-          <InvoiceTableFC invoices={invoices} />
-          {totalPages > 1 && (
-            <InvoicesPagination page={page} totalPages={totalPages} total={total} pageSize={page_size} />
-          )}
-        </>
-      )}
+        )}
+      </div>
 
-      {activeTab === "efatura" && (
-        <EFaturaTab data={eFaturaPageData} />
+      {/* Tabela — flex-1, só as linhas fazem scroll */}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 md:px-6 lg:px-8 py-4">
+        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full">
+          {activeTab === "todas" && <InvoiceTableFC invoices={invoices} />}
+          {activeTab === "efatura" && <EFaturaTab data={eFaturaPageData} />}
+        </div>
+      </div>
+
+      {/* Paginação — estática no fundo */}
+      {activeTab === "todas" && totalPages > 1 && (
+        <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pb-4 max-w-7xl mx-auto w-full">
+          <InvoicesPagination page={page} totalPages={totalPages} total={total} pageSize={page_size} />
+        </div>
       )}
     </div>
   )

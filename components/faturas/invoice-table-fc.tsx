@@ -6,7 +6,7 @@ import { AlertTriangle, FileText, Loader2, Mail, MessageCircle, Send, Upload } f
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/faturas/status-badge"
@@ -79,34 +79,34 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
     })
   }
 
-  if (invoices.length === 0) {
-    return (
-      <div className="border rounded-lg p-12 flex flex-col items-center text-center bg-background">
-        <FileText className="h-10 w-10 text-muted-foreground mb-3" />
-        <h2 className="font-semibold mb-1">Sem faturas para mostrar</h2>
-        <p className="text-sm text-muted-foreground max-w-md">
-          Quando enviares faturas via WhatsApp, email ou upload manual, vão aparecer aqui.
-        </p>
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between px-1 min-h-[32px]">
-        <p className="text-sm text-muted-foreground">
-          {selected.size > 0 ? `${selected.size} selecionada${selected.size !== 1 ? "s" : ""}` : ""}
-        </p>
-        <Button size="sm" onClick={handleCreateFC} disabled={isPending || selected.size === 0}>
-          {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-          Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
-        </Button>
-      </div>
+    <div className="flex-1 min-h-0 flex flex-col gap-2">
+      {invoices.length === 0 ? (
+        <div className="flex-1 border rounded-lg p-12 flex flex-col items-center text-center bg-background">
+          <FileText className="h-10 w-10 text-muted-foreground mb-3" />
+          <h2 className="font-semibold mb-1">Sem faturas para mostrar</h2>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Quando enviares faturas via WhatsApp, email ou upload manual, vão aparecer aqui.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Barra ERP — estática */}
+          <div className="flex-shrink-0 flex items-center justify-between px-1 min-h-[32px]">
+            <p className="text-sm text-muted-foreground">
+              {selected.size > 0 ? `${selected.size} selecionada${selected.size !== 1 ? "s" : ""}` : ""}
+            </p>
+            <Button size="sm" onClick={handleCreateFC} disabled={isPending || selected.size === 0}>
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
+            </Button>
+          </div>
 
-      <div className="rounded-lg border bg-background overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
+          {/* Tabela — thead sticky, tbody scrollável */}
+          <div className="flex-1 min-h-0 rounded-lg border bg-background overflow-auto">
+            <table className="w-full caption-bottom text-sm">
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow>
               <TableHead className="w-10">
                 {eligible.length > 0 && (
                   <input
@@ -204,9 +204,11 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
                 </TableRow>
               )
             })}
-          </TableBody>
-        </Table>
-      </div>
+                </TableBody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   )
 }
