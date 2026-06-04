@@ -4,6 +4,7 @@ import { extractInvoiceData } from '@/lib/claude/extract-invoice'
 import { matchProjectFromText } from '@/lib/utils/projects'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { log } from '@/lib/utils/audit'
+import { reconcileInvoiceWithEFatura } from '@/lib/efatura/reconcile'
 import { Invoice } from '@/types'
 
 function getTwiMLResponse(body: string): Response {
@@ -172,6 +173,13 @@ export async function POST(req: Request) {
           resourceId: invoice.id,
           metadata: { sender_phone: from, confidence: extraction.confidence },
         })
+
+        // Reconciliar com e-Fatura (fire-and-forget)
+        void reconcileInvoiceWithEFatura(
+          supabase,
+          { id: invoice.id, supplier_nif: invoice.supplier_nif ?? null, invoice_number: invoice.invoice_number ?? null, total: invoice.total !== null ? Number(invoice.total) : null },
+          tenantId,
+        ).catch(() => null)
 
         let response = '✅ Fatura recebida!'
         if (extraction.supplier_name) {
