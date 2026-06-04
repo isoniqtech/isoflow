@@ -95,7 +95,7 @@ export default async function FaturasPage({
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {hasPermission(session.role, "relatorios", "view_all") && total > 0 && (
+            {hasPermission(session.role, "relatorios", "view_all") && total > 0 && activeTab !== "efatura" && (
               <ExportDropdown exportUrl={`/api/faturas/export?${new URLSearchParams({
                 ...(status !== "all" ? { status } : {}),
                 ...(source !== "all" ? { source } : {}),
