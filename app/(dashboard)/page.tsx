@@ -80,7 +80,7 @@ export default async function DashboardPage({
               label="Receita"
               value={formatCurrency(data.kpis.revenue)}
               icon={TrendingUp}
-              hint={data.kpis.revenue_source === "toconline" ? "Fonte: Toconline · sem IVA" : "Faturas emitidas · sem IVA"}
+              hint={data.kpis.revenue_source === "toconline" ? "Fonte: ERP · sem IVA" : "Faturas emitidas · sem IVA"}
             />
             <KpiCard
               label="Gastos"
