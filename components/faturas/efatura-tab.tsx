@@ -103,7 +103,7 @@ function ATStatusBadge({ status }: { status: string | null }) {
 }
 
 export function EFaturaTab({ data }: { data: EFaturaPageData }) {
-  const { efatura_docs, efatura_docs_matched } = data
+  const { efatura_docs } = data
   const router = useRouter()
 
   const [atFilters, setAtFilters] = useState<string[]>([])
@@ -113,6 +113,8 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
     if (atFilters.length === 0) return efatura_docs
     return efatura_docs.filter(d => d.at_status !== null && atFilters.includes(d.at_status))
   }, [efatura_docs, atFilters])
+
+  const pendingCount = efatura_docs.filter(d => !d.invoice_id).length
 
   function handleRefresh() {
     startRefresh(async () => {
@@ -154,8 +156,8 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
       {/* ── Toolbar — estática ───────────────────────────────── */}
       <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          {filteredDocs.length} documento{filteredDocs.length !== 1 ? "s" : ""} AT pendente{filteredDocs.length !== 1 ? "s" : ""}
-          {filteredDocs.length !== efatura_docs.length && ` (${efatura_docs.length} total)`}
+          {filteredDocs.length} documento{filteredDocs.length !== 1 ? "s" : ""}
+          {pendingCount > 0 && ` · ${pendingCount} por conciliar`}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
@@ -229,7 +231,16 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
                     <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
                     <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
                     <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
-                    <TableCell><ATStatusBadge status={doc.at_status} /></TableCell>
+                    <TableCell>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <ATStatusBadge status={doc.at_status} />
+                      {doc.invoice_id && (
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                          Conciliada
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

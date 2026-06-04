@@ -57,23 +57,16 @@ export async function listEFaturaPageData(
     // Todas as faturas incoming com join ao efatura_documents
     supabase.rpc("get_invoices_with_efatura", { p_tenant_id: tenantId, p_user_id: role === "member" ? userId : null }),
 
-    // Docs e-Fatura não conciliados (direita)
+    // Todos os docs e-Fatura (conciliados e por conciliar)
     supabase
       .from("efatura_documents")
       .select("id, toconline_id, at_document_id, document_number, document_date, supplier_nif, supplier_name, total, subtotal, vat_amount, currency, at_status, invoice_id, matched_at, matched_by")
       .eq("tenant_id", tenantId)
-      .is("invoice_id", null)
       .order("document_date", { ascending: false })
       .limit(500),
 
-    // Docs e-Fatura já conciliados
-    supabase
-      .from("efatura_documents")
-      .select("id, toconline_id, at_document_id, document_number, document_date, supplier_nif, supplier_name, total, subtotal, vat_amount, currency, at_status, invoice_id, matched_at, matched_by")
-      .eq("tenant_id", tenantId)
-      .not("invoice_id", "is", null)
-      .order("document_date", { ascending: false })
-      .limit(200),
+    // Placeholder — já não usamos a lista separada de conciliados
+    Promise.resolve({ data: [] }),
   ])
 
   const mapDoc = (d: Record<string, unknown>): EFaturaDocument => ({
