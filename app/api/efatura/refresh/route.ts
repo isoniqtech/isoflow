@@ -53,7 +53,7 @@ export async function POST() {
     const nifs = [...new Set(unmatchedDocs.map(d => d.supplier_nif).filter(Boolean))] as string[]
     const { data: invoices } = await supabase
       .from("invoices")
-      .select("id, supplier_nif, invoice_number, toconline_fc_id, at_communicated")
+      .select("id, supplier_nif, invoice_number, toconline_fc_id, total, at_communicated")
       .eq("tenant_id", ctx.tenantId)
       .in("supplier_nif", nifs)
       .neq("status", "rejected")
@@ -73,10 +73,11 @@ export async function POST() {
     for (const doc of unmatchedDocs) {
       if (!doc.supplier_nif || !doc.document_number) continue
       const candidates = invoicesByNif.get(doc.supplier_nif) ?? []
+      const docTotal = Number(doc.total ?? 0)
       const inv = candidates.find(
         i =>
-          i.invoice_number === doc.document_number ||
-          i.toconline_fc_id === doc.document_number,
+          (i.invoice_number === doc.document_number || i.toconline_fc_id === doc.document_number) &&
+          Math.abs(Number(i.total ?? 0) - docTotal) < 0.01,
       )
       if (!inv) continue
 
