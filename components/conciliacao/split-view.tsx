@@ -97,7 +97,7 @@ export function SplitView({
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <FileText className="h-4 w-4" />
-                Faturas sem match
+                Faturas por conciliar
               </h3>
               <span className="text-xs text-muted-foreground">
                 {invoices.length}
@@ -161,7 +161,7 @@ export function SplitView({
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <Landmark className="h-4 w-4" />
-                Movimentos sem match
+                Movimentos por conciliar
               </h3>
               <span className="text-xs text-muted-foreground">
                 {bankTxs.length}

@@ -34,8 +34,10 @@ export default async function ConciliacaoPage() {
       .from("invoices")
       .select("id, supplier_name, invoice_number, invoice_date, total, status")
       .eq("tenant_id", session.tenant.id)
-      .in("status", ["pending", "processing"])
       .eq("type", "incoming")
+      .is("bank_transaction_id", null)
+      .neq("status", "rejected")
+      .neq("status", "duplicate")
       .not("total", "is", null)
       .order("invoice_date", { ascending: false })
       .limit(100),
@@ -135,7 +137,7 @@ export default async function ConciliacaoPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Conciliação Bancária</h1>
           <p className="text-muted-foreground text-sm">
-            {invoices.length} faturas sem match · {txs.length} movimentos sem match
+            {invoices.length} faturas por conciliar · {txs.length} movimentos por conciliar
             {invoices.length > 0 && (
               <>
                 {" · "}
