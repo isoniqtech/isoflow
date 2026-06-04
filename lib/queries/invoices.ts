@@ -22,6 +22,7 @@ export type InvoiceListItem = {
   category: string | null
   needs_review: boolean
   at_communicated: boolean
+  efatura_at_status: string | null
   erp_synced: boolean
   erp_document_id: string | null
   toconline_fc_id: string | null
@@ -56,7 +57,7 @@ export type ProjectOption = {
 }
 
 const SELECT_FIELDS =
-  "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, type, category, needs_review, at_communicated, erp_synced, erp_document_id, toconline_fc_id, bank_transaction_id, project_id, created_at"
+  "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, type, category, needs_review, at_communicated, erp_synced, erp_document_id, toconline_fc_id, bank_transaction_id, project_id, created_at, efatura_documents(at_status)"
 
 const PAGE_SIZE = 50
 
@@ -80,6 +81,10 @@ function mapRow(
     category: (r.category as string | null) ?? null,
     needs_review: (r.needs_review as boolean) ?? false,
     at_communicated: (r.at_communicated as boolean) ?? false,
+    efatura_at_status: (() => {
+      const docs = r.efatura_documents as Array<{ at_status: string | null }> | null
+      return docs?.[0]?.at_status ?? null
+    })(),
     erp_synced: (r.erp_synced as boolean) ?? false,
     erp_document_id: (r.erp_document_id as string | null) ?? null,
     toconline_fc_id: (r.toconline_fc_id as string | null) ?? null,
