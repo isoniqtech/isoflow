@@ -19,6 +19,8 @@ export type DashboardKpis = {
   ebitda: number
   ebitda_pct: number
   revenue_source: "toconline" | "invoices"
+  // VAT estimate: positivo = a pagar, negativo = a receber
+  vat_estimate: number
 }
 
 export type RecentProject = {
@@ -116,7 +118,7 @@ export async function getDashboardData(
     // Period invoices (for KPIs)
     supabase
       .from("invoices")
-      .select("id, total, subtotal, status, invoice_date, created_at, type")
+      .select("id, total, subtotal, vat_amount, status, invoice_date, created_at, type")
       .eq("tenant_id", tenantId)
       .gte("invoice_date", startDate)
       .lte("invoice_date", endDate)
@@ -188,6 +190,15 @@ export async function getDashboardData(
   const ebitda = revenueRaw - expensesRaw
   const ebitdaPct = revenueRaw > 0 ? Math.round((ebitda / revenueRaw) * 100) : 0
 
+  // Estimativa de IVA: IVA liquidado (outgoing) - IVA dedutível (incoming)
+  const vatCollected = periodList
+    .filter(i => i.type === "outgoing")
+    .reduce((s, i) => s + Number((i as Record<string, unknown>).vat_amount ?? (Number(i.total ?? 0) - Number(i.subtotal ?? i.total ?? 0))), 0)
+  const vatDeductible = periodList
+    .filter(i => i.type === "incoming")
+    .reduce((s, i) => s + Number((i as Record<string, unknown>).vat_amount ?? (Number(i.total ?? 0) - Number(i.subtotal ?? i.total ?? 0))), 0)
+  const vatEstimate = vatCollected - vatDeductible
+
   // Bank pending: transações do período sem invoice_id (por conciliar)
   const bankAll = bankAllData ?? []
   const bankTotal = bankAll.length
@@ -213,6 +224,7 @@ export async function getDashboardData(
     ebitda,
     ebitda_pct: ebitdaPct,
     revenue_source: useToconlineCache ? "toconline" : "invoices",
+    vat_estimate: vatEstimate,
   }
 
   // Chart: always annual, always without VAT

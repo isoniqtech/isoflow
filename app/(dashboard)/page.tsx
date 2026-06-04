@@ -2,7 +2,7 @@ import { redirect } from "next/navigation"
 import {
   Activity,
   Banknote,
-  FileText,
+  Calculator,
   Receipt,
   TrendingDown,
   TrendingUp,
@@ -14,7 +14,6 @@ import { AlertsPanel } from "@/components/dashboard/alerts-panel"
 import { InvoicesChart } from "@/components/dashboard/invoices-chart"
 import { ActiveProjects } from "@/components/dashboard/active-projects"
 import { DashboardControls } from "@/components/dashboard/dashboard-controls"
-import { VatEstimateCard } from "@/components/dashboard/vat-estimate-card"
 import { formatCurrency } from "@/lib/utils/portugal"
 import type { DashboardMode } from "@/lib/queries/dashboard"
 import type { VatRegime } from "@/types"
@@ -110,10 +109,10 @@ export default async function DashboardPage({
               hint={`${data.kpis.efatura_pending_count} de ${data.kpis.efatura_total_count} docs AT`}
             />
             <KpiCard
-              label="Faturas"
-              value={data.kpis.invoices_this_period.toLocaleString("pt-PT")}
-              icon={FileText}
-              hint="No período selecionado"
+              label="Estimativa IVA"
+              value={formatCurrency(Math.abs(data.kpis.vat_estimate))}
+              icon={Calculator}
+              hint={data.kpis.vat_estimate > 0 ? "a pagar à AT" : data.kpis.vat_estimate < 0 ? "a receber da AT" : "equilibrado"}
             />
           </div>
         </div>
@@ -122,9 +121,6 @@ export default async function DashboardPage({
           <AlertsPanel alerts={data.alerts} />
         </div>
       </div>
-
-      {/* Estimativa IVA */}
-      <VatEstimateCard vatRegime={vatRegime} />
 
       {/* Gráfico anual */}
       <InvoicesChart data={data.chart} year={year} />
