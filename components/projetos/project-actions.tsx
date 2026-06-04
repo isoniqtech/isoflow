@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation"
 import { FileDown, Pencil, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -17,6 +17,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+
+const CONFIRM_WORD = "irreversível"
 
 export function ProjectActions({
   projectId,
@@ -33,6 +35,8 @@ export function ProjectActions({
 }) {
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
+  const [confirmText, setConfirmText] = useState("")
+  const confirmed = confirmText === CONFIRM_WORD
 
   async function handleDelete() {
     setDeleting(true)
@@ -76,7 +80,7 @@ export function ProjectActions({
         </Button>
       )}
       {canDelete && (
-        <AlertDialog>
+        <AlertDialog onOpenChange={(open) => { if (!open) setConfirmText("") }}>
           <AlertDialogTrigger asChild>
             <Button variant="outline" size="sm" className="text-destructive">
               <Trash2 className="mr-2 h-4 w-4" />
@@ -86,21 +90,37 @@ export function ProjectActions({
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Apagar projeto?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Vais apagar permanentemente o projeto <strong>{projectName}</strong>.
-                As faturas associadas ficam sem projeto (não são apagadas).
-                Esta ação é irreversível.
+              <AlertDialogDescription asChild>
+                <div className="space-y-3">
+                  <p>
+                    Vais apagar permanentemente o projeto <strong>{projectName}</strong>.
+                    As faturas associadas ficam sem projeto. Esta ação é irreversível.
+                  </p>
+                  <div className="space-y-1.5">
+                    <p className="text-sm">
+                      Escreve <strong className="font-mono">{CONFIRM_WORD}</strong> para confirmar:
+                    </p>
+                    <Input
+                      value={confirmText}
+                      onChange={(e) => setConfirmText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && confirmed) handleDelete() }}
+                      placeholder={CONFIRM_WORD}
+                      autoComplete="off"
+                      className="font-mono"
+                    />
+                  </div>
+                </div>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
+              <Button
                 onClick={handleDelete}
-                disabled={deleting}
+                disabled={!confirmed || deleting}
                 className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               >
                 {deleting ? "A apagar..." : "Apagar projeto"}
-              </AlertDialogAction>
+              </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
