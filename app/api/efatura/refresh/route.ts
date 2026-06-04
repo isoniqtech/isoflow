@@ -38,7 +38,7 @@ export async function POST() {
   // 1. Buscar todos os docs sem invoice_id e com NIF
   const { data: unmatchedDocs } = await supabase
     .from("efatura_documents")
-    .select("id, supplier_nif, document_number, at_status")
+    .select("id, supplier_nif, document_number, at_status, total")
     .eq("tenant_id", ctx.tenantId)
     .is("invoice_id", null)
     .not("supplier_nif", "is", null)
