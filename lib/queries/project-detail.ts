@@ -5,6 +5,7 @@ import type {
   InvoiceSource,
   ProjectStatus,
   ProjectType,
+  VatRegime,
 } from "@/types"
 
 export type ProjectDetail = {
@@ -73,6 +74,7 @@ const PT_MONTHS = [
 export async function getProjectDetail(
   id: string,
   tenantId: string,
+  vatRegime: VatRegime = "normal",
 ): Promise<ProjectDetailData | null> {
   const supabase = createClient()
 
@@ -87,7 +89,7 @@ export async function getProjectDetail(
   const { data: invoiceRows } = await supabase
     .from("invoices")
     .select(
-      "id, supplier_name, invoice_number, invoice_date, total, status, source, category, created_at",
+      "id, supplier_name, invoice_number, invoice_date, total, subtotal, status, source, category, created_at",
     )
     .eq("tenant_id", tenantId)
     .eq("project_id", id)
@@ -105,7 +107,12 @@ export async function getProjectDetail(
     category: r.category,
   }))
 
-  const total_spent = invoices.reduce((s, i) => s + Number(i.total ?? 0), 0)
+  const total_spent = (invoiceRows ?? []).reduce((s, r) => {
+    const amount = vatRegime === "isento"
+      ? Number(r.subtotal ?? r.total ?? 0)
+      : Number(r.total ?? 0)
+    return s + amount
+  }, 0)
   const budget = project.budget !== null ? Number(project.budget) : null
   const kpis: ProjectKpis = {
     total_spent,

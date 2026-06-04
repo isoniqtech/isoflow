@@ -61,7 +61,8 @@ export default async function ProjetoDetailPage({
   const session = await getCurrentSession()
   if (!session) redirect("/login")
 
-  const data = await getProjectDetail(params.id, session.tenant.id)
+  const vatRegime = ((session.tenant as Record<string, unknown>).vat_regime as import("@/types").VatRegime) ?? "normal"
+  const data = await getProjectDetail(params.id, session.tenant.id, vatRegime)
   if (!data) notFound()
 
   const { project, kpis, monthly, by_category, invoices } = data
@@ -118,7 +119,7 @@ export default async function ProjetoDetailPage({
             projectId={project.id}
             projectName={project.name}
             canEdit={canEdit}
-            canDelete={canDelete}
+            canDelete={false}
             canExportReport={canExportReport}
           />
         </div>
@@ -198,19 +199,6 @@ export default async function ProjetoDetailPage({
             budget={project.budget}
             threshold={project.budget_alert_threshold}
           />
-        </div>
-      )}
-
-      {project.name_aliases.length > 0 && (
-        <div className="rounded-lg border bg-background p-4 space-y-2">
-          <span className="text-sm font-medium">Aliases para matching automático</span>
-          <div className="flex flex-wrap gap-1.5">
-            {project.name_aliases.map((alias) => (
-              <Badge key={alias} variant="secondary">
-                {alias}
-              </Badge>
-            ))}
-          </div>
         </div>
       )}
 
