@@ -17,19 +17,23 @@ export async function reconcileInvoiceWithEFatura(
   },
   tenantId: string,
 ): Promise<boolean> {
-  if (!invoice.supplier_nif || !invoice.invoice_number || invoice.total === null) {
+  if (!invoice.invoice_number || invoice.total === null) {
     return false
   }
 
-  // Procurar documento e-Fatura não associado com NIF + número de documento
-  const { data: efaturaDocs } = await supabase
+  // Procurar documento e-Fatura não associado — se houver NIF filtra por NIF, senão só por número
+  let query = supabase
     .from("efatura_documents")
     .select("id, at_status, total")
     .eq("tenant_id", tenantId)
     .is("invoice_id", null)
-    .eq("supplier_nif", invoice.supplier_nif)
     .eq("document_number", invoice.invoice_number)
-    .limit(5)
+
+  if (invoice.supplier_nif) {
+    query = query.eq("supplier_nif", invoice.supplier_nif)
+  }
+
+  const { data: efaturaDocs } = await query.limit(5)
 
   if (!efaturaDocs?.length) return false
 

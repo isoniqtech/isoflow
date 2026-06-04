@@ -41,7 +41,6 @@ export async function POST() {
     .select("id, supplier_nif, document_number, at_status, total")
     .eq("tenant_id", ctx.tenantId)
     .is("invoice_id", null)
-    .not("supplier_nif", "is", null)
     .not("document_number", "is", null)
     .limit(1000)
 
@@ -49,15 +48,14 @@ export async function POST() {
   let atUpdated = 0
 
   if (unmatchedDocs && unmatchedDocs.length > 0) {
-    // 2. Buscar invoices com os NIFs relevantes (batch)
-    const nifs = [...new Set(unmatchedDocs.map(d => d.supplier_nif).filter(Boolean))] as string[]
+    // 2. Buscar todas as invoices do tenant (incluindo as sem NIF)
     const { data: invoices } = await supabase
       .from("invoices")
       .select("id, supplier_nif, invoice_number, toconline_fc_id, total, at_communicated")
       .eq("tenant_id", ctx.tenantId)
-      .in("supplier_nif", nifs)
       .neq("status", "rejected")
 
+    // Indexar por NIF e também ter lista completa para fallback sem NIF
     const invoicesByNif = new Map<string, typeof invoices>()
     for (const inv of invoices ?? []) {
       if (!inv.supplier_nif) continue
@@ -65,15 +63,21 @@ export async function POST() {
       list.push(inv)
       invoicesByNif.set(inv.supplier_nif, list)
     }
+    const allInvoices = invoices ?? []
 
     // 3. Fazer match em memória e batch update
     const efaturaUpdates: { id: string; invoice_id: string }[] = []
     const invoiceAtUpdates: string[] = []
 
     for (const doc of unmatchedDocs) {
-      if (!doc.supplier_nif || !doc.document_number) continue
-      const candidates = invoicesByNif.get(doc.supplier_nif) ?? []
+      if (!doc.document_number) continue
       const docTotal = Number(doc.total ?? 0)
+
+      // Candidatos: se doc tem NIF, filtrar por NIF; senão, usar todos
+      const candidates = doc.supplier_nif
+        ? (invoicesByNif.get(doc.supplier_nif) ?? [])
+        : allInvoices
+
       const inv = candidates.find(
         i =>
           (i.invoice_number === doc.document_number || i.toconline_fc_id === doc.document_number) &&

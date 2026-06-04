@@ -52,13 +52,6 @@ function ATBadge({ inv }: { inv: InvoiceListItem }) {
       </span>
     )
   }
-  if (inv.toconline_fc_id) {
-    return (
-      <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">
-        Sem associação
-      </span>
-    )
-  }
   return (
     <span className="text-xs text-muted-foreground">Sem FC</span>
   )
