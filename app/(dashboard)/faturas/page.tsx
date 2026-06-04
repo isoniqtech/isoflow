@@ -1,7 +1,8 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Download, Plus } from "lucide-react"
+import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ExportDropdown } from "@/components/faturas/export-dropdown"
 import { InvoiceTableFC } from "@/components/faturas/invoice-table-fc"
 import { InvoiceFilters } from "@/components/faturas/invoice-filters"
 import { InvoicesRealtime } from "@/components/faturas/invoices-realtime"
@@ -95,19 +96,14 @@ export default async function FaturasPage({
           </div>
           <div className="flex items-center gap-2">
             {hasPermission(session.role, "relatorios", "view_all") && total > 0 && (
-              <Button variant="outline" asChild>
-                <a href={`/api/faturas/export?${new URLSearchParams({
-                  ...(status !== "all" ? { status } : {}),
-                  ...(source !== "all" ? { source } : {}),
-                  ...(project_id !== "all" ? { project: project_id } : {}),
-                  ...(needs_review ? { review: "1" } : {}),
-                  ...(date_from ? { from: date_from } : {}),
-                  ...(date_to ? { to: date_to } : {}),
-                }).toString()}`}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Exportar CSV
-                </a>
-              </Button>
+              <ExportDropdown exportUrl={`/api/faturas/export?${new URLSearchParams({
+                ...(status !== "all" ? { status } : {}),
+                ...(source !== "all" ? { source } : {}),
+                ...(project_id !== "all" ? { project: project_id } : {}),
+                ...(needs_review ? { review: "1" } : {}),
+                ...(date_from ? { from: date_from } : {}),
+                ...(date_to ? { to: date_to } : {}),
+              }).toString()}`} />
             )}
             {canCreate && activeTab !== "efatura" && (
               <Button asChild>
