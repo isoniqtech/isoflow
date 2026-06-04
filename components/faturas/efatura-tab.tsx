@@ -11,7 +11,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import type { EFaturaPageData, EFaturaDocument } from "@/lib/queries/efatura-documents"
@@ -150,10 +150,10 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
 
-      {/* ── Toolbar ──────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* ── Toolbar — estática ───────────────────────────────── */}
+      <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           {filteredDocs.length} documento{filteredDocs.length !== 1 ? "s" : ""} AT pendente{filteredDocs.length !== 1 ? "s" : ""}
           {filteredDocs.length !== efatura_docs.length && ` (${efatura_docs.length} total)`}
@@ -203,79 +203,82 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
         </div>
       </div>
 
-      {/* ── Documentos AT ──────────────────────────────────── */}
-      {filteredDocs.length === 0 ? (
-        <EmptyState icon={FileText} title="Sem documentos pendentes" description="Todos os documentos AT já estão associados a faturas." />
-      ) : (
-        <div className="rounded-lg border bg-background overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fornecedor</TableHead>
-                <TableHead className="hidden md:table-cell">Nº Documento</TableHead>
-                <TableHead className="hidden md:table-cell">Data</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead>Estado AT</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDocs.map((doc) => (
-                <TableRow key={doc.id}>
-                  <TableCell>
-                    <p className="font-medium truncate">{doc.supplier_name ?? "Fornecedor desconhecido"}</p>
-                    {doc.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{doc.supplier_nif}</p>}
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
-                  <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
-                  <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
-                  <TableCell><ATStatusBadge status={doc.at_status} /></TableCell>
+      {/* ── Tabela + arquivo — área com scroll ───────────────── */}
+      <div className="flex-1 min-h-0 overflow-auto space-y-4">
+        {/* Documentos AT — thead sticky */}
+        {filteredDocs.length === 0 ? (
+          <EmptyState icon={FileText} title="Sem documentos pendentes" description="Todos os documentos AT já estão associados a faturas." />
+        ) : (
+          <div className="rounded-lg border bg-background">
+            <table className="w-full caption-bottom text-sm">
+              <TableHeader className="sticky top-0 z-10 bg-background">
+                <TableRow>
+                  <TableHead>Fornecedor</TableHead>
+                  <TableHead className="hidden md:table-cell">Nº Documento</TableHead>
+                  <TableHead className="hidden md:table-cell">Data</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead>Estado AT</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {/* ── Compras Registadas (arquivo) ──────────────────── */}
-      {efatura_docs_matched.length > 0 && (
-        <section>
-          <button
-            onClick={() => setShowMatched(v => !v)}
-            className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            {showMatched ? "▲" : "▶"} Compras Registadas ({efatura_docs_matched.length})
-          </button>
-          {showMatched && (
-            <div className="mt-3 rounded-lg border bg-background overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead className="hidden md:table-cell">Nº e-Fatura</TableHead>
-                    <TableHead className="hidden md:table-cell">Data</TableHead>
-                    <TableHead className="text-right">Valor</TableHead>
-                    <TableHead>Estado AT</TableHead>
+              </TableHeader>
+              <TableBody>
+                {filteredDocs.map((doc) => (
+                  <TableRow key={doc.id}>
+                    <TableCell>
+                      <p className="font-medium truncate">{doc.supplier_name ?? "Fornecedor desconhecido"}</p>
+                      {doc.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{doc.supplier_nif}</p>}
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
+                    <TableCell><ATStatusBadge status={doc.at_status} /></TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {efatura_docs_matched.map((doc) => (
-                    <TableRow key={doc.id}>
-                      <TableCell>
-                        <p className="font-medium truncate">{doc.supplier_name ?? "—"}</p>
-                        {doc.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{doc.supplier_nif}</p>}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
-                      <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
-                      <TableCell><ATStatusBadge status={doc.at_status} /></TableCell>
+                ))}
+              </TableBody>
+            </table>
+          </div>
+        )}
+
+        {/* Compras Registadas (arquivo) */}
+        {efatura_docs_matched.length > 0 && (
+          <section className="pb-4">
+            <button
+              onClick={() => setShowMatched(v => !v)}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showMatched ? "▲" : "▶"} Compras Registadas ({efatura_docs_matched.length})
+            </button>
+            {showMatched && (
+              <div className="mt-3 rounded-lg border bg-background">
+                <table className="w-full caption-bottom text-sm">
+                  <TableHeader className="sticky top-0 z-10 bg-background">
+                    <TableRow>
+                      <TableHead>Fornecedor</TableHead>
+                      <TableHead className="hidden md:table-cell">Nº e-Fatura</TableHead>
+                      <TableHead className="hidden md:table-cell">Data</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead>Estado AT</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </section>
-      )}
+                  </TableHeader>
+                  <TableBody>
+                    {efatura_docs_matched.map((doc) => (
+                      <TableRow key={doc.id}>
+                        <TableCell>
+                          <p className="font-medium truncate">{doc.supplier_name ?? "—"}</p>
+                          {doc.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{doc.supplier_nif}</p>}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
+                        <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
+                        <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
+                        <TableCell><ATStatusBadge status={doc.at_status} /></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
     </div>
   )
 }
