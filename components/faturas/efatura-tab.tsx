@@ -2,11 +2,14 @@
 
 import { useState, useTransition, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Loader2, RefreshCw, ChevronDown } from "lucide-react"
+import { FileSpreadsheet, FileText, Loader2, RefreshCw, ChevronDown, Download, Sheet } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -115,20 +118,35 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   function handleRefresh() {
     startRefresh(async () => {
       try {
-        const res = await fetch("/api/efatura/sync", { method: "POST" })
+        const res = await fetch("/api/efatura/refresh", { method: "POST" })
         const json = await res.json()
         if (!res.ok) {
           toast.error(json.error ?? "Erro ao atualizar e-Fatura")
           return
         }
+        const { n8n_triggered, matched, at_communicated_updated } = json as {
+          n8n_triggered: boolean
+          matched: number
+          at_communicated_updated: number
+        }
+        const lines: string[] = []
+        if (n8n_triggered) lines.push("dados frescos pedidos ao AT")
+        if (matched > 0) lines.push(`${matched} fatura${matched !== 1 ? "s" : ""} associada${matched !== 1 ? "s" : ""}`)
+        if (at_communicated_updated > 0) lines.push(`${at_communicated_updated} marcada${at_communicated_updated !== 1 ? "s" : ""} AT`)
         toast.success("e-Fatura atualizada", {
-          description: json.synced !== undefined ? `${json.synced} documento(s) sincronizado(s)` : undefined,
+          description: lines.length ? lines.join(" · ") : "Sem alterações",
         })
         router.refresh()
       } catch {
         toast.error("Erro de ligação ao servidor")
       }
     })
+  }
+
+  function exportUrl(format: "csv" | "xlsx" | "pdf") {
+    const params = new URLSearchParams({ format })
+    if (atFilters.length > 0) params.set("at_status", atFilters.join(","))
+    return `/api/efatura/export?${params.toString()}`
   }
 
   return (
@@ -140,13 +158,41 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
           {filteredDocs.length} documento{filteredDocs.length !== 1 ? "s" : ""} AT pendente{filteredDocs.length !== 1 ? "s" : ""}
           {filteredDocs.length !== efatura_docs.length && ` (${efatura_docs.length} total)`}
         </p>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             options={AT_STATUS_OPTIONS}
             selected={atFilters}
             onChange={setAtFilters}
             placeholder="Estado AT"
           />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline">
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <a href={exportUrl("csv")} download>
+                  <Sheet className="mr-2 h-4 w-4" />
+                  CSV
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={exportUrl("xlsx")} download>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Excel (.xlsx)
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={exportUrl("pdf")} download>
+                  <FileText className="mr-2 h-4 w-4" />
+                  PDF
+                </a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isPendingRefresh}>
             {isPendingRefresh
               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
