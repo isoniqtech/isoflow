@@ -135,8 +135,6 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
               const SourceIcon = SOURCE_ICONS[inv.source] ?? FileText
               const isEligible = inv.type === "incoming" && !inv.toconline_fc_id
               const isSelected = selected.has(inv.id)
-              const overdue = inv.due_date && inv.status !== "paid" && inv.status !== "rejected" && new Date(inv.due_date) < new Date()
-
               return (
                 <TableRow key={inv.id} className={cn("cursor-pointer", isSelected && "bg-muted/40")}>
                   <TableCell className="px-3">
@@ -168,9 +166,7 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-sm">
                     <Link href={`/faturas/${inv.id}`} className="block">
-                      <span className={cn(overdue && "text-destructive font-medium")}>
-                        {inv.invoice_date ? formatDate(inv.invoice_date) : "—"}
-                      </span>
+                      {inv.invoice_date ? formatDate(inv.invoice_date) : "—"}
                     </Link>
                   </TableCell>
                   <TableCell className="hidden lg:table-cell font-mono text-sm">
