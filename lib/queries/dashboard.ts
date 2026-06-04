@@ -182,19 +182,65 @@ export async function getDashboardData(
     .filter((i) => i.type === "incoming")
     .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
 
-  // Revenue without VAT: try Toconline cache first (only for current month in mensal mode)
+  // Revenue without VAT
   const cachedRevenue = tenantCache
-  const useToconlineCache =
-    mode === "mensal" &&
-    cachedRevenue &&
-    cachedRevenue.toconline_revenue_month === month &&
-    cachedRevenue.toconline_revenue_year === year &&
-    cachedRevenue.toconline_revenue_total !== null
-  const revenueRaw = useToconlineCache
-    ? Number(cachedRevenue!.toconline_revenue_total)
-    : periodList
-        .filter((i) => i.type === "outgoing")
-        .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+  const snapshotMap = new Map<number, number>(
+    (snapshotRows ?? []).map((s) => [s.month, Number(s.revenue)]),
+  )
+
+  let revenueRaw = 0
+  let useToconlineCache = false
+
+  if (mode === "mensal") {
+    // Mensal: cache TOConline se for o mês corrente, senão snapshot, senão faturas
+    if (
+      cachedRevenue &&
+      cachedRevenue.toconline_revenue_month === month &&
+      cachedRevenue.toconline_revenue_year === year &&
+      cachedRevenue.toconline_revenue_total !== null
+    ) {
+      revenueRaw = Number(cachedRevenue.toconline_revenue_total)
+      useToconlineCache = true
+    } else {
+      revenueRaw = snapshotMap.get(month) ??
+        periodList.filter(i => i.type === "outgoing").reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+      if (snapshotMap.has(month)) useToconlineCache = true
+    }
+  } else if (mode === "trimestral") {
+    // Trimestral: somar snapshots dos 3 meses + cache do mês corrente se incluído
+    const startM = (quarter - 1) * 3 + 1
+    for (let m = startM; m <= startM + 2; m++) {
+      if (cachedRevenue?.toconline_revenue_month === m && cachedRevenue?.toconline_revenue_year === year && cachedRevenue?.toconline_revenue_total !== null) {
+        revenueRaw += Number(cachedRevenue.toconline_revenue_total)
+        useToconlineCache = true
+      } else if (snapshotMap.has(m)) {
+        revenueRaw += snapshotMap.get(m) ?? 0
+        useToconlineCache = true
+      } else {
+        // Fallback: faturas outgoing do mês m no período
+        const ms = `${year}-${String(m).padStart(2, "0")}`
+        revenueRaw += periodList
+          .filter(i => i.type === "outgoing" && (i.invoice_date ?? "").startsWith(ms))
+          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+      }
+    }
+  } else {
+    // Acumulado: somar todos os snapshots do ano + cache mês corrente
+    for (let m = 1; m <= 12; m++) {
+      if (cachedRevenue?.toconline_revenue_month === m && cachedRevenue?.toconline_revenue_year === year && cachedRevenue?.toconline_revenue_total !== null) {
+        revenueRaw += Number(cachedRevenue.toconline_revenue_total)
+        useToconlineCache = true
+      } else if (snapshotMap.has(m)) {
+        revenueRaw += snapshotMap.get(m) ?? 0
+        useToconlineCache = true
+      } else {
+        const ms = `${year}-${String(m).padStart(2, "0")}`
+        revenueRaw += periodList
+          .filter(i => i.type === "outgoing" && (i.invoice_date ?? "").startsWith(ms))
+          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+      }
+    }
+  }
 
   const ebitda = revenueRaw - expensesRaw
   const ebitdaPct = revenueRaw > 0 ? Math.round((ebitda / revenueRaw) * 100) : 0
@@ -237,9 +283,6 @@ export async function getDashboardData(
   }
 
   // Chart: always annual, always without VAT
-  const snapshotMap = new Map<number, number>(
-    (snapshotRows ?? []).map((s) => [s.month, Number(s.revenue)]),
-  )
   const chart = buildAnnualChart(
     currentMonth,
     currentYear,
