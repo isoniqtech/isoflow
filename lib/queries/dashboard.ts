@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server"
 import type { VatRegime } from "@/types"
 
-export type DashboardMode = "mensal" | "acumulado"
+export type DashboardMode = "mensal" | "trimestral" | "acumulado"
 
 export type DashboardKpis = {
   invoices_this_period: number
@@ -83,12 +83,13 @@ export async function getDashboardData(
     vatRegime: VatRegime
     mode: DashboardMode
     month: number
+    quarter: number
     year: number
   },
 ): Promise<DashboardData> {
   const supabase = createClient()
 
-  const { mode, month, year, vatRegime } = options
+  const { mode, month, quarter, year, vatRegime } = options
 
   // Date range for the selected period
   let startDate: string
@@ -97,6 +98,12 @@ export async function getDashboardData(
     const lastDay = new Date(year, month, 0).getDate()
     startDate = `${year}-${String(month).padStart(2, "0")}-01`
     endDate = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+  } else if (mode === "trimestral") {
+    const startMonth = (quarter - 1) * 3 + 1
+    const endMonth = quarter * 3
+    const lastDay = new Date(year, endMonth, 0).getDate()
+    startDate = `${year}-${String(startMonth).padStart(2, "0")}-01`
+    endDate = `${year}-${String(endMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
   } else {
     startDate = `${year}-01-01`
     endDate = `${year}-12-31`
@@ -158,11 +165,13 @@ export async function getDashboardData(
       .eq("tenant_id", tenantId)
       .gte("date", startDate)
       .lte("date", endDate),
-    // e-Fatura docs: total and unmatched
+    // e-Fatura docs do período: total e por conciliar
     supabase
       .from("efatura_documents")
       .select("id, invoice_id")
-      .eq("tenant_id", tenantId),
+      .eq("tenant_id", tenantId)
+      .gte("document_date", startDate)
+      .lte("document_date", endDate),
   ])
 
   const periodList = periodInvoices ?? []

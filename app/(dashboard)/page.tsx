@@ -18,12 +18,12 @@ import { formatCurrency } from "@/lib/utils/portugal"
 import type { DashboardMode } from "@/lib/queries/dashboard"
 import type { VatRegime } from "@/types"
 
-const VALID_MODES: DashboardMode[] = ["mensal", "acumulado"]
+const VALID_MODES: DashboardMode[] = ["mensal", "trimestral", "acumulado"]
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: { mode?: string; month?: string; year?: string }
+  searchParams: { mode?: string; month?: string; quarter?: string; year?: string }
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
@@ -31,11 +31,15 @@ export default async function DashboardPage({
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth() + 1
+  const currentQuarter = Math.ceil(currentMonth / 3)
+
+  const hasParams = !!(searchParams.mode || searchParams.month || searchParams.quarter || searchParams.year)
 
   const mode: DashboardMode = VALID_MODES.includes(searchParams.mode as DashboardMode)
     ? (searchParams.mode as DashboardMode)
     : "mensal"
   const month = Math.min(12, Math.max(1, parseInt(searchParams.month ?? String(currentMonth), 10) || currentMonth))
+  const quarter = Math.min(4, Math.max(1, parseInt(searchParams.quarter ?? String(currentQuarter), 10) || currentQuarter))
   const year = parseInt(searchParams.year ?? String(currentYear), 10) || currentYear
 
   const vatRegime = ((session.tenant as Record<string, unknown>).vat_regime as VatRegime) ?? "normal"
@@ -46,6 +50,7 @@ export default async function DashboardPage({
     vatRegime,
     mode,
     month,
+    quarter,
     year,
   })
 
@@ -55,6 +60,8 @@ export default async function DashboardPage({
 
   const periodLabel = mode === "mensal"
     ? `mês ${String(month).padStart(2, "0")}/${year}`
+    : mode === "trimestral"
+    ? `T${quarter} ${year}`
     : `ano ${year}`
 
   return (
@@ -67,7 +74,7 @@ export default async function DashboardPage({
             Olá, {session.user.name.split(" ")[0]}. Resumo do {periodLabel}.
           </p>
         </div>
-        <DashboardControls mode={mode} month={month} year={year} />
+        <DashboardControls mode={mode} month={month} quarter={quarter} year={year} hasParams={hasParams} />
       </div>
 
       {/* KPIs + Alertas */}
