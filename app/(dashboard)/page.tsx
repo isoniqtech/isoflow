@@ -101,7 +101,7 @@ export default async function DashboardPage({
               label="Banco pendentes"
               value={`${data.kpis.bank_pending_pct}%`}
               icon={Banknote}
-              hint={`${data.kpis.bank_pending_count} de ${data.kpis.bank_total_count} movimentos`}
+              hint={`${data.kpis.bank_pending_count} de ${data.kpis.bank_total_count} mov. no período`}
             />
             <KpiCard
               label="e-Fatura pendentes"

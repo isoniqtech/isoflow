@@ -110,7 +110,7 @@ export async function getDashboardData(
     { data: tenantCache },
     { data: annualRows },
     { data: snapshotRows },
-    { count: bankTotalCount, data: bankAllData },
+    { data: bankAllData },
     { data: efaturaData },
   ] = await Promise.all([
     // Period invoices (for KPIs)
@@ -149,11 +149,13 @@ export async function getDashboardData(
       .select("month, revenue")
       .eq("tenant_id", tenantId)
       .eq("year", year),
-    // Bank transactions: total count + all for pending check
+    // Bank transactions do período: total e pendentes de conciliação
     supabase
       .from("bank_transactions")
-      .select("id, external_status", { count: "exact" })
-      .eq("tenant_id", tenantId),
+      .select("id, invoice_id")
+      .eq("tenant_id", tenantId)
+      .gte("date", startDate)
+      .lte("date", endDate),
     // e-Fatura docs: total and unmatched
     supabase
       .from("efatura_documents")
@@ -186,12 +188,10 @@ export async function getDashboardData(
   const ebitda = revenueRaw - expensesRaw
   const ebitdaPct = revenueRaw > 0 ? Math.round((ebitda / revenueRaw) * 100) : 0
 
-  // Bank pending (external_status = 'PENDING')
+  // Bank pending: transações do período sem invoice_id (por conciliar)
   const bankAll = bankAllData ?? []
-  const bankTotal = bankTotalCount ?? 0
-  const bankPending = bankAll.filter(
-    (t) => (t as { external_status?: string }).external_status === "PENDING"
-  ).length
+  const bankTotal = bankAll.length
+  const bankPending = bankAll.filter((t) => !(t as { invoice_id?: string | null }).invoice_id).length
   const bankPendingPct = bankTotal > 0 ? Math.round((bankPending / bankTotal) * 100) : 0
 
   // e-Fatura pending (docs without invoice_id)
