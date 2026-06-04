@@ -119,16 +119,15 @@ export async function GET(req: Request) {
     if (date_from) filterParts.push(`De: ${date_from}`)
     if (date_to) filterParts.push(`Até: ${date_to}`)
 
-    const buf = await renderToBuffer(
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      createElement(FaturasReport as any, {
-        invoices: all,
-        tenantName,
-        generatedAt,
-        filters: filterParts.length ? filterParts.join(" · ") : undefined,
-      })
-    )
-    return new Response(buf, {
+    const element = createElement(FaturasReport, {
+      invoices: all,
+      tenantName,
+      generatedAt,
+      filters: filterParts.length ? filterParts.join(" · ") : undefined,
+    }) as unknown as Parameters<typeof renderToBuffer>[0]
+    const pdfBuffer = await renderToBuffer(element)
+    const pdfBytes = new Uint8Array(pdfBuffer)
+    return new Response(pdfBytes, {
       status: 200,
       headers: {
         "Content-Type": "application/pdf",
