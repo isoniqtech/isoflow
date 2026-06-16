@@ -7,6 +7,7 @@
 
 export type TenantPlan = "starter" | "business" | "pro" | "enterprise"
 export type TenantStatus = "trial" | "active" | "suspended" | "cancelled"
+export type BillingCycle = "monthly" | "annual"
 export type VatRegime = "isento" | "reduzido" | "intermedio" | "normal"
 
 export type UserRole = "owner" | "admin" | "accountant" | "member"
@@ -95,6 +96,9 @@ export interface Tenant {
   primary_color: string
   app_name: string
   vat_regime: VatRegime
+  billing_cycle: BillingCycle
+  internal_notes: string | null
+  next_billing_date: string | null
   created_at: string
   updated_at: string
 }

@@ -935,15 +935,18 @@ export type Database = {
           address: string | null
           app_name: string | null
           auto_erp_send: boolean
+          billing_cycle: string | null
           created_at: string | null
           credits_balance: number | null
           credits_used_this_month: number | null
           email: string | null
           favicon_path: string | null
           id: string
+          internal_notes: string | null
           logo_path: string | null
           logo_url: string | null
           name: string
+          next_billing_date: string | null
           nif: string | null
           onboarding_completed: boolean | null
           phone: string | null
@@ -960,15 +963,18 @@ export type Database = {
           address?: string | null
           app_name?: string | null
           auto_erp_send?: boolean
+          billing_cycle?: string | null
           created_at?: string | null
           credits_balance?: number | null
           credits_used_this_month?: number | null
           email?: string | null
           favicon_path?: string | null
           id?: string
+          internal_notes?: string | null
           logo_path?: string | null
           logo_url?: string | null
           name: string
+          next_billing_date?: string | null
           nif?: string | null
           onboarding_completed?: boolean | null
           phone?: string | null
@@ -985,15 +991,18 @@ export type Database = {
           address?: string | null
           app_name?: string | null
           auto_erp_send?: boolean
+          billing_cycle?: string | null
           created_at?: string | null
           credits_balance?: number | null
           credits_used_this_month?: number | null
           email?: string | null
           favicon_path?: string | null
           id?: string
+          internal_notes?: string | null
           logo_path?: string | null
           logo_url?: string | null
           name?: string
+          next_billing_date?: string | null
           nif?: string | null
           vat_regime?: string | null
           onboarding_completed?: boolean | null

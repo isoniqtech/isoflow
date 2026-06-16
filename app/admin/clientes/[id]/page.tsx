@@ -2,11 +2,16 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import {
   Activity,
+  AlertTriangle,
+  CalendarDays,
   ChevronLeft,
   Coins,
   FileText,
   FolderKanban,
+  Globe,
   LifeBuoy,
+  MessageSquareWarning,
+  StickyNote,
   Users,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
@@ -73,10 +78,24 @@ export default async function AdminClienteDetailPage({
   const data = await getAdminClientDetail(params.id)
   if (!data) notFound()
 
-  const { tenant, owner, user_count, invoice_count, project_count, open_tickets, recent_tickets } = data
+  const { tenant, owner, user_count, invoice_count, project_count, integration_count, open_tickets, recent_tickets } = data
   const status = STATUS_STYLES[tenant.status]
   const mrr = tenant.status === "active" ? PLAN_PRICES[tenant.plan] : 0
   const audit = await listAdminAudit(tenant.id, { limit: 20 })
+
+  // Diagnósticos
+  const creditsLow = tenant.credits_balance > 0 && tenant.credits_balance < 50
+  const creditsEmpty = tenant.credits_balance === 0
+  const trialExpiringSoon =
+    tenant.status === "trial" &&
+    tenant.trial_ends_at &&
+    new Date(tenant.trial_ends_at) <= new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+  const diagnostics: Array<{ level: "warn" | "danger"; msg: string }> = []
+  if (creditsEmpty) diagnostics.push({ level: "danger", msg: "Sem créditos — processamento de faturas bloqueado" })
+  else if (creditsLow) diagnostics.push({ level: "warn", msg: `Apenas ${tenant.credits_balance} créditos restantes` })
+  if (trialExpiringSoon) diagnostics.push({ level: "warn", msg: `Trial expira em ${formatDate(tenant.trial_ends_at!)}` })
+  if (!tenant.onboarding_completed) diagnostics.push({ level: "warn", msg: "Onboarding por terminar" })
+  if (integration_count === 0) diagnostics.push({ level: "warn", msg: "Nenhuma integração ativa (ERP/Banco)" })
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
@@ -101,6 +120,9 @@ export default async function AdminClienteDetailPage({
               <Badge variant="secondary" className="capitalize">
                 {tenant.plan}
               </Badge>
+              <Badge variant="outline" className="capitalize">
+                {tenant.billing_cycle === "annual" ? "Anual" : "Mensal"}
+              </Badge>
               {!tenant.onboarding_completed && (
                 <Badge
                   variant="outline"
@@ -122,6 +144,30 @@ export default async function AdminClienteDetailPage({
         </div>
       </div>
 
+      {/* Diagnósticos */}
+      {diagnostics.length > 0 && (
+        <div className="space-y-2">
+          {diagnostics.map((d, i) => (
+            <div
+              key={i}
+              className={cn(
+                "flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-sm",
+                d.level === "danger"
+                  ? "border-destructive/40 bg-destructive/10 text-destructive"
+                  : "border-amber-300/40 bg-amber-50 text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300",
+              )}
+            >
+              {d.level === "danger" ? (
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+              ) : (
+                <MessageSquareWarning className="h-4 w-4 shrink-0" />
+              )}
+              {d.msg}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <KpiCard label="MRR" value={formatCurrency(mrr)} icon={Coins} />
         <KpiCard
@@ -141,32 +187,75 @@ export default async function AdminClienteDetailPage({
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium">
-                Contacto e dono
+                Contacto e faturação
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               {owner ? (
-                <div>
-                  <p className="font-medium">{owner.name}</p>
-                  <p className="text-muted-foreground text-xs">{owner.email}</p>
+                <div className="flex items-start gap-3">
+                  <Users className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                  <div>
+                    <p className="font-medium">{owner.name}</p>
+                    <p className="text-muted-foreground text-xs">{owner.email}</p>
+                    {owner.last_login_at && (
+                      <p className="text-muted-foreground text-xs mt-0.5">
+                        Último acesso: {formatDate(owner.last_login_at)}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <p className="text-muted-foreground">Sem owner registado.</p>
               )}
               {tenant.phone && (
-                <p className="text-sm">
+                <p>
                   <span className="text-muted-foreground">Telefone: </span>
                   {tenant.phone}
                 </p>
               )}
               {tenant.address && (
-                <p className="text-sm whitespace-pre-line">
+                <p className="whitespace-pre-line">
                   <span className="text-muted-foreground">Morada: </span>
                   {tenant.address}
                 </p>
               )}
+              <div className="flex items-center gap-2 pt-1 border-t">
+                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  <span>
+                    <span className="text-muted-foreground">Ciclo: </span>
+                    <strong>{tenant.billing_cycle === "annual" ? "Anual" : "Mensal"}</strong>
+                  </span>
+                  {tenant.next_billing_date && (
+                    <span>
+                      <span className="text-muted-foreground">Próxima fatura: </span>
+                      <strong>{formatDate(tenant.next_billing_date)}</strong>
+                    </span>
+                  )}
+                  <span>
+                    <span className="text-muted-foreground">Integrações ativas: </span>
+                    <strong>{integration_count}</strong>
+                  </span>
+                </div>
+              </div>
             </CardContent>
           </Card>
+
+          {tenant.internal_notes && (
+            <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900/40 dark:bg-amber-950/20">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                  <StickyNote className="h-4 w-4" />
+                  Notas internas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-amber-900 dark:text-amber-200 whitespace-pre-line">
+                  {tenant.internal_notes}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">

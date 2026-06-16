@@ -206,16 +206,20 @@ export type AdminClientDetail = {
     address: string | null
     plan: TenantPlan
     status: TenantStatus
+    billing_cycle: "monthly" | "annual"
     credits_balance: number
     credits_used_this_month: number
     trial_ends_at: string | null
+    next_billing_date: string | null
     onboarding_completed: boolean
+    internal_notes: string | null
     created_at: string
   }
-  owner: { id: string; name: string; email: string } | null
+  owner: { id: string; name: string; email: string; last_login_at: string | null } | null
   user_count: number
   invoice_count: number
   project_count: number
+  integration_count: number
   open_tickets: number
   recent_tickets: Array<{
     id: string
@@ -237,11 +241,11 @@ export async function getAdminClientDetail(
     .maybeSingle()
   if (!tenant) return null
 
-  const [{ data: owner }, { count: user_count }, { count: invoice_count }, { count: project_count }, { data: ticketRows }] =
+  const [{ data: owner }, { count: user_count }, { count: invoice_count }, { count: project_count }, { count: integration_count }, { data: ticketRows }] =
     await Promise.all([
       supabase
         .from("users")
-        .select("id, name, email")
+        .select("id, name, email, last_login_at")
         .eq("tenant_id", id)
         .eq("role", "owner")
         .maybeSingle(),
@@ -257,6 +261,11 @@ export async function getAdminClientDetail(
         .from("projects")
         .select("id", { count: "exact", head: true })
         .eq("tenant_id", id),
+      supabase
+        .from("tenant_integrations")
+        .select("id", { count: "exact", head: true })
+        .eq("tenant_id", id)
+        .eq("is_active", true),
       supabase
         .from("support_tickets")
         .select("id, title, status, priority, created_at")
@@ -282,18 +291,22 @@ export async function getAdminClientDetail(
       address: tenant.address,
       plan: (tenant.plan ?? "starter") as TenantPlan,
       status: (tenant.status ?? "trial") as TenantStatus,
+      billing_cycle: (tenant.billing_cycle ?? "monthly") as "monthly" | "annual",
       credits_balance: tenant.credits_balance ?? 0,
       credits_used_this_month: tenant.credits_used_this_month ?? 0,
       trial_ends_at: tenant.trial_ends_at,
+      next_billing_date: tenant.next_billing_date ?? null,
       onboarding_completed: tenant.onboarding_completed ?? false,
+      internal_notes: tenant.internal_notes ?? null,
       created_at: tenant.created_at ?? new Date().toISOString(),
     },
     owner: owner
-      ? { id: owner.id, name: owner.name, email: owner.email }
+      ? { id: owner.id, name: owner.name, email: owner.email, last_login_at: owner.last_login_at ?? null }
       : null,
     user_count: user_count ?? 0,
     invoice_count: invoice_count ?? 0,
     project_count: project_count ?? 0,
+    integration_count: integration_count ?? 0,
     open_tickets,
     recent_tickets: (ticketRows ?? []).map((t) => ({
       id: t.id,
