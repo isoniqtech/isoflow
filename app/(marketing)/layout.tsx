@@ -45,7 +45,7 @@ export default function MarketingLayout({
                 <span className="font-semibold">ISOFlow</span>
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Plataforma portuguesa para gestão automática de faturas, conciliação bancária e controlo de obras.
+                Plataforma portuguesa para gestão automática de faturas, conciliação bancária e controlo de projetos.
               </p>
             </div>
             <div>
@@ -61,8 +61,8 @@ export default function MarketingLayout({
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li>ISONIQ TECH</li>
                 <li>
-                  <a href="mailto:geral@isoniqtech.com" className="hover:text-foreground transition-colors">
-                    geral@isoniqtech.com
+                  <a href="mailto:info@isoniqtech.com" className="hover:text-foreground transition-colors">
+                    info@isoniqtech.com
                   </a>
                 </li>
                 <li>Portugal</li>

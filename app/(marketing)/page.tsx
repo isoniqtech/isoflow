@@ -2,9 +2,9 @@ import Link from "next/link"
 import {
   ArrowRight,
   BrainCircuit,
-  Building2,
   CheckCircle2,
   FileText,
+  FolderKanban,
   Landmark,
   Link2,
   MessageCircle,
@@ -27,13 +27,13 @@ const FEATURES = [
     icon: BrainCircuit,
     title: "Extração com IA",
     description:
-      "Lê fornecedor, NIF, valores, IVA e data de vencimento. Confiança superior a 95% — sem digitação manual.",
+      "Lê fornecedor, NIF, valores, IVA e data de vencimento. Confiança superior a 95%, sem digitação manual.",
   },
   {
-    icon: Building2,
-    title: "Projetos & Obras",
+    icon: FolderKanban,
+    title: "Gestão de Projetos",
     description:
-      "Associa cada fatura ao projeto ou obra certa. Controla orçamentos e recebe alertas quando estás a aproximar-te do limite.",
+      "Associa cada fatura ao projeto certo. Controla orçamentos e recebe alertas quando estás a aproximar-te do limite.",
   },
   {
     icon: Landmark,
@@ -60,13 +60,13 @@ const STEPS = [
     number: "01",
     title: "Recebes a fatura",
     description:
-      "O fornecedor envia por WhatsApp, email ou fazes upload manual. Qualquer formato — PDF, JPG ou PNG.",
+      "O fornecedor envia por WhatsApp, email ou fazes upload manual. Qualquer formato: PDF, JPG ou PNG.",
   },
   {
     number: "02",
     title: "IA processa e organiza",
     description:
-      "Extrai todos os dados em segundos e associa ao projeto ou obra certa. Assinala o que precisa de revisão.",
+      "Extrai todos os dados em segundos e associa ao projeto certo. Assinala o que precisa de revisão.",
   },
   {
     number: "03",
@@ -126,7 +126,7 @@ const PLANS = [
   },
 ]
 
-const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "geral@isoniqtech.com"
+const CONTACT_EMAIL = process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "info@isoniqtech.com"
 
 export default function LandingPage() {
   return (
@@ -134,37 +134,46 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/50 to-background dark:from-blue-950/20 dark:to-background pt-20 pb-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <Badge variant="outline" className="mb-6 text-blue-700 border-blue-200 bg-blue-50 dark:text-blue-300 dark:border-blue-800 dark:bg-blue-950/50">
+          <Badge variant="outline" className="mb-6 text-blue-700 border-blue-200 bg-blue-50 dark:text-blue-300 dark:border-blue-800 dark:bg-blue-950/50 animate-in fade-in duration-500">
             Desenvolvido em Portugal, para empresas portuguesas
           </Badge>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6 leading-tight">
-            Faturas e obras{" "}
+          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6 leading-tight animate-in fade-in slide-in-from-bottom-4 duration-700">
+            Faturas e projetos{" "}
             <span className="text-blue-600 dark:text-blue-400">sob controlo.</span>
             <br />
             Automaticamente.
           </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
             Recebe faturas por WhatsApp ou email. A IA extrai os dados, associa ao projeto certo e concilia com o banco.
             Tu só confirmas.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button size="lg" className="text-base px-8" asChild>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+            <Button
+              size="lg"
+              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
+              asChild
+            >
               <a href="#contacto">
                 Pedir demonstração
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </a>
             </Button>
-            <Button size="lg" variant="outline" className="text-base px-8" asChild>
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-950/30 dark:hover:border-blue-700 dark:hover:text-blue-300 active:scale-95"
+              asChild
+            >
               <a href="#precos">Ver preços</a>
             </Button>
           </div>
         </div>
 
         {/* Stats strip */}
-        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-4 sm:gap-8 text-center">
+        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-4 sm:gap-8 text-center animate-in fade-in duration-1000 delay-500">
           {[
             { value: "< 5s", label: "por fatura processada" },
-            { value: "+95%", label: "de precisão na extração IA" },
+            { value: "+95%", label: "de precisão na extração" },
             { value: "0", label: "digitação manual necessária" },
           ].map((stat) => (
             <div key={stat.label}>
@@ -183,7 +192,7 @@ export default function LandingPage() {
               Tudo o que precisas numa só plataforma
             </h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-              Desde a receção da fatura até à comunicação com o ERP — sem sair do ISOFlow.
+              Desde a receção da fatura até à comunicação com o ERP, sem sair do ISOFlow.
             </p>
           </div>
 
@@ -191,9 +200,12 @@ export default function LandingPage() {
             {FEATURES.map((feature) => {
               const Icon = feature.icon
               return (
-                <Card key={feature.title} className="border bg-card hover:shadow-md transition-shadow">
+                <Card
+                  key={feature.title}
+                  className="border bg-card transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-800 cursor-default"
+                >
                   <CardHeader className="pb-3">
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center mb-3">
+                    <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center mb-3 transition-colors duration-200 group-hover:bg-blue-200">
                       <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <CardTitle className="text-base">{feature.title}</CardTitle>
@@ -222,9 +234,9 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {STEPS.map((step, i) => (
-              <div key={step.number} className="relative flex flex-col items-center text-center md:items-start md:text-left">
+              <div key={step.number} className="relative flex flex-col items-center text-center md:items-start md:text-left group">
                 <div className="flex items-center gap-4 mb-4">
-                  <span className="text-4xl font-black text-blue-600/20 dark:text-blue-400/20 leading-none">
+                  <span className="text-4xl font-black text-blue-600/20 dark:text-blue-400/20 leading-none transition-colors duration-200 group-hover:text-blue-600/40 dark:group-hover:text-blue-400/40">
                     {step.number}
                   </span>
                   {i < STEPS.length - 1 && (
@@ -257,8 +269,8 @@ export default function LandingPage() {
                 key={plan.name}
                 className={
                   plan.highlighted
-                    ? "border-2 border-blue-600 dark:border-blue-400 shadow-lg relative"
-                    : "border"
+                    ? "border-2 border-blue-600 dark:border-blue-400 shadow-lg relative transition-all duration-200 hover:shadow-xl hover:-translate-y-1"
+                    : "border transition-all duration-200 hover:shadow-md hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-800"
                 }
               >
                 {plan.highlighted && (
@@ -286,7 +298,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Button
-                    className="w-full mt-2"
+                    className="w-full mt-2 transition-all duration-200 hover:scale-105 active:scale-95"
                     variant={plan.highlighted ? "default" : "outline"}
                     asChild
                   >
@@ -298,7 +310,7 @@ export default function LandingPage() {
           </div>
 
           {/* Enterprise */}
-          <Card className="border bg-muted/30">
+          <Card className="border bg-muted/30 transition-all duration-200 hover:shadow-md">
             <CardContent className="py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
                 <p className="font-semibold">Enterprise</p>
@@ -307,7 +319,11 @@ export default function LandingPage() {
                   A partir de 599€/mês.
                 </p>
               </div>
-              <Button variant="outline" className="shrink-0" asChild>
+              <Button
+                variant="outline"
+                className="shrink-0 transition-all duration-200 hover:scale-105 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-950/30 active:scale-95"
+                asChild
+              >
                 <a href={`mailto:${CONTACT_EMAIL}`}>Falar com vendas</a>
               </Button>
             </CardContent>
@@ -324,7 +340,7 @@ export default function LandingPage() {
               { icon: FileText, text: "Conforme com RGPD" },
               { icon: Landmark, text: "Preparado para e-Fatura e AT" },
             ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-2">
+              <div key={text} className="flex items-center gap-2 transition-colors duration-200 hover:text-foreground">
                 <Icon className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
                 <span>{text}</span>
               </div>
@@ -340,7 +356,7 @@ export default function LandingPage() {
             Pronto para começar?
           </h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
-            Entra em contacto. A equipa ISONIQ TECH trata de tudo —
+            Entra em contacto. A equipa ISONIQ TECH trata de tudo:
             configuração, integração e formação incluídas na implementação.
           </p>
 
@@ -368,15 +384,24 @@ export default function LandingPage() {
                 e configuramos a tua empresa sem custo inicial.
               </p>
 
-              <Button className="w-full" size="lg" asChild>
+              <Button
+                className="w-full transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-95"
+                size="lg"
+                asChild
+              >
                 <a href={`mailto:${CONTACT_EMAIL}?subject=Pedido de demonstração ISOFlow`}>
                   Enviar pedido de demonstração
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </a>
               </Button>
 
-              <Button className="w-full" variant="outline" size="lg" asChild>
-                <Link href="/login">Já tenho conta — Entrar</Link>
+              <Button
+                className="w-full transition-all duration-200 hover:scale-[1.02] hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-950/30 active:scale-95"
+                variant="outline"
+                size="lg"
+                asChild
+              >
+                <Link href="/login">Já tenho conta. Entrar</Link>
               </Button>
             </CardContent>
           </Card>
