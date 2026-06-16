@@ -37,7 +37,7 @@ export default function DashboardError({
           Tentar de novo
         </Button>
         <Button variant="outline" asChild>
-          <Link href="/">Voltar ao dashboard</Link>
+          <Link href="/dashboard">Voltar ao dashboard</Link>
         </Button>
       </div>
     </div>

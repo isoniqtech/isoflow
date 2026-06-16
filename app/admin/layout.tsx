@@ -13,7 +13,7 @@ export default async function AdminLayout({
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
-  if (!isSuperAdmin(session.user.id)) redirect("/")
+  if (!isSuperAdmin(session.user.id)) redirect("/dashboard")
 
   return (
     <div className="min-h-screen flex bg-muted/30">
@@ -21,7 +21,7 @@ export default async function AdminLayout({
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b bg-background flex items-center px-4 gap-3 shrink-0">
           <Link
-            href="/"
+            href="/dashboard"
             className="text-sm text-muted-foreground hover:text-foreground inline-flex items-center"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />

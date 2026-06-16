@@ -17,7 +17,8 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/efatura/sync" ||
     pathname.includes("/update-fc") ||
     pathname.startsWith("/auth/callback") ||
-    pathname === "/reset-password"
+    pathname === "/reset-password" ||
+    pathname === "/"
   ) {
     return response
   }
@@ -34,7 +35,7 @@ export async function middleware(request: NextRequest) {
 
   if (isAuthRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = "/"
+    url.pathname = "/dashboard"
     return NextResponse.redirect(url)
   }
 
@@ -62,7 +63,7 @@ export async function middleware(request: NextRequest) {
     const superAdminId = process.env.SUPER_ADMIN_USER_ID
     if (!superAdminId || user.id !== superAdminId) {
       const url = request.nextUrl.clone()
-      url.pathname = "/"
+      url.pathname = "/dashboard"
       return NextResponse.redirect(url)
     }
   }

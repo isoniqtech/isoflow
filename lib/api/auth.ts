@@ -6,6 +6,8 @@ export type ApiContext = {
   email: string
   tenantId: string
   role: UserRole
+  creditsBalance: number
+  plan: string
 }
 
 export async function getApiContext(): Promise<ApiContext | null> {
@@ -22,11 +24,27 @@ export async function getApiContext(): Promise<ApiContext | null> {
     .maybeSingle()
   if (!profile) return null
 
+  const { data: tenant } = await supabase
+    .from("tenants")
+    .select("status, trial_ends_at, credits_balance, plan")
+    .eq("id", profile.tenant_id)
+    .maybeSingle()
+  if (!tenant) return null
+
+  if (tenant.status === "cancelled" || tenant.status === "suspended") return null
+  if (
+    tenant.status === "trial" &&
+    tenant.trial_ends_at &&
+    new Date(tenant.trial_ends_at) < new Date()
+  ) return null
+
   return {
     userId: user.id,
     email: user.email ?? "",
     tenantId: profile.tenant_id,
     role: (profile.role ?? "member") as UserRole,
+    creditsBalance: tenant.credits_balance ?? 0,
+    plan: tenant.plan ?? "starter",
   }
 }
 

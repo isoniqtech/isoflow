@@ -30,7 +30,7 @@ function SidebarBrand() {
   const { tenant } = useTenant()
   return (
     <Link
-      href="/"
+      href="/dashboard"
       className="flex items-center gap-2 px-4 h-14 border-b shrink-0"
     >
       {tenant.logo_url ? (
@@ -117,6 +117,5 @@ function NavLink({
 }
 
 function isActive(pathname: string, href: string): boolean {
-  if (href === "/") return pathname === "/"
   return pathname === href || pathname.startsWith(`${href}/`)
 }

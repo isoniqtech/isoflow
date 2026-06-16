@@ -58,7 +58,6 @@ export default async function DashboardPage({
     ? `+${formatCurrency(data.kpis.ebitda)}`
     : formatCurrency(data.kpis.ebitda)
 
-  // Prazo IVA: 15 do 2º mês após o fim do período
   const vatEndMonth = mode === "mensal" ? month : mode === "trimestral" ? quarter * 3 : 12
   const vatDeadlineMonth = vatEndMonth + 2 > 12 ? vatEndMonth + 2 - 12 : vatEndMonth + 2
   const vatDeadlineYear = vatEndMonth + 2 > 12 ? year + 1 : year
@@ -74,7 +73,6 @@ export default async function DashboardPage({
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
@@ -85,10 +83,8 @@ export default async function DashboardPage({
         <DashboardControls mode={mode} month={month} quarter={quarter} year={year} hasParams={hasParams} />
       </div>
 
-      {/* KPIs + Alertas */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
         <div className="lg:col-span-3 flex flex-col gap-4">
-          {/* Linha 1 — Receita, Gastos, EBITDA */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <KpiCard
               label="Receita"
@@ -109,7 +105,6 @@ export default async function DashboardPage({
               hint={`${data.kpis.ebitda_pct >= 0 ? "+" : ""}${data.kpis.ebitda_pct}% da receita`}
             />
           </div>
-          {/* Linha 2 — Banco pendentes, e-Fatura pendentes, Nº faturas */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <KpiCard
               label="Banco pendentes"
@@ -137,10 +132,7 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* Gráfico anual */}
       <InvoicesChart data={data.chart} year={year} />
-
-      {/* Projetos */}
       <ActiveProjects projects={data.active_projects} />
     </div>
   )
