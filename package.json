@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:diff": "supabase db diff -f",
+    "db:push": "supabase db push",
+    "db:reset": "supabase db reset"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.95.1",
