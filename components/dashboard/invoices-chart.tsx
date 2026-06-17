@@ -32,7 +32,7 @@ export function InvoicesChart({ data, year }: { data: ChartPoint[]; year: number
     <Card>
       <CardHeader>
         <CardTitle className="text-sm font-medium">
-          Receita vs Gastos — {year}
+          Receita vs Gastos {year}
         </CardTitle>
         <CardDescription>
           Receita {formatCurrency(totalRevenue)} · Gastos {formatCurrency(totalExpenses)} · EBITDA {formatCurrency(totalEbitda)}
