@@ -50,12 +50,16 @@ Existem **dois ambientes completamente separados**. NUNCA confundir.
 | **Supabase Projeto** | isoflow dev | isoflow |
 | **Vercel Target** | preview | production |
 
+### Sequência obrigatória de trabalho:
+1. **Local** — desenvolver e testar em localhost
+2. **Dev/Preview** — commit para `develop` → deploy automático para test.isoniqtech.com → validar
+3. **Produção** — só após validação completa em dev, merge para `main` → flow.isoniqtech.com
+
 ### Regras absolutas de ambiente:
-- **Trabalhar sempre em `develop` → preview → test.isoniqtech.com primeiro**
-- Só passar para `main` → produção quando tudo está validado em preview
-- O MCP Supabase está ligado ao projeto de **PRODUÇÃO** — usar com extrema cautela
-- Para aplicar migrações em **dev**, ir ao Supabase dashboard → org "isoflow DEV" → projeto "isoflow dev" → SQL Editor
-- Para aplicar migrações em **produção** via MCP, confirmar sempre com o utilizador antes
+- NUNCA saltar passos — local → dev → prod, sempre por esta ordem
+- O MCP Supabase está ligado ao projeto de **PRODUÇÃO** — nunca aplicar migrações via MCP sem confirmação explícita do utilizador
+- Migrações em **dev**: instruir o utilizador a correr no Supabase dashboard → org "isoflow DEV" → projeto "isoflow dev" → SQL Editor
+- Migrações em **produção**: só após validação em dev, com confirmação explícita
 
 ---
 
