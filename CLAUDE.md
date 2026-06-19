@@ -22,6 +22,27 @@ Desenvolvida pela ISONIQ TECH (isoniqtech.com).
 
 ---
 
+## 🌐 Ambientes — LEITURA OBRIGATÓRIA ANTES DE TOCAR NA DB
+
+Existem **dois ambientes completamente separados**. NUNCA confundir.
+
+| | Preview (Dev) | Produção |
+|---|---|---|
+| **URL** | test.isoniqtech.com | flow.isoniqtech.com |
+| **Branch Git** | develop | main |
+| **Supabase Org** | isoflow DEV | Isoniq Tech |
+| **Supabase Projeto** | isoflow dev | isoflow |
+| **Vercel Target** | preview | production |
+
+### Regras absolutas de ambiente:
+- **Trabalhar sempre em `develop` → preview → test.isoniqtech.com primeiro**
+- Só passar para `main` → produção quando tudo está validado em preview
+- O MCP Supabase está ligado ao projeto de **PRODUÇÃO** — usar com extrema cautela
+- Para aplicar migrações em **dev**, ir ao Supabase dashboard → org "isoflow DEV" → projeto "isoflow dev" → SQL Editor
+- Para aplicar migrações em **produção** via MCP, confirmar sempre com o utilizador antes
+
+---
+
 ## 🏗️ Stack Técnica
 
 | Camada | Tecnologia | Notas |
