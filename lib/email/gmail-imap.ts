@@ -132,7 +132,8 @@ export async function fetchNewEmailsOnConnection(
   dateRange: DateRange,
 ): Promise<FetchResult> {
   // IMAP SINCE é precisão de dia — post-filtramos por hora exacta abaixo.
-  const searchCriteria = ["SINCE", toImapDate(dateRange.since)]
+  // Critérios com argumentos têm de ser arrays aninhados no imap-simple.
+  const searchCriteria = [["SINCE", toImapDate(dateRange.since)]]
   const fetchOptions = {
     bodies: [""],
     markSeen: false,
