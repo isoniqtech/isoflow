@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { AdminClientsFilters } from "./clients-filters"
 import { listAdminClients } from "@/lib/queries/admin"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
 import type { TenantPlan, TenantStatus } from "@/types"
@@ -71,12 +72,23 @@ export default async function AdminClientesPage({
       : "all"
   const q = searchParams.q ?? ""
 
-  const clients = await listAdminClients({
-    status,
-    plan,
-    credits: credits === "all" ? undefined : credits,
-    q: q || undefined,
-  })
+  const superAdminUserId = process.env.SUPER_ADMIN_USER_ID
+  const [clients, superAdminProfile] = await Promise.all([
+    listAdminClients({
+      status,
+      plan,
+      credits: credits === "all" ? undefined : credits,
+      q: q || undefined,
+    }),
+    superAdminUserId
+      ? createAdminClient()
+          .from("users")
+          .select("tenant_id")
+          .eq("id", superAdminUserId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ])
+  const isoniqTenantId = superAdminProfile.data?.tenant_id ?? null
 
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-4 max-w-7xl mx-auto">
@@ -130,7 +142,14 @@ export default async function AdminClientesPage({
                   <TableRow key={c.id} className="cursor-pointer">
                     <TableCell>
                       <Link href={`/admin/clientes/${c.id}`} className="block">
-                        <p className="font-medium truncate">{c.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium truncate">{c.name}</p>
+                          {c.id === isoniqTenantId && (
+                            <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 shrink-0">
+                              ISONIQ
+                            </Badge>
+                          )}
+                        </div>
                         {c.email && (
                           <p className="text-xs text-muted-foreground truncate">
                             {c.email}
