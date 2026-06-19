@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -45,9 +46,10 @@ export function CreateUserForm({
   onCreated,
 }: {
   tenantId: string
-  onCreated: () => void
+  onCreated?: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const router = useRouter()
 
   const {
     register,
@@ -79,7 +81,8 @@ export function CreateUserForm({
     toast.success("Utilizador criado com sucesso")
     reset()
     setOpen(false)
-    onCreated()
+    router.refresh()
+    onCreated?.()
   }
 
   return (
