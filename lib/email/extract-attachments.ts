@@ -37,7 +37,7 @@ const RELEVANT_MIME_TYPES = new Set<string>([
 
 // Limites de tamanho dos ficheiros.
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
-const MIN_FILE_SIZE = 10 * 1024 // 10 KB
+const MIN_FILE_SIZE = 1 * 1024 // 1 KB
 
 // Tipos de email reencaminhado (RFC822).
 const FORWARDED_MIME_TYPES = new Set<string>([
