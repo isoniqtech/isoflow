@@ -57,7 +57,7 @@ export function EmailIntegrationCard({
     initial?.imapPort ? String(initial.imapPort) : "993",
   )
   const [tag, setTag] = useState(initial?.tag ?? "")
-  const [showForm, setShowForm] = useState(!initial)
+  const [showForm, setShowForm] = useState(!initial || !initial.is_active)
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [syncing, setSyncing] = useState(false)
@@ -266,7 +266,7 @@ export function EmailIntegrationCard({
           <StatusBadge status={status} />
         </div>
 
-        {initial && status !== "soon" && (
+        {initial && status !== "soon" && status !== "disconnected" && (
           <div className="text-xs text-muted-foreground space-y-0.5">
             <p>
               <span className="font-medium text-foreground">{initial.email}</span>
@@ -394,7 +394,7 @@ export function EmailIntegrationCard({
             </div>
 
             <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-              {initial && (
+              {initial?.is_active && (
                 <Button
                   type="button"
                   variant="ghost"
@@ -428,7 +428,7 @@ export function EmailIntegrationCard({
                 disabled={saving || !email}
               >
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {initial ? "Guardar alterações" : "Ligar"}
+                {initial?.is_active ? "Guardar alterações" : "Ligar"}
               </Button>
             </div>
           </div>
