@@ -52,8 +52,10 @@ Existem **dois ambientes completamente separados**. NUNCA confundir.
 
 ### Sequência obrigatória de trabalho:
 1. **Local** — desenvolver e testar em localhost
-2. **Dev/Preview** — commit para `develop` → deploy automático para test.isoniqtech.com → validar
-3. **Produção** — só após validação completa em dev, merge para `main` → flow.isoniqtech.com
+2. **GitHub `develop`** — commit + push → Vercel faz deploy automático para test.isoniqtech.com → validar
+3. **GitHub `main`** — só após validação completa em dev, merge/PR develop→main → Vercel faz deploy para flow.isoniqtech.com
+
+GitHub: https://github.com/isoniqtech/isoflow (controlo de versões obrigatório em todos os passos)
 
 ### Regras absolutas de ambiente:
 - NUNCA saltar passos — local → dev → prod, sempre por esta ordem
