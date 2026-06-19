@@ -25,6 +25,15 @@ export const formatDate = (input: string | Date) =>
     typeof input === "string" ? new Date(input) : input,
   )
 
+export const formatDateTime = (input: string | Date) =>
+  new Intl.DateTimeFormat("pt-PT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(typeof input === "string" ? new Date(input) : input)
+
 /**
  * Parse de número que aceita formato português ("1.234,56" ou "1234,56") e
  * inglês ("1234.56"). Devolve NaN se não conseguir interpretar.

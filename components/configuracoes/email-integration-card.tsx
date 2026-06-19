@@ -24,7 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { formatDate } from "@/lib/utils/portugal"
+import { formatDateTime } from "@/lib/utils/portugal"
 
 type Provider = "gmail" | "outlook" | "imap"
 
@@ -280,7 +280,7 @@ export function EmailIntegrationCard({
               )}
             </p>
             {initial.last_sync_at && (
-              <p>Última sincronização: {formatDate(initial.last_sync_at)}</p>
+              <p>Última sincronização: {formatDateTime(initial.last_sync_at)}</p>
             )}
             {initial.sync_error && (
               <p className="text-destructive">{initial.sync_error}</p>
