@@ -146,7 +146,7 @@ export default async function AdminClientesPage({
                           <p className="font-medium truncate">{c.name}</p>
                           {c.id === isoniqTenantId && (
                             <Badge className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0 shrink-0">
-                              ISONIQ
+                              ADMIN
                             </Badge>
                           )}
                         </div>
