@@ -80,23 +80,17 @@ export async function syncTenantEmails(
     return summary
   }
 
-  // Lock atómico: só corremos se sync_locked_until for null ou já passou.
-  // Postgres avalia o WHERE com o valor atual antes do UPDATE, garantindo
-  // que dois clientes simultâneos não conseguem ambos passar.
+  // Lock atómico via RPC — usa função SQL que contorna o schema cache do PostgREST.
   const lockUntil = new Date(Date.now() + LOCK_TTL_MS).toISOString()
-  const nowIso = new Date().toISOString()
-  const { data: locked, error: lockErr } = await admin
-    .from("tenant_integrations")
-    .update({ sync_locked_until: lockUntil })
-    .eq("id", integration.id)
-    .or(`sync_locked_until.is.null,sync_locked_until.lt.${nowIso}`)
-    .select("id")
-    .maybeSingle()
+  const { data: acquired, error: lockErr } = await admin.rpc(
+    "acquire_email_sync_lock",
+    { p_integration_id: integration.id, p_lock_until: lockUntil },
+  )
   if (lockErr) {
     summary.errors.push(`Lock acquire: ${lockErr.message}`)
     return summary
   }
-  if (!locked) {
+  if (!acquired) {
     summary.alreadyRunning = true
     summary.errors.push(
       "Outra sincronização ainda está a correr — espera ~1 minuto",
