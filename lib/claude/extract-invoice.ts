@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import sharp from "sharp"
 
-const CLAUDE_MODEL = "claude-sonnet-4-5"
+const CLAUDE_MODEL = "claude-sonnet-4-6"
 
 /**
  * Claude API rejeita imagens > 5MB base64. Damos uma margem de segurança.
