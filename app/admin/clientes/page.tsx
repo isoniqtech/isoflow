@@ -178,7 +178,7 @@ export default async function AdminClientesPage({
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
                       <Link href={`/admin/clientes/${c.id}`} className="block">
-                        {c.mrr > 0 ? formatCurrency(c.mrr) : "—"}
+                        {c.id === isoniqTenantId ? "—" : c.mrr > 0 ? formatCurrency(c.mrr) : "—"}
                       </Link>
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">

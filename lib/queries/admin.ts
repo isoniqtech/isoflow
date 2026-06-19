@@ -57,10 +57,22 @@ export async function getAdminOverview(): Promise<AdminOverview> {
       t.created_at && new Date(t.created_at) >= startOfMonth,
   ).length
 
+  const superAdminUserId = process.env.SUPER_ADMIN_USER_ID
+  let isoniqTenantId: string | null = null
+  if (superAdminUserId) {
+    const { data: adminProfile } = await supabase
+      .from("users")
+      .select("tenant_id")
+      .eq("id", superAdminUserId)
+      .maybeSingle()
+    isoniqTenantId = adminProfile?.tenant_id ?? null
+  }
+
   const mrrPlanMap = new Map<TenantPlan, { count: number; mrr: number }>()
   let mrr_total = 0
   for (const t of tenantsList) {
     if (t.status !== "active") continue
+    if (t.id === isoniqTenantId) continue
     const plan = (t.plan ?? "starter") as TenantPlan
     const price = PLAN_PRICES[plan] ?? 0
     mrr_total += price
