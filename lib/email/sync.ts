@@ -5,6 +5,7 @@ import {
   fetchNewEmailsOnConnection,
   markAsRead,
   withInbox,
+  type DateRange,
   type EmailCredentials,
   type EmailProvider,
 } from "@/lib/email/gmail-imap"
@@ -52,6 +53,7 @@ const LOCK_TTL_MS = 10 * 60 * 1000 // 10 minutos
 export async function syncTenantEmails(
   admin: Client,
   tenantId: string,
+  dateRange: DateRange,
 ): Promise<SyncSummary> {
   const summary: SyncSummary = {
     tenantId,
@@ -82,7 +84,8 @@ export async function syncTenantEmails(
 
   // Lock atómico via RPC — usa função SQL que contorna o schema cache do PostgREST.
   const lockUntil = new Date(Date.now() + LOCK_TTL_MS).toISOString()
-  const { data: acquired, error: lockErr } = await admin.rpc(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: acquired, error: lockErr } = await (admin as any).rpc(
     "acquire_email_sync_lock",
     { p_integration_id: integration.id, p_lock_until: lockUntil },
   )
@@ -119,19 +122,19 @@ export async function syncTenantEmails(
 
   try {
     await withInbox(credentials, async (conn) => {
-      const fetched = await fetchNewEmailsOnConnection(conn, credentials)
+      const fetched = await fetchNewEmailsOnConnection(conn, credentials, dateRange)
       summary.emailsPrefilter = fetched.prefilterCount
       summary.emailsFetched = fetched.matched.length
       summary.rejectedAddresses = fetched.rejectedAddresses
 
-      for (const { uid, parsed } of fetched.matched) {
+      for (const { uid, parsed, wasUnseen } of fetched.matched) {
         try {
           const result = await processEmailInvoice(parsed, tenantId, admin)
           summary.results.push(result)
 
-          // Só marcamos como lido se NÃO foi skipped por já-processado
-          // (mantemos não lido se foi skipped por créditos para o user ver).
-          if (!result.skipped || result.reason === "already_processed") {
+          // Só marcamos como lido se era não lido e não foi skipped por créditos
+          // (mantemos não lido se sem créditos para o user ver).
+          if (wasUnseen && (!result.skipped || result.reason === "already_processed")) {
             try {
               await markAsRead(conn, uid)
             } catch (e) {

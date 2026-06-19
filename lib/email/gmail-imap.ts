@@ -99,25 +99,40 @@ function matchesTag(
   )
 }
 
+export interface DateRange {
+  /** Início do intervalo (inclusivo). */
+  since: Date
+  /** Fim do intervalo (exclusivo). */
+  until: Date
+}
+
 export interface FetchResult {
-  /** Total de emails UNSEEN encontrados antes de filtrar por tag. */
+  /** Total de emails encontrados no intervalo antes de filtrar por tag. */
   prefilterCount: number
   /** Emails que passaram o filtro de tag e vão ser processados. */
-  matched: Array<{ uid: number; parsed: ParsedMail }>
+  matched: Array<{ uid: number; parsed: ParsedMail; wasUnseen: boolean }>
   /** Endereços encontrados em emails rejeitados pelo filtro (para debug). */
   rejectedAddresses: string[]
 }
 
+/** Formata uma Date para o formato IMAP: "DD-Mon-YYYY". */
+function toImapDate(d: Date): string {
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+  return `${d.getUTCDate()}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`
+}
+
 /**
- * Busca emails não lidos numa connection JÁ aberta (caller responsável por
- * `connectToImap` + `openBox` antes — ver withInbox helper).
- * Devolve até 50 emails por chamada para evitar abusos / out-of-memory.
+ * Busca emails num intervalo de datas numa connection JÁ aberta.
+ * Processa lidos e não lidos — deduplicação feita via email_processing_log.
+ * Devolve até 50 emails por chamada.
  */
 export async function fetchNewEmailsOnConnection(
   connection: ImapSimple,
   credentials: EmailCredentials,
+  dateRange: DateRange,
 ): Promise<FetchResult> {
-  const searchCriteria = ["UNSEEN"]
+  // IMAP SINCE é precisão de dia — post-filtramos por hora exacta abaixo.
+  const searchCriteria = ["SINCE", toImapDate(dateRange.since)]
   const fetchOptions = {
     bodies: [""],
     markSeen: false,
@@ -125,7 +140,6 @@ export async function fetchNewEmailsOnConnection(
   }
   const messages = await connection.search(searchCriteria, fetchOptions)
   // IMAP devolve por sequence number ascendente (mais antigo → mais recente).
-  // Para faturas, os mais recentes são os mais relevantes — pegamos no fim.
   const limited = messages.slice(-50)
 
   const matched: FetchResult["matched"] = []
@@ -135,11 +149,16 @@ export async function fetchNewEmailsOnConnection(
     if (!fullPart) continue
     try {
       const parsed = await simpleParser(fullPart.body as string)
+
+      // Post-filtro por timestamp exacto (IMAP SINCE é só precisão de dia).
+      const emailDate = parsed.date ?? new Date(0)
+      if (emailDate < dateRange.since || emailDate >= dateRange.until) continue
+
+      const wasUnseen = !msg.attributes.flags.includes("\\Seen")
+
       if (matchesTag(parsed, credentials.email, credentials.tag)) {
-        matched.push({ uid: msg.attributes.uid, parsed })
+        matched.push({ uid: msg.attributes.uid, parsed, wasUnseen })
       } else {
-        // Capturamos o primeiro To: para debug — assim o user vê para onde
-        // os emails rejeitados foram enviados.
         const to = parsed.to
         if (to) {
           const arr = Array.isArray(to) ? to : [to]
@@ -162,9 +181,10 @@ export async function fetchNewEmailsOnConnection(
  */
 export async function fetchNewEmails(
   credentials: EmailCredentials,
+  dateRange: DateRange,
 ): Promise<FetchResult> {
   return withInbox(credentials, (conn) =>
-    fetchNewEmailsOnConnection(conn, credentials),
+    fetchNewEmailsOnConnection(conn, credentials, dateRange),
   )
 }
 

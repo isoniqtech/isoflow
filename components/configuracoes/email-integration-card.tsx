@@ -288,6 +288,18 @@ export function EmailIntegrationCard({
           </div>
         )}
 
+        {initial && status !== "soon" && status !== "disconnected" && (
+          <div className="rounded-md bg-muted/50 border px-3 py-2 text-xs text-muted-foreground space-y-1">
+            <p className="font-medium text-foreground">Sincronização automática — 3×/dia</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-0.5">
+              <p><span className="font-mono text-foreground">9h</span> — emails das 19h-9h</p>
+              <p><span className="font-mono text-foreground">14h</span> — emails das 9h-14h</p>
+              <p><span className="font-mono text-foreground">20h</span> — emails das 14h-20h</p>
+            </div>
+            <p className="text-[11px]">Hora Portugal (verão). Sincronização manual cobre as últimas 4 horas. Emails já processados são ignorados.</p>
+          </div>
+        )}
+
         {canEdit && showForm && (
           <div className="space-y-3 pt-2 border-t">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

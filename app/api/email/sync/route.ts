@@ -4,6 +4,8 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { syncTenantEmails } from "@/lib/email/sync"
 import { log } from "@/lib/utils/audit"
 
+const MANUAL_SYNC_HOURS = 4
+
 export const runtime = "nodejs"
 export const maxDuration = 300 // Fluid compute default — sync pode demorar
 
@@ -21,7 +23,11 @@ export async function POST() {
   }
 
   const admin = createAdminClient()
-  const summary = await syncTenantEmails(admin, ctx.tenantId)
+  const dateRange = {
+    since: new Date(Date.now() - MANUAL_SYNC_HOURS * 60 * 60 * 1000),
+    until: new Date(),
+  }
+  const summary = await syncTenantEmails(admin, ctx.tenantId, dateRange)
 
   if (summary.alreadyRunning) {
     return Response.json(

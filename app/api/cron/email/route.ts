@@ -1,19 +1,46 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { syncTenantEmails } from "@/lib/email/sync"
+import type { DateRange } from "@/lib/email/gmail-imap"
 import { log } from "@/lib/utils/audit"
 
 export const runtime = "nodejs"
 export const maxDuration = 300
 
 /**
- * Cron job — executado pelo Vercel a cada 5 minutos (config em vercel.json).
- *
- * Autenticação: header `Authorization: Bearer ${CRON_SECRET}` (definido em
- * env). O Vercel Cron envia esse header automaticamente quando configurado.
- *
- * Itera por todos os tenants com integração de email ativa e dispara um
- * sync para cada. Falhas isoladas não bloqueiam os restantes.
+ * Cron job — executado 3x/dia: 8h, 13h, 19h UTC (vercel.json).
+ * Cada execução cobre um intervalo diferente com margem de 5 minutos:
+ *   08h UTC → emails das 18:55 do dia anterior até às 08:05
+ *   13h UTC → emails das 07:55 às 13:05
+ *   19h UTC → emails das 12:55 às 19:05
  */
+function getCronDateRange(): DateRange {
+  const now = new Date()
+  const hour = now.getUTCHours()
+  const MARGIN = 5 * 60 * 1000 // 5 minutos em ms
+  const until = new Date(now.getTime() + MARGIN)
+
+  let since: Date
+  if (hour >= 8 && hour < 13) {
+    // Cron das 8h → desde as 19h de ontem
+    const prev = new Date(now)
+    prev.setUTCDate(prev.getUTCDate() - 1)
+    prev.setUTCHours(19, 0, 0, 0)
+    since = new Date(prev.getTime() - MARGIN)
+  } else if (hour >= 13 && hour < 19) {
+    // Cron das 13h → desde as 8h de hoje
+    const start = new Date(now)
+    start.setUTCHours(8, 0, 0, 0)
+    since = new Date(start.getTime() - MARGIN)
+  } else {
+    // Cron das 19h (ou fora de janela) → desde as 13h de hoje
+    const start = new Date(now)
+    start.setUTCHours(13, 0, 0, 0)
+    since = new Date(start.getTime() - MARGIN)
+  }
+
+  return { since, until }
+}
+
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET
   const auth = req.headers.get("authorization")
@@ -22,6 +49,7 @@ export async function GET(req: Request) {
   }
 
   const admin = createAdminClient()
+  const dateRange = getCronDateRange()
 
   const { data: integrations, error } = await admin
     .from("tenant_integrations")
@@ -48,7 +76,7 @@ export async function GET(req: Request) {
 
   for (const tenantId of tenantIds) {
     try {
-      const summary = await syncTenantEmails(admin, tenantId)
+      const summary = await syncTenantEmails(admin, tenantId, dateRange)
       const invoicesCreated = summary.results.reduce(
         (n, r) => n + r.invoicesCreated,
         0,
@@ -67,6 +95,8 @@ export async function GET(req: Request) {
           resourceType: "tenant_integration",
           metadata: {
             manual: false,
+            since: dateRange.since.toISOString(),
+            until: dateRange.until.toISOString(),
             emails_fetched: summary.emailsFetched,
             invoices_created: invoicesCreated,
             errors_count: summary.errors.length,
@@ -76,17 +106,14 @@ export async function GET(req: Request) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error(`cron sync tenant=${tenantId} failed:`, msg)
-      out.push({
-        tenantId,
-        emailsFetched: 0,
-        invoicesCreated: 0,
-        errors: 1,
-      })
+      out.push({ tenantId, emailsFetched: 0, invoicesCreated: 0, errors: 1 })
     }
   }
 
   return Response.json({
     data: {
+      since: dateRange.since.toISOString(),
+      until: dateRange.until.toISOString(),
       tenants_processed: out.length,
       summary: out,
     },
