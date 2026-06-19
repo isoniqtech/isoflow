@@ -1,4 +1,4 @@
-# CLAUDE.md — ISOFlow by ISONIQ TECH
+# CLAUDE.md - ISOFlow by ISONIQ TECH
 
 ---
 
@@ -21,7 +21,7 @@ Lê este ficheiro COMPLETO antes de escrever qualquer linha de código.
 Lê também PRD.md, TECH.md e TASKS.md antes de começar qualquer tarefa.
 
 ## ✍️ Regras de Escrita
-- **NUNCA usar travessão longo (—) em nenhum texto, label, título ou comentário de código.**
+- **NUNCA usar travessão longo (-) em nenhum texto, label, título ou comentário de código.**
   Usar hífen (-) ou reescrever a frase sem travessão.
 
 ---
@@ -42,7 +42,7 @@ Desenvolvida pela ISONIQ TECH (isoniqtech.com).
 
 ---
 
-## 🌐 Ambientes — LEITURA OBRIGATÓRIA ANTES DE TOCAR NA DB
+## 🌐 Ambientes - LEITURA OBRIGATÓRIA ANTES DE TOCAR NA DB
 
 Existem **dois ambientes completamente separados**. NUNCA confundir.
 
@@ -55,15 +55,15 @@ Existem **dois ambientes completamente separados**. NUNCA confundir.
 | **Vercel Target** | preview | production |
 
 ### Sequência obrigatória de trabalho:
-1. **Local** — desenvolver e testar em localhost
-2. **GitHub `develop`** — commit + push → Vercel faz deploy automático para test.isoniqtech.com → validar
-3. **GitHub `main`** — só após validação completa em dev, merge/PR develop→main → Vercel faz deploy para flow.isoniqtech.com
+1. **Local** - desenvolver e testar em localhost
+2. **GitHub `develop`** - commit + push → Vercel faz deploy automático para test.isoniqtech.com → validar
+3. **GitHub `main`** - só após validação completa em dev, merge/PR develop→main → Vercel faz deploy para flow.isoniqtech.com
 
 GitHub: https://github.com/isoniqtech/isoflow (controlo de versões obrigatório em todos os passos)
 
 ### Regras absolutas de ambiente:
-- NUNCA saltar passos — local → dev → prod, sempre por esta ordem
-- O MCP Supabase está ligado ao projeto de **PRODUÇÃO** — nunca aplicar migrações via MCP sem confirmação explícita do utilizador
+- NUNCA saltar passos - local → dev → prod, sempre por esta ordem
+- O MCP Supabase está ligado ao projeto de **PRODUÇÃO** - nunca aplicar migrações via MCP sem confirmação explícita do utilizador
 - Migrações em **dev**: instruir o utilizador a correr no Supabase dashboard → org "isoflow DEV" → projeto "isoflow dev" → SQL Editor
 - Migrações em **produção**: só após validação em dev, com confirmação explícita
 
@@ -285,7 +285,7 @@ isoflow/
 ## 🗄️ Schema Completo
 
 ```sql-- =============================================
--- MIGRATION 001 — TENANTS
+-- MIGRATION 001 - TENANTS
 -- =============================================
 CREATE TABLE tenants (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -313,7 +313,7 @@ app_name text DEFAULT 'ISOFlow',
 created_at timestamptz DEFAULT now(),
 updated_at timestamptz DEFAULT now()
 );-- =============================================
--- MIGRATION 002 — USERS
+-- MIGRATION 002 - USERS
 -- =============================================
 CREATE TABLE users (
 id uuid PRIMARY KEY REFERENCES auth.users ON DELETE CASCADE,
@@ -328,7 +328,7 @@ last_login_at timestamptz,
 created_at timestamptz DEFAULT now(),
 updated_at timestamptz DEFAULT now()
 );CREATE INDEX idx_users_tenant ON users(tenant_id);-- =============================================
--- MIGRATION 003 — TENANT INTEGRATIONS
+-- MIGRATION 003 - TENANT INTEGRATIONS
 -- =============================================
 CREATE TABLE tenant_integrations (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -346,7 +346,7 @@ created_at timestamptz DEFAULT now(),
 updated_at timestamptz DEFAULT now(),
 UNIQUE(tenant_id, type, provider)
 );-- =============================================
--- MIGRATION 004 — PROJECTS
+-- MIGRATION 004 - PROJECTS
 -- =============================================
 CREATE TABLE projects (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -372,7 +372,7 @@ created_at timestamptz DEFAULT now(),
 updated_at timestamptz DEFAULT now()
 );CREATE INDEX idx_projects_tenant ON projects(tenant_id);
 CREATE INDEX idx_projects_status ON projects(tenant_id, status);-- =============================================
--- MIGRATION 005 — PROJECT MEMBERS
+-- MIGRATION 005 - PROJECT MEMBERS
 -- =============================================
 CREATE TABLE project_members (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -383,7 +383,7 @@ created_at timestamptz DEFAULT now(),
 UNIQUE(project_id, user_id)
 );CREATE INDEX idx_project_members_user ON project_members(user_id);
 CREATE INDEX idx_project_members_project ON project_members(project_id);-- =============================================
--- MIGRATION 006 — INVOICES
+-- MIGRATION 006 - INVOICES
 -- =============================================
 CREATE TABLE invoices (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -442,7 +442,7 @@ CREATE INDEX idx_invoices_project ON invoices(project_id);
 CREATE INDEX idx_invoices_status ON invoices(tenant_id, status);
 CREATE INDEX idx_invoices_date ON invoices(tenant_id, invoice_date);
 CREATE INDEX idx_invoices_supplier ON invoices(tenant_id, supplier_nif);-- =============================================
--- MIGRATION 007 — BANK TRANSACTIONS
+-- MIGRATION 007 - BANK TRANSACTIONS
 -- =============================================
 CREATE TABLE bank_transactions (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -469,7 +469,7 @@ created_at timestamptz DEFAULT now()
 CREATE INDEX idx_bank_date ON bank_transactions(tenant_id, date);
 CREATE INDEX idx_bank_unmatched ON bank_transactions(tenant_id, invoice_id)
 WHERE invoice_id IS NULL;-- =============================================
--- MIGRATION 008 — RECONCILIATIONS
+-- MIGRATION 008 - RECONCILIATIONS
 -- =============================================
 CREATE TABLE reconciliations (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -488,7 +488,7 @@ rejection_reason text,
 created_at timestamptz DEFAULT now(),
 UNIQUE(invoice_id, bank_transaction_id)
 );-- =============================================
--- MIGRATION 009 — CREDITS
+-- MIGRATION 009 - CREDITS
 -- =============================================
 CREATE TABLE subscriptions (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -516,7 +516,7 @@ reference_type text,
 balance_after integer NOT NULL,
 created_at timestamptz DEFAULT now()
 );CREATE INDEX idx_credits_tenant ON credit_transactions(tenant_id);-- =============================================
--- MIGRATION 010 — SUPPORT
+-- MIGRATION 010 - SUPPORT
 -- =============================================
 CREATE TABLE support_tickets (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -549,7 +549,7 @@ attachments jsonb DEFAULT '[]',
 is_internal boolean DEFAULT false,
 created_at timestamptz DEFAULT now()
 );-- =============================================
--- MIGRATION 011 — AUDIT LOGS
+-- MIGRATION 011 - AUDIT LOGS
 -- =============================================
 CREATE TABLE audit_logs (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -563,7 +563,7 @@ ip_address text,
 user_agent text,
 created_at timestamptz DEFAULT now()
 );CREATE INDEX idx_audit_tenant ON audit_logs(tenant_id, created_at DESC);-- =============================================
--- MIGRATION 012 — ROLE PERMISSIONS
+-- MIGRATION 012 - ROLE PERMISSIONS
 -- =============================================
 CREATE TABLE role_permissions (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -576,7 +576,7 @@ can_edit boolean DEFAULT false,
 can_delete boolean DEFAULT false,
 UNIQUE(tenant_id, role, resource)
 );-- =============================================
--- MIGRATION 013 — RLS POLICIES
+-- MIGRATION 013 - RLS POLICIES
 -- =============================================
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_members ENABLE ROW LEVEL SECURITY;
@@ -727,7 +727,7 @@ source: { type: 'base64', media_type: mediaType, data: fileBase64 },
 
 ---
 
-## 🏗️ Projetos — Matching Automático
+## 🏗️ Projetos - Matching Automático
 
 ```typescript// lib/utils/projects.tsexport async function matchProjectFromText(
 text: string,
@@ -842,7 +842,7 @@ NUNCA logar NIF, IBAN, credenciais ou valores em logs
 Rate limiting em TODOS os endpoints públicos
 Validar TODOS os inputs com Zod antes de processar
 CÓDIGO:
-9.  TypeScript strict — ZERO any, ZERO ts-ignore
+9.  TypeScript strict - ZERO any, ZERO ts-ignore
 10. SEMPRE try/catch em chamadas a APIs externas
 11. SEMPRE loading states durante operações async
 12. SEMPRE feedback ao utilizador (toast sucesso/erro)
@@ -853,7 +853,7 @@ CÓDIGO:
 17. Endpoint de apagamento total de dados por tenant
 18. Backups automáticos diários via SupabasePERFORMANCE:
 19. Índices em tenant_id + created_at + project_id
-20. Paginação obrigatória — máximo 50 registos por página
+20. Paginação obrigatória - máximo 50 registos por página
 21. Ficheiros via CDN Supabase Storage
 22. Nunca bloquear a UI durante uploads (background processing)
 
@@ -887,7 +887,7 @@ STRIPE_STARTER_PRICE_ID=
 STRIPE_BUSINESS_PRICE_ID=
 STRIPE_PRO_PRICE_ID=
 
-# Tink (Open Banking — substitui Salt Edge)
+# Tink (Open Banking - substitui Salt Edge)
 # https://console.tink.com → Apps → credentials
 TINK_CLIENT_ID=
 TINK_CLIENT_SECRET=
@@ -907,12 +907,12 @@ INVOICE_FILES_BUCKET=
 # Domínio para emails inbound (ex: "isoflow.pt" → faturas+<tenant>@isoflow.pt)
 INBOUND_EMAIL_DOMAIN=
 
-# Gmail (OAuth — inbound de email alternativo a Resend)
+# Gmail (OAuth - inbound de email alternativo a Resend)
 # Cria app OAuth em https://console.cloud.google.com
 GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
 
-# n8n (ERP forwarder default — clientes podem override por tenant)
+# n8n (ERP forwarder default - clientes podem override por tenant)
 N8N_WEBHOOK_URL=
 N8N_WEBHOOK_SECRET=
 
@@ -921,35 +921,35 @@ N8N_WEBHOOK_SECRET=
 CRON_SECRET=
 ```
 
- TASKS ACTUAIS — Sprint de Testes
+ TASKS ACTUAIS - Sprint de Testes
 
 Implementa estas 3 funcionalidades por ordem. Não alteres nada fora do que está descrito.
 Antes de qualquer alteração, lê o ficheiro completo envolvido.
 
 
 ⚠️ REGRAS DE SEGURANÇA PARA ESTAS TASKS
-Regra 1 — Antes de alterar InvoiceStatus em types/index.ts:
+Regra 1 - Antes de alterar InvoiceStatus em types/index.ts:
 Corre primeiro:
 bashgrep -r "InvoiceStatus|STATUS_LABELS|STATUS_CLASSES" --include="*.ts" --include="*.tsx" -l | grep -v node_modules | grep -v .next
 Actualiza TODOS os ficheiros encontrados em simultâneo. Ficheiros confirmados com Record<InvoiceStatus, ...>:
 
-components/faturas/status-badge.tsx — STATUS_LABELS e STATUS_CLASSES
-components/faturas/invoice-filters.tsx — <SelectItem> de estados
+components/faturas/status-badge.tsx - STATUS_LABELS e STATUS_CLASSES
+components/faturas/invoice-filters.tsx - <SelectItem> de estados
 
-Regra 2 — Não alterar assinaturas de API routes existentes.
+Regra 2 - Não alterar assinaturas de API routes existentes.
 Só criar novas: /api/faturas/[id]/file-url e /api/faturas/sync-toconline.
-Regra 3 — Não tocar em: middleware.ts, lib/supabase/, app/(auth)/.
-Regra 4 — O status na tabela invoices é text com CHECK constraint (não enum PostgreSQL). Actualizar o CHECK constraint na migration e os tipos TypeScript.
+Regra 3 - Não tocar em: middleware.ts, lib/supabase/, app/(auth)/.
+Regra 4 - O status na tabela invoices é text com CHECK constraint (não enum PostgreSQL). Actualizar o CHECK constraint na migration e os tipos TypeScript.
 
-TASK 1 — Gráfico Receita vs Gastos no Dashboard
+TASK 1 - Gráfico Receita vs Gastos no Dashboard
 1. lib/queries/dashboard.ts
 Alterar ChartPoint (actualmente { month: string; count: number; value: number }):
 tsexport type ChartPoint = {
   month: string
   count: number
   value: number      // manter
-  revenue: number    // novo — soma de outgoing
-  expenses: number   // novo — soma de incoming
+  revenue: number    // novo - soma de outgoing
+  expenses: number   // novo - soma de incoming
 }
 Adicionar a DashboardKpis (sem remover campos existentes):
 tsrevenue_this_month: number
@@ -970,7 +970,7 @@ tsconst chartConfig = {
   expenses: { label: "Gastos", color: "hsl(var(--chart-2))" },
 } satisfies ChartConfig
 Substituir <Bar dataKey="count"/> por duas barras: revenue e expenses.
-Actualizar CardTitle para "Receita vs Gastos — 6 meses".
+Actualizar CardTitle para "Receita vs Gastos - 6 meses".
 Manter: Card, ChartContainer, h-56 w-full, CartesianGrid, XAxis.
 3. app/(dashboard)/page.tsx
 Adicionar imports TrendingUp, TrendingDown de lucide-react.
@@ -978,10 +978,10 @@ Mudar grid para sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 e adicionar 2 KpiCa
 tsx<KpiCard label="Receita este mês" value={formatCurrency(data.kpis.revenue_this_month)} icon={TrendingUp} hint="Faturas emitidas" />
 <KpiCard label="Gastos este mês" value={formatCurrency(data.kpis.expenses_this_month)} icon={TrendingDown} hint="Faturas recebidas" />
 
-TASK 2 — Detalhe da Fatura com Imagem + Campos Editáveis
+TASK 2 - Detalhe da Fatura com Imagem + Campos Editáveis
 Criar app/api/faturas/[id]/file-url/route.ts:
 
-GET — verificar tenant_id, gerar signed URL (TTL 3600s) do bucket invoice-files
+GET - verificar tenant_id, gerar signed URL (TTL 3600s) do bucket invoice-files
 Retornar { url: string, file_type: string }
 
 Implementar lib/queries/invoice-detail.ts:
@@ -1018,7 +1018,7 @@ Badge AT: at_communicated → verde "Na e-Fatura" / cinza "Não comunicado AT"
 Se needs_review: badge âmbar "Precisa Revisão"
 
 
-TASK 3 — Integração TOCONLINE + Estados de Conciliação
+TASK 3 - Integração TOCONLINE + Estados de Conciliação
 Implementar lib/integrations/toconline.ts (actualmente export {}):
 tsexport interface TOCOnlineDocument {
   id: number
@@ -1056,11 +1056,11 @@ Retornar { created: n, updated: n, errors: string[] }
 
 Implementar app/api/integracoes/toconline/route.ts:
 
-GET — testar ligação ao TOCONLINE
-POST { action: "sync", month?, year? } — trigger sync manual
+GET - testar ligação ao TOCONLINE
+POST { action: "sync", month?, year? } - trigger sync manual
 
 Actualizar em SIMULTÂNEO (compilação TypeScript):
-types/index.ts — adicionar | "reconciled" a InvoiceStatus
+types/index.ts - adicionar | "reconciled" a InvoiceStatus
 components/faturas/status-badge.tsx:
 ts// STATUS_LABELS: reconciled: "Conciliada AT"
 // STATUS_CLASSES: reconciled: "bg-violet-100 text-violet-900 border-violet-200 dark:bg-violet-900/20 dark:text-violet-200 dark:border-violet-900/40"
@@ -1087,8 +1087,8 @@ CREATE INDEX IF NOT EXISTS idx_invoices_type_date
 
 Ordem de implementação
 
-supabase/migrations/014_toconline_indexes.sql — correr no Supabase primeiro
-types/index.ts + status-badge.tsx + invoice-filters.tsx — em simultâneo
+supabase/migrations/014_toconline_indexes.sql - correr no Supabase primeiro
+types/index.ts + status-badge.tsx + invoice-filters.tsx - em simultâneo
 TASK 2 completa
 TASK 1
 TASK 3
