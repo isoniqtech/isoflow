@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 
@@ -13,6 +14,7 @@ export async function GET(
   }
 
   const supabase = createClient()
+  const admin = createAdminClient()
 
   let query = supabase
     .from("invoices")
@@ -30,7 +32,7 @@ export async function GET(
   if (!invoice.file_path) return jsonError("No file attached", 404)
 
   const bucket = process.env.INVOICE_FILES_BUCKET ?? "invoice-files"
-  const { data: signed, error: signErr } = await supabase.storage
+  const { data: signed, error: signErr } = await admin.storage
     .from(bucket)
     .createSignedUrl(invoice.file_path, 3600)
 
