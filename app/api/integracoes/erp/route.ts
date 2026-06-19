@@ -74,7 +74,13 @@ export async function POST(req: Request) {
     return jsonError("Payload inválido", 400, (e as z.ZodError).flatten())
   }
 
-  const admin = createAdminClient()
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    return jsonError(e instanceof Error ? e.message : "Configuração do servidor incompleta", 500)
+  }
+
   const supabase = createClient()
 
   const { data: existing } = await supabase
@@ -88,7 +94,11 @@ export async function POST(req: Request) {
 
   let api_key_encrypted: string | null = existing?.api_key_encrypted ?? null
   if (parsed.secret) {
-    api_key_encrypted = encrypt(parsed.secret)
+    try {
+      api_key_encrypted = encrypt(parsed.secret)
+    } catch (e) {
+      return jsonError(e instanceof Error ? e.message : "Erro ao encriptar credenciais", 500)
+    }
   }
 
   if (existing) {

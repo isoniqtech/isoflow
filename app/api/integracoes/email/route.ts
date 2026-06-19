@@ -83,7 +83,13 @@ export async function POST(req: Request) {
     return jsonError("Payload inválido", 400, (e as z.ZodError).flatten())
   }
 
-  const admin = createAdminClient()
+  let admin: ReturnType<typeof createAdminClient>
+  try {
+    admin = createAdminClient()
+  } catch (e) {
+    return jsonError(e instanceof Error ? e.message : "Configuração do servidor incompleta", 500)
+  }
+
   const supabase = createClient()
 
   const { data: existing } = await supabase
@@ -103,10 +109,12 @@ export async function POST(req: Request) {
 
   let api_key_encrypted: string | null = existing?.api_key_encrypted ?? null
   if (parsed.appPassword) {
-    // Gmail mostra app passwords como "xxxx xxxx xxxx xxxx" — aceitamos
-    // com ou sem espaços. Strip de whitespace para ser tolerante.
-    const cleaned = parsed.appPassword.replace(/\s+/g, "")
-    api_key_encrypted = encrypt(cleaned)
+    try {
+      const cleaned = parsed.appPassword.replace(/\s+/g, "")
+      api_key_encrypted = encrypt(cleaned)
+    } catch (e) {
+      return jsonError(e instanceof Error ? e.message : "Erro ao encriptar credenciais", 500)
+    }
   }
   if (!api_key_encrypted) {
     return jsonError("App password é obrigatória na primeira gravação", 400)
