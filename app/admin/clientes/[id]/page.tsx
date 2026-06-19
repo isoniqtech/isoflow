@@ -24,12 +24,15 @@ import {
   listAdminAudit,
   PLAN_PRICES,
 } from "@/lib/queries/admin"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { CreateUserForm } from "@/components/admin/create-user-form"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
 import type {
   SupportTicketPriority,
   SupportTicketStatus,
   TenantStatus,
+  UserRole,
 } from "@/types"
 
 const STATUS_STYLES: Record<TenantStatus, { label: string; className: string }> = {
@@ -81,7 +84,15 @@ export default async function AdminClienteDetailPage({
   const { tenant, owner, user_count, invoice_count, project_count, integration_count, open_tickets, recent_tickets } = data
   const status = STATUS_STYLES[tenant.status]
   const mrr = tenant.status === "active" ? PLAN_PRICES[tenant.plan] : 0
-  const audit = await listAdminAudit(tenant.id, { limit: 20 })
+  const [audit, usersResult] = await Promise.all([
+    listAdminAudit(tenant.id, { limit: 20 }),
+    createAdminClient()
+      .from("users")
+      .select("id, name, email, role, is_active, last_login_at")
+      .eq("tenant_id", tenant.id)
+      .order("created_at", { ascending: true }),
+  ])
+  const tenantUsers = usersResult.data ?? []
 
   // Diagnósticos
   const creditsLow = tenant.credits_balance > 0 && tenant.credits_balance < 50
@@ -238,6 +249,48 @@ export default async function AdminClienteDetailPage({
                   </span>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                Utilizadores ({tenantUsers.length})
+              </CardTitle>
+              <CreateUserForm tenantId={tenant.id} onCreated={() => {}} />
+            </CardHeader>
+            <CardContent className="p-0">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/20">
+                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Nome</th>
+                    <th className="text-left px-4 py-2 font-medium text-muted-foreground hidden sm:table-cell">Email</th>
+                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Role</th>
+                    <th className="text-right px-4 py-2 font-medium text-muted-foreground hidden md:table-cell">Ultimo login</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tenantUsers.map((u) => (
+                    <tr key={u.id} className="border-b last:border-0">
+                      <td className="px-4 py-2.5 font-medium">{u.name}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground hidden sm:table-cell text-xs">{u.email}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant="secondary" className="capitalize text-xs">{u.role}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-xs text-muted-foreground hidden md:table-cell">
+                        {u.last_login_at ? formatDate(u.last_login_at) : "Nunca"}
+                      </td>
+                    </tr>
+                  ))}
+                  {tenantUsers.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground text-sm">
+                        Nenhum utilizador neste tenant
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </CardContent>
           </Card>
 
