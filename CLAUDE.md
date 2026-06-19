@@ -20,6 +20,10 @@ Fluxo obrigatório:
 Lê este ficheiro COMPLETO antes de escrever qualquer linha de código.
 Lê também PRD.md, TECH.md e TASKS.md antes de começar qualquer tarefa.
 
+## ✍️ Regras de Escrita
+- **NUNCA usar travessão longo (—) em nenhum texto, label, título ou comentário de código.**
+  Usar hífen (-) ou reescrever a frase sem travessão.
+
 ---
 
 ## 🎯 O Produto
