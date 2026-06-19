@@ -84,7 +84,6 @@ export async function syncTenantEmails(
 
   // Lock atómico via RPC — usa função SQL que contorna o schema cache do PostgREST.
   const lockUntil = new Date(Date.now() + LOCK_TTL_MS).toISOString()
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: acquired, error: lockErr } = await (admin as any).rpc(
     "acquire_email_sync_lock",
     { p_integration_id: integration.id, p_lock_until: lockUntil },
