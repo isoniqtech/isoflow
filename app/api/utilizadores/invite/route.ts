@@ -37,16 +37,17 @@ export async function POST(req: Request) {
     return jsonError(error.message, 500, error.message)
   }
 
-  const { error: profileErr } = await admin.from("users").insert({
+  const { error: profileErr } = await admin.from("users").upsert({
     id: data.user.id,
     tenant_id: ctx.tenantId,
     name,
     email,
     role,
     is_active: true,
-  })
+  }, { onConflict: "id" })
 
   if (profileErr) {
+    console.error("[invite] profile upsert error:", profileErr.message)
     await admin.auth.admin.deleteUser(data.user.id)
     return jsonError("Erro ao criar perfil", 500, profileErr.message)
   }
