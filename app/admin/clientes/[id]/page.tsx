@@ -257,7 +257,7 @@ export default async function AdminClienteDetailPage({
               <CardTitle className="text-sm font-medium">
                 Utilizadores ({tenantUsers.length})
               </CardTitle>
-              <CreateUserForm tenantId={tenant.id} onCreated={() => {}} />
+              <CreateUserForm tenantId={tenant.id} />
             </CardHeader>
             <CardContent className="p-0">
               <table className="w-full text-sm">
