@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { ChevronLeft, Mail, UserPlus } from "lucide-react"
+import { ChevronLeft, Mail } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,9 @@ import { createClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
 import { formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
+import { InviteUserForm } from "@/components/configuracoes/invite-user-form"
+import { UserRoleSelect } from "@/components/configuracoes/user-role-select"
+import { UserDeactivateButton } from "@/components/configuracoes/user-deactivate-button"
 import type { UserRole } from "@/types"
 
 const ROLE_STYLES: Record<UserRole, { label: string; className: string }> = {
@@ -58,6 +61,8 @@ export default async function UtilizadoresPage() {
     redirect("/configuracoes")
   }
 
+  const canManage = hasPermission(session.role, "utilizadores", "edit")
+
   const supabase = createClient()
   const { data: users } = await supabase
     .from("users")
@@ -75,22 +80,16 @@ export default async function UtilizadoresPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Configurações
+          Configuracoes
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Utilizadores
-            </h1>
+            <h1 className="text-2xl font-semibold tracking-tight">Utilizadores</h1>
             <p className="text-muted-foreground text-sm">
-              {list.length}{" "}
-              {list.length === 1 ? "utilizador" : "utilizadores"} na empresa
+              {list.length} {list.length === 1 ? "utilizador" : "utilizadores"} na empresa
             </p>
           </div>
-          <Button disabled title="Em breve">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Convidar utilizador
-          </Button>
+          {canManage && <InviteUserForm />}
         </div>
       </div>
 
@@ -101,16 +100,17 @@ export default async function UtilizadoresPage() {
               <TableHead>Nome</TableHead>
               <TableHead className="hidden sm:table-cell">Email</TableHead>
               <TableHead>Role</TableHead>
-              <TableHead className="hidden md:table-cell">
-                Último acesso
-              </TableHead>
+              <TableHead className="hidden md:table-cell">Ultimo acesso</TableHead>
               <TableHead>Estado</TableHead>
+              {canManage && <TableHead />}
             </TableRow>
           </TableHeader>
           <TableBody>
             {list.map((u) => {
-              const role = ROLE_STYLES[(u.role ?? "member") as UserRole]
+              const roleStyle = ROLE_STYLES[(u.role ?? "member") as UserRole]
               const isYou = u.id === session.user.id
+              const isOwner = u.role === "owner"
+              const canEdit = canManage && !isYou && !isOwner
               return (
                 <TableRow key={u.id}>
                   <TableCell>
@@ -124,9 +124,7 @@ export default async function UtilizadoresPage() {
                         <p className="font-medium truncate">
                           {u.name}
                           {isYou && (
-                            <span className="ml-1 text-xs text-muted-foreground">
-                              (tu)
-                            </span>
+                            <span className="ml-1 text-xs text-muted-foreground">(tu)</span>
                           )}
                         </p>
                         <p className="text-xs text-muted-foreground sm:hidden truncate">
@@ -145,12 +143,16 @@ export default async function UtilizadoresPage() {
                     </a>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={role.className}>
-                      {role.label}
-                    </Badge>
+                    {canEdit ? (
+                      <UserRoleSelect userId={u.id} currentRole={(u.role ?? "member") as UserRole} />
+                    ) : (
+                      <Badge variant="outline" className={roleStyle.className}>
+                        {roleStyle.label}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {u.last_login_at ? formatDate(u.last_login_at) : "—"}
+                    {u.last_login_at ? formatDate(u.last_login_at) : "Nunca"}
                   </TableCell>
                   <TableCell>
                     <span
@@ -170,16 +172,18 @@ export default async function UtilizadoresPage() {
                       {u.is_active ? "Ativo" : "Inativo"}
                     </span>
                   </TableCell>
+                  {canManage && (
+                    <TableCell className="text-right">
+                      {canEdit && u.is_active && (
+                        <UserDeactivateButton userId={u.id} userName={u.name} />
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               )
             })}
           </TableBody>
         </Table>
-      </div>
-
-      <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-        O fluxo de convite por email está em desenvolvimento — vai precisar do
-        Resend configurado. Por agora, a lista mostra apenas membros existentes.
       </div>
     </div>
   )
