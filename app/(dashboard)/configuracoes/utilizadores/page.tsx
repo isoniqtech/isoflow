@@ -93,6 +93,40 @@ export default async function UtilizadoresPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {([
+          {
+            role: "Owner",
+            className: "border-purple-200 bg-purple-50 dark:border-purple-900/40 dark:bg-purple-950/20",
+            titleClass: "text-purple-900 dark:text-purple-200",
+            description: "Acesso total. Gere utilizadores, projetos, subscrição, pagamentos e todas as integracoes.",
+          },
+          {
+            role: "Admin",
+            className: "border-blue-200 bg-blue-50 dark:border-blue-900/40 dark:bg-blue-950/20",
+            titleClass: "text-blue-900 dark:text-blue-200",
+            description: "Gere faturas, projetos e equipa. Nao gere subscrição nem integracoes bancarias.",
+          },
+          {
+            role: "Contabilista",
+            className: "border-emerald-200 bg-emerald-50 dark:border-emerald-900/40 dark:bg-emerald-950/20",
+            titleClass: "text-emerald-900 dark:text-emerald-200",
+            description: "Ve e exporta faturas, valores e conciliacao bancaria. Nao gere utilizadores.",
+          },
+          {
+            role: "Membro",
+            className: "border-slate-200 bg-slate-50 dark:border-slate-800/40 dark:bg-slate-900/20",
+            titleClass: "text-slate-900 dark:text-slate-200",
+            description: "Envia faturas. Ve apenas as suas proprias faturas e os projetos a que foi atribuido.",
+          },
+        ] as const).map(({ role, className, titleClass, description }) => (
+          <div key={role} className={`rounded-lg border p-3 ${className}`}>
+            <p className={`text-sm font-semibold mb-1 ${titleClass}`}>{role}</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">{description}</p>
+          </div>
+        ))}
+      </div>
+
       <div className="rounded-lg border bg-background overflow-x-auto">
         <Table>
           <TableHeader>
