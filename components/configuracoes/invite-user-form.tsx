@@ -52,22 +52,26 @@ export function InviteUserForm() {
   const role = watch("role")
 
   async function onSubmit(data: FormData) {
-    const res = await fetch("/api/utilizadores/invite", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
+    try {
+      const res = await fetch("/api/utilizadores/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      toast.error(err.error ?? "Erro ao enviar convite")
-      return
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error ?? "Erro ao enviar convite")
+        return
+      }
+
+      toast.success(`Convite enviado para ${data.email}`)
+      reset()
+      setOpen(false)
+      router.refresh()
+    } catch {
+      toast.error("Erro de ligacao ao servidor")
     }
-
-    toast.success(`Convite enviado para ${data.email}`)
-    reset()
-    setOpen(false)
-    router.refresh()
   }
 
   return (

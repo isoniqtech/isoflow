@@ -32,7 +32,10 @@ export async function POST(req: Request) {
     data: { name, tenant_id: ctx.tenantId, role },
   })
 
-  if (error) return jsonError("Erro ao enviar convite", 500, error.message)
+  if (error) {
+    console.error("[invite] inviteUserByEmail error:", error.message, error)
+    return jsonError(error.message, 500, error.message)
+  }
 
   const { error: profileErr } = await admin.from("users").insert({
     id: data.user.id,
