@@ -29,7 +29,7 @@ type LoginValues = z.infer<typeof loginSchema>
 export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get("redirectTo") ?? "/"
+  const redirectTo = searchParams.get("redirectTo") ?? "/dashboard"
   const [submitting, setSubmitting] = useState(false)
 
   const form = useForm<LoginValues>({
