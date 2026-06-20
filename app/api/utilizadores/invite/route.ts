@@ -23,8 +23,9 @@ export async function POST(req: Request) {
   const { name, email, role } = parsed.data
   const admin = createAdminClient()
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? ""
-  const redirectTo = `${appUrl}/reset-password`
+  const host = req.headers.get("host") ?? ""
+  const proto = host.includes("localhost") ? "http" : "https"
+  const redirectTo = `${proto}://${host}/reset-password`
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo,
