@@ -28,17 +28,12 @@ import {
 const schema = z.object({
   name: z.string().min(2, "Nome obrigatorio"),
   email: z.string().email("Email invalido"),
-  role: z.enum(["owner", "admin", "accountant", "member"]),
-  password: z.string().min(6, "Minimo 6 caracteres"),
+  role: z.enum(["admin", "accountant", "member"]),
 })
 
 type FormData = z.infer<typeof schema>
 
 const ROLE_DESCRIPTIONS: Record<string, { label: string; description: string }> = {
-  owner: {
-    label: "Owner",
-    description: "Acesso total ao tenant. Gere utilizadores, projetos, subscrição, pagamentos e todas as integracoes.",
-  },
   admin: {
     label: "Admin",
     description: "Gere faturas, projetos e utilizadores. Pode convidar membros e criar projetos. Nao gere subscrição nem integracoes bancarias.",
@@ -53,14 +48,9 @@ const ROLE_DESCRIPTIONS: Record<string, { label: string; description: string }> 
   },
 }
 
-export function CreateUserForm({
-  tenantId,
-  onCreated,
-}: {
-  tenantId: string
-  onCreated?: () => void
-}) {
+export function InviteUserForm() {
   const [open, setOpen] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
   const router = useRouter()
 
   const {
@@ -78,52 +68,55 @@ export function CreateUserForm({
   const role = watch("role")
 
   async function onSubmit(data: FormData) {
-    const res = await fetch(`/api/admin/tenants/${tenantId}/users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    })
+    setServerError(null)
+    try {
+      const res = await fetch("/api/utilizadores/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      toast.error(err.error ?? "Erro ao criar utilizador")
-      return
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        const msg = err.error ?? "Erro ao enviar convite"
+        setServerError(msg)
+        toast.error(msg)
+        return
+      }
+
+      toast.success(`Convite enviado para ${data.email}`)
+      reset()
+      setOpen(false)
+      router.refresh()
+    } catch {
+      setServerError("Erro de ligacao ao servidor")
+      toast.error("Erro de ligacao ao servidor")
     }
-
-    toast.success("Utilizador criado com sucesso")
-    reset()
-    setOpen(false)
-    router.refresh()
-    onCreated?.()
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm">
-          <UserPlus className="h-4 w-4 mr-2" />
-          Novo utilizador
+        <Button>
+          <UserPlus className="mr-2 h-4 w-4" />
+          Convidar utilizador
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Criar utilizador</DialogTitle>
+          <DialogTitle>Convidar utilizador</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 pt-2">
           <div className="space-y-1.5">
             <Label htmlFor="name">Nome</Label>
             <Input id="name" {...register("name")} placeholder="Nome completo" />
-            {errors.name && (
-              <p className="text-xs text-destructive">{errors.name.message}</p>
-            )}
+            {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" {...register("email")} placeholder="email@empresa.pt" />
-            {errors.email && (
-              <p className="text-xs text-destructive">{errors.email.message}</p>
-            )}
+            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -145,18 +138,15 @@ export function CreateUserForm({
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              {...register("password")}
-              placeholder="Minimo 6 caracteres"
-            />
-            {errors.password && (
-              <p className="text-xs text-destructive">{errors.password.message}</p>
-            )}
-          </div>
+          <p className="text-xs text-muted-foreground">
+            O utilizador vai receber um email com link para definir a password e entrar na app.
+          </p>
+
+          {serverError && (
+            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+              {serverError}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
@@ -164,7 +154,7 @@ export function CreateUserForm({
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Criar
+              Enviar convite
             </Button>
           </div>
         </form>

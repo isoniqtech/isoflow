@@ -1,21 +1,5 @@
 # CLAUDE.md - ISOFlow by ISONIQ TECH
 
----
-
-## ⛔ REGRA DE SCHEMA (INQUEBRÁVEL)
-
-**NUNCA alterar o schema de produção à mão pelo dashboard Supabase.**
-
-Toda a alteração de schema é uma migration em `supabase/migrations/`, aplicada **primeiro ao DEV** e só depois ao **PROD via merge em `main`** (o GitHub Action `deploy-migrations.yml` faz o push automático).
-
-Fluxo obrigatório:
-1. `git checkout -b feat/minha-feature`
-2. `npm run db:diff -- nome_da_migration` → gera ficheiro em `supabase/migrations/`
-3. `supabase link --project-ref <DEV_REF> && npm run db:push` → testa no DEV
-4. PR → review → merge em `main` → GitHub Action aplica ao PROD automaticamente
-
----
-
 ## LEITURA OBRIGATÓRIA
 Lê este ficheiro COMPLETO antes de escrever qualquer linha de código.
 Lê também PRD.md, TECH.md e TASKS.md antes de começar qualquer tarefa.
