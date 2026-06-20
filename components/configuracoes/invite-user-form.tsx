@@ -35,6 +35,7 @@ type FormData = z.infer<typeof schema>
 
 export function InviteUserForm() {
   const [open, setOpen] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
   const router = useRouter()
 
   const {
@@ -52,6 +53,7 @@ export function InviteUserForm() {
   const role = watch("role")
 
   async function onSubmit(data: FormData) {
+    setServerError(null)
     try {
       const res = await fetch("/api/utilizadores/invite", {
         method: "POST",
@@ -61,7 +63,9 @@ export function InviteUserForm() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        toast.error(err.error ?? "Erro ao enviar convite")
+        const msg = err.error ?? "Erro ao enviar convite"
+        setServerError(msg)
+        toast.error(msg)
         return
       }
 
@@ -70,6 +74,7 @@ export function InviteUserForm() {
       setOpen(false)
       router.refresh()
     } catch {
+      setServerError("Erro de ligacao ao servidor")
       toast.error("Erro de ligacao ao servidor")
     }
   }
@@ -116,6 +121,12 @@ export function InviteUserForm() {
           <p className="text-xs text-muted-foreground">
             O utilizador vai receber um email com link para definir a password e entrar na app.
           </p>
+
+          {serverError && (
+            <p className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+              {serverError}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
