@@ -17,23 +17,23 @@ export async function middleware(request: NextRequest) {
     pathname === "/api/efatura/sync" ||
     pathname.includes("/update-fc") ||
     pathname.startsWith("/auth/callback") ||
-    pathname === "/reset-password" ||
-    pathname === "/"
+    pathname === "/reset-password"
   ) {
     return response
   }
 
   const isAuthRoute = AUTH_ROUTES.has(pathname)
+  const isLandingPage = pathname === "/"
 
   if (!user) {
-    if (isAuthRoute) return response
+    if (isAuthRoute || isLandingPage) return response
     const url = request.nextUrl.clone()
     url.pathname = "/login"
     url.searchParams.set("redirectTo", pathname)
     return NextResponse.redirect(url)
   }
 
-  if (isAuthRoute) {
+  if (isAuthRoute || isLandingPage) {
     const url = request.nextUrl.clone()
     url.pathname = "/dashboard"
     return NextResponse.redirect(url)
