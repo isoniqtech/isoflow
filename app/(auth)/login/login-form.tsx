@@ -52,8 +52,7 @@ export function LoginForm() {
     }
 
     toast.success("Bem-vindo de volta")
-    router.push(redirectTo)
-    router.refresh()
+    window.location.href = redirectTo
   }
 
   return (
