@@ -33,6 +33,21 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
+const ROLE_DESCRIPTIONS: Record<string, { label: string; description: string }> = {
+  admin: {
+    label: "Admin",
+    description: "Gere faturas, projetos e utilizadores. Pode convidar membros e criar projetos. Nao gere subscrição nem integracoes bancarias.",
+  },
+  accountant: {
+    label: "Contabilista",
+    description: "Ve faturas, valores, conciliacao bancaria e exporta relatorios. Nao gere utilizadores nem configuracoes.",
+  },
+  member: {
+    label: "Membro",
+    description: "Envia faturas (upload, WhatsApp ou email). Ve apenas as suas proprias faturas e os projetos a que foi atribuido.",
+  },
+}
+
 export function InviteUserForm() {
   const [open, setOpen] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
@@ -111,11 +126,16 @@ export function InviteUserForm() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="accountant">Contabilista</SelectItem>
-                <SelectItem value="member">Membro</SelectItem>
+                {Object.entries(ROLE_DESCRIPTIONS).map(([value, { label }]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            {role && ROLE_DESCRIPTIONS[role] && (
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                {ROLE_DESCRIPTIONS[role].description}
+              </p>
+            )}
           </div>
 
           <p className="text-xs text-muted-foreground">

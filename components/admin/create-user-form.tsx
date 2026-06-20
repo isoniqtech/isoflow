@@ -34,11 +34,23 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  accountant: "Contabilista",
-  member: "Membro",
+const ROLE_DESCRIPTIONS: Record<string, { label: string; description: string }> = {
+  owner: {
+    label: "Owner",
+    description: "Acesso total ao tenant. Gere utilizadores, projetos, subscrição, pagamentos e todas as integracoes.",
+  },
+  admin: {
+    label: "Admin",
+    description: "Gere faturas, projetos e utilizadores. Pode convidar membros e criar projetos. Nao gere subscrição nem integracoes bancarias.",
+  },
+  accountant: {
+    label: "Contabilista",
+    description: "Ve faturas, valores, conciliacao bancaria e exporta relatorios. Nao gere utilizadores nem configuracoes.",
+  },
+  member: {
+    label: "Membro",
+    description: "Envia faturas (upload, WhatsApp ou email). Ve apenas as suas proprias faturas e os projetos a que foi atribuido.",
+  },
 }
 
 export function CreateUserForm({
@@ -121,13 +133,16 @@ export function CreateUserForm({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(ROLE_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
-                  </SelectItem>
+                {Object.entries(ROLE_DESCRIPTIONS).map(([value, { label }]) => (
+                  <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {role && ROLE_DESCRIPTIONS[role] && (
+              <p className="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                {ROLE_DESCRIPTIONS[role].description}
+              </p>
+            )}
           </div>
 
           <div className="space-y-1.5">
