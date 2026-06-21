@@ -25,6 +25,16 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = AUTH_ROUTES.has(pathname)
   const isLandingPage = pathname === "/"
 
+  // Supabase pode redirecionar o code PKCE para a raiz quando o redirectTo nao esta na allow list
+  if (isLandingPage && request.nextUrl.searchParams.has("code")) {
+    const url = request.nextUrl.clone()
+    const code = url.searchParams.get("code")!
+    url.pathname = "/auth/callback"
+    url.searchParams.set("code", code)
+    url.searchParams.set("next", "/reset-password")
+    return NextResponse.redirect(url)
+  }
+
   if (!user) {
     if (isAuthRoute || isLandingPage) return response
     const url = request.nextUrl.clone()
