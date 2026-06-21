@@ -25,7 +25,7 @@ export async function POST(req: Request) {
 
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? ""
   const proto = host.includes("localhost") ? "http" : "https"
-  const redirectTo = `${proto}://${host}/auth/callback?next=/reset-password`
+  const redirectTo = `${proto}://${host}/reset-password`
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo,

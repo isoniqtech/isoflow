@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -34,6 +34,13 @@ type Values = z.infer<typeof schema>
 export function ResetPasswordForm() {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    // Processa tokens do hash (implicit flow - convites e recovery)
+    const supabase = createClient()
+    supabase.auth.getSession().then(() => setReady(true))
+  }, [])
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -58,6 +65,14 @@ export function ResetPasswordForm() {
     toast.success("Password atualizada")
     router.push("/")
     router.refresh()
+  }
+
+  if (!ready) {
+    return (
+      <div className="flex justify-center py-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
