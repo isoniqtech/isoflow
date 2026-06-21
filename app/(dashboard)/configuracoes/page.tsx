@@ -17,7 +17,7 @@ export default async function ConfiguracoesPage() {
   const supabase = createClient()
   const { data: tenantFull } = await supabase
     .from("tenants")
-    .select("phone, address, vat_regime, auto_erp_send")
+    .select("phone, address, vat_regime, auto_erp_send, logo_url")
     .eq("id", session.tenant.id)
     .maybeSingle()
 
@@ -84,6 +84,7 @@ export default async function ConfiguracoesPage() {
                 address: tenantFull?.address ?? null,
                 vat_regime: (tenantFull?.vat_regime as import("@/types").VatRegime) ?? "normal",
                 auto_erp_send: (tenantFull?.auto_erp_send as boolean) ?? false,
+                logo_url: tenantFull?.logo_url ?? null,
               }}
             />
           </CardContent>

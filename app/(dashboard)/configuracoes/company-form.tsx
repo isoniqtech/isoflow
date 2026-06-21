@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
+import { Loader2, Upload, X } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -68,10 +69,14 @@ export function CompanyForm({
     address: string | null
     vat_regime: VatRegime
     auto_erp_send: boolean
+    logo_url: string | null
   }
 }) {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
+  const [logoUrl, setLogoUrl] = useState<string | null>(tenant.logo_url)
+  const [logoUploading, setLogoUploading] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -86,6 +91,38 @@ export function CompanyForm({
       auto_erp_send: tenant.auto_erp_send,
     },
   })
+
+  async function handleLogoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLogoUploading(true)
+    const form = new FormData()
+    form.append("logo", file)
+    const res = await fetch("/api/configuracoes/logo", { method: "POST", body: form })
+    const json = await res.json()
+    if (!res.ok) {
+      toast.error(json.error ?? "Erro ao carregar logo")
+    } else {
+      setLogoUrl(json.url)
+      toast.success("Logo atualizado")
+      router.refresh()
+    }
+    setLogoUploading(false)
+    if (fileRef.current) fileRef.current.value = ""
+  }
+
+  async function handleLogoRemove() {
+    setLogoUploading(true)
+    const res = await fetch("/api/configuracoes/logo", { method: "DELETE" })
+    if (res.ok) {
+      setLogoUrl(null)
+      toast.success("Logo removido")
+      router.refresh()
+    } else {
+      toast.error("Erro ao remover logo")
+    }
+    setLogoUploading(false)
+  }
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true)
@@ -107,11 +144,7 @@ export function CompanyForm({
       .eq("id", tenant.id)
 
     if (error) {
-      console.error("Company update failed:", error)
-      toast.error("Não foi possível guardar", {
-        description: error.message,
-        duration: 8000,
-      })
+      toast.error("Não foi possível guardar", { description: error.message, duration: 8000 })
       setSubmitting(false)
       return
     }
@@ -121,9 +154,76 @@ export function CompanyForm({
     router.refresh()
   }
 
+  const appInitial = tenant.app_name.charAt(0).toUpperCase()
+
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
+        {/* Logo da empresa */}
+        <div className="flex items-center gap-4 pb-2">
+          <div className="relative shrink-0">
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt="Logo da empresa"
+                width={64}
+                height={64}
+                className="h-16 w-16 rounded-xl object-contain border bg-muted"
+                unoptimized
+              />
+            ) : (
+              <div
+                className="h-16 w-16 rounded-xl flex items-center justify-center text-white text-2xl font-bold border"
+                style={{ backgroundColor: tenant.primary_color }}
+              >
+                {appInitial}
+              </div>
+            )}
+            {logoUploading && (
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/40">
+                <Loader2 className="h-5 w-5 animate-spin text-white" />
+              </div>
+            )}
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Logo da empresa</p>
+            <p className="text-xs text-muted-foreground">PNG, JPG, WebP ou SVG. Max 2 MB.</p>
+            <div className="flex items-center gap-2">
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                className="hidden"
+                onChange={handleLogoChange}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={logoUploading}
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload className="h-3.5 w-3.5 mr-1.5" />
+                {logoUrl ? "Substituir" : "Carregar logo"}
+              </Button>
+              {logoUrl && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={logoUploading}
+                  onClick={handleLogoRemove}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <X className="h-3.5 w-3.5 mr-1" />
+                  Remover
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -264,10 +364,10 @@ export function CompanyForm({
                 </FormControl>
                 <div>
                   <FormLabel className="font-medium cursor-pointer">
-                    Envio automático ao ERP
+                    Envio automatico ao ERP
                   </FormLabel>
                   <FormDescription className="mt-0.5">
-                    Quando chega uma nova fatura em estado &quot;Em Sistema&quot; sem necessitar de revisão, é enviada automaticamente ao ERP.
+                    Quando chega uma nova fatura em estado &quot;Em Sistema&quot; sem necessitar de revisao, e enviada automaticamente ao ERP.
                   </FormDescription>
                 </div>
               </div>
@@ -278,7 +378,7 @@ export function CompanyForm({
         <div className="flex justify-end">
           <Button type="submit" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Guardar alterações
+            Guardar alteracoes
           </Button>
         </div>
       </form>
