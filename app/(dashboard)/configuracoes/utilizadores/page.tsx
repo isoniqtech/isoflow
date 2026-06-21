@@ -189,22 +189,33 @@ export default async function UtilizadoresPage() {
                     {u.last_login_at ? formatDate(u.last_login_at) : "Nunca"}
                   </TableCell>
                   <TableCell>
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1.5 text-xs",
-                        u.is_active
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "h-2 w-2 rounded-full",
-                          u.is_active ? "bg-emerald-500" : "bg-muted-foreground",
-                        )}
-                      />
-                      {u.is_active ? "Ativo" : "Inativo"}
-                    </span>
+                    {(() => {
+                      const isPending = !u.is_active && !u.last_login_at
+                      return (
+                        <span
+                          className={cn(
+                            "inline-flex items-center gap-1.5 text-xs",
+                            u.is_active
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : isPending
+                              ? "text-amber-600 dark:text-amber-400"
+                              : "text-muted-foreground",
+                          )}
+                        >
+                          <span
+                            className={cn(
+                              "h-2 w-2 rounded-full",
+                              u.is_active
+                                ? "bg-emerald-500"
+                                : isPending
+                                ? "bg-amber-500"
+                                : "bg-muted-foreground",
+                            )}
+                          />
+                          {u.is_active ? "Ativo" : isPending ? "Pendente" : "Inativo"}
+                        </span>
+                      )
+                    })()}
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">

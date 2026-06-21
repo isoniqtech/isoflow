@@ -69,9 +69,9 @@ export function ResetPasswordForm() {
       return
     }
 
-    toast.success("Password atualizada")
-    router.push("/")
-    router.refresh()
+    await fetch("/api/profile/activate", { method: "POST" })
+    toast.success("Password definida. Bem-vindo!")
+    window.location.href = "/dashboard"
   }
 
   if (!ready) {

@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     name,
     email,
     role,
-    is_active: true,
+    is_active: false,
   }, { onConflict: "id" })
 
   if (profileErr) {
