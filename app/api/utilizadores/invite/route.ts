@@ -6,7 +6,7 @@ import { hasPermission } from "@/lib/utils/permissions"
 const schema = z.object({
   name: z.string().min(2).max(100),
   email: z.string().email(),
-  role: z.enum(["admin", "accountant", "member"]),
+  role: z.enum(["owner", "admin", "accountant", "member"]),
 })
 
 export async function POST(req: Request) {
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
   const { name, email, role } = parsed.data
   const admin = createAdminClient()
 
-  const host = req.headers.get("host") ?? ""
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? ""
   const proto = host.includes("localhost") ? "http" : "https"
   const redirectTo = `${proto}://${host}/reset-password`
 
