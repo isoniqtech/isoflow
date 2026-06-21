@@ -28,12 +28,16 @@ import {
 const schema = z.object({
   name: z.string().min(2, "Nome obrigatorio"),
   email: z.string().email("Email invalido"),
-  role: z.enum(["admin", "accountant", "member"]),
+  role: z.enum(["owner", "admin", "accountant", "member"]),
 })
 
 type FormData = z.infer<typeof schema>
 
 const ROLE_DESCRIPTIONS: Record<string, { label: string; description: string }> = {
+  owner: {
+    label: "Owner",
+    description: "Acesso total. Gere utilizadores, projetos, subscrição, pagamentos e todas as integracoes.",
+  },
   admin: {
     label: "Admin",
     description: "Gere faturas, projetos e utilizadores. Pode convidar membros e criar projetos. Nao gere subscrição nem integracoes bancarias.",
