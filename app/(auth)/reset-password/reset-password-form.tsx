@@ -37,9 +37,16 @@ export function ResetPasswordForm() {
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // Processa tokens do hash (implicit flow - convites e recovery)
     const supabase = createClient()
-    supabase.auth.getSession().then(() => setReady(true))
+    const hash = window.location.hash
+    if (hash && hash.includes("access_token")) {
+      const params = new URLSearchParams(hash.substring(1))
+      const access_token = params.get("access_token") ?? ""
+      const refresh_token = params.get("refresh_token") ?? ""
+      supabase.auth.setSession({ access_token, refresh_token }).then(() => setReady(true))
+    } else {
+      supabase.auth.getSession().then(() => setReady(true))
+    }
   }, [])
 
   const form = useForm<Values>({
