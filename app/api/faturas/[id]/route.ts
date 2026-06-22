@@ -139,6 +139,14 @@ export async function DELETE(
   }
 
   const supabase = createClient()
+
+  const { data: invoice } = await supabase
+    .from("invoices")
+    .select("email_message_id")
+    .eq("id", params.id)
+    .eq("tenant_id", ctx.tenantId)
+    .single()
+
   const { error } = await supabase
     .from("invoices")
     .delete()
@@ -146,6 +154,14 @@ export async function DELETE(
     .eq("tenant_id", ctx.tenantId)
 
   if (error) return jsonError("Could not delete invoice", 500, error.message)
+
+  if (invoice?.email_message_id) {
+    await supabase
+      .from("email_processing_log")
+      .delete()
+      .eq("tenant_id", ctx.tenantId)
+      .eq("email_message_id", invoice.email_message_id)
+  }
 
   await log(supabase, {
     action: "invoice.deleted",
