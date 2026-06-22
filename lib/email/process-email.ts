@@ -4,8 +4,10 @@ import type { Database } from "@/types/supabase"
 import {
   deduplicateAttachments,
   extractAllAttachments,
+  extractLinkedDocuments,
   htmlBodyAsText,
   type EmailAttachment,
+  type LinkExtractionDebug,
 } from "@/lib/email/extract-attachments"
 import {
   extractInvoiceData,
@@ -161,7 +163,24 @@ export async function processEmailInvoice(
 
   // 3. Extrair anexos
   const raw = await extractAllAttachments(email)
-  const attachments = deduplicateAttachments(raw)
+  let attachments = deduplicateAttachments(raw)
+
+  // Caso 9 — sem anexos mas com links de download no corpo do email
+  if (attachments.length === 0) {
+    const linkDebug: LinkExtractionDebug = { triedUrls: [], results: [] }
+    const linked = await extractLinkedDocuments(email, linkDebug)
+    if (linked.length > 0) {
+      attachments = deduplicateAttachments(linked)
+    } else if (linkDebug.triedUrls.length > 0) {
+      // Guardar debug nos details para diagnóstico via DB
+      result.details.push({
+        filename: "_link_debug",
+        status: "skipped",
+        message: JSON.stringify({ tried: linkDebug.triedUrls, results: linkDebug.results }),
+      })
+    }
+  }
+
   result.attachmentsFound = attachments.length
 
   // Caso 8 — fatura inteira em HTML (sem anexo relevante)
