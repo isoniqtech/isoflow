@@ -12,6 +12,7 @@ export type AttachmentSource =
   | "forwarded"
   | "zip"
   | "html"
+  | "link"
 
 export interface EmailAttachment {
   filename: string
@@ -267,6 +268,96 @@ export function htmlBodyAsText(parsedEmail: ParsedMail): string | null {
     .replace(/\s+/g, " ")
     .trim()
   return text.length > 80 ? text : null
+}
+
+const DOWNLOAD_LINK_URL_PATTERNS = [
+  /\.(pdf|jpg|jpeg|png)(\?[^"'\s]*)?$/i,
+  /\/(download|invoice|fatura|factura|document|ficheiro|file|attachment|anexo)\b/i,
+]
+
+const DOWNLOAD_LINK_TEXT_KEYWORDS = [
+  "download", "descarregar", "baixar",
+  "fatura", "factura", "invoice", "recibo", "receipt",
+  "documento", "document", "pdf", "ver fatura", "abrir fatura",
+  "visualizar", "clique aqui", "click here",
+]
+
+/**
+ * Caso 9 - email sem anexos mas com links de download no corpo HTML.
+ * Extrai URLs candidatas, faz fetch e devolve os ficheiros descarregados
+ * como EmailAttachment[] (source: "link").
+ * Só é chamada quando extractAllAttachments devolve lista vazia.
+ */
+export async function extractLinkedDocuments(
+  parsedEmail: ParsedMail,
+): Promise<EmailAttachment[]> {
+  const html = parsedEmail.html
+  if (!html || typeof html !== "string") return []
+
+  const linkRegex = /<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  const candidates: string[] = []
+  let m: RegExpExecArray | null
+
+  while ((m = linkRegex.exec(html)) !== null) {
+    const url = m[1].trim()
+    const text = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
+
+    if (!url.startsWith("http://") && !url.startsWith("https://")) continue
+
+    const urlMatchesPattern = DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(url))
+    const textMatchesKeyword = DOWNLOAD_LINK_TEXT_KEYWORDS.some((k) => text.includes(k))
+
+    if (urlMatchesPattern || textMatchesKeyword) {
+      candidates.push(url)
+    }
+  }
+
+  const unique = [...new Set(candidates)].slice(0, 5)
+  if (!unique.length) return []
+
+  const result: EmailAttachment[] = []
+
+  for (const url of unique) {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15_000)
+
+      let res: Response
+      try {
+        res = await fetch(url, {
+          signal: controller.signal,
+          redirect: "follow",
+          headers: { "User-Agent": "ISOFlow-InvoiceProcessor/1.0" },
+        })
+      } finally {
+        clearTimeout(timeoutId)
+      }
+
+      if (!res.ok) continue
+
+      const contentType = normalizeMime(res.headers.get("content-type") ?? "")
+      if (!RELEVANT_MIME_TYPES.has(contentType)) continue
+
+      const buf = Buffer.from(await res.arrayBuffer())
+      const size = buf.byteLength
+      if (size < MIN_FILE_SIZE || size > MAX_FILE_SIZE) continue
+
+      const disposition = res.headers.get("content-disposition") ?? ""
+      const filenameMatch = disposition.match(/filename[*]?=(?:UTF-8'')?["']?([^"';\r\n]+)/i)
+      const urlFilename = url.split("/").pop()?.split("?")[0] ?? ""
+      const rawFilename = filenameMatch?.[1]?.trim() ?? urlFilename
+      const filename = rawFilename || `documento.${extensionForMime(contentType)}`
+
+      const base64 = buf.toString("base64")
+      const hash = createHash("sha256").update(buf).digest("hex")
+
+      result.push({ filename, mimeType: contentType, base64, size, source: "link", hash })
+    } catch (e) {
+      console.warn(`extractLinkedDocuments: fetch failed for ${url}:`, e instanceof Error ? e.message : String(e))
+    }
+  }
+
+  return result
 }
 
 export {
