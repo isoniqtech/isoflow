@@ -366,6 +366,11 @@ async function collectEmails(root: ParsedMail, depth = 2): Promise<ParsedMail[]>
   return emails
 }
 
+export interface LinkExtractionDebug {
+  triedUrls: string[]
+  results: Array<{ url: string; outcome: string }>
+}
+
 /**
  * Caso 9 - email sem anexos mas com links de download.
  * Estratégia em dois passos:
@@ -375,6 +380,7 @@ async function collectEmails(root: ParsedMail, depth = 2): Promise<ParsedMail[]>
  */
 export async function extractLinkedDocuments(
   parsedEmail: ParsedMail,
+  debug?: LinkExtractionDebug,
 ): Promise<EmailAttachment[]> {
   // Recolher todos os emails aninhados (até 2 níveis de forward)
   const emails = await collectEmails(parsedEmail, 2)
@@ -411,11 +417,13 @@ export async function extractLinkedDocuments(
 
   console.log(`[eld] e=${emails.length} str=${strong.length} fb=${fallback.length} try=${unique.length}`)
   unique.forEach((u, i) => console.log(`[eld:${i}] ${u.slice(0, 100)}`))
+  if (debug) debug.triedUrls = [...unique]
   if (!unique.length) return []
 
   const result: EmailAttachment[] = []
 
   for (const url of unique) {
+    let outcome = "unknown"
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 15_000)
@@ -431,28 +439,42 @@ export async function extractLinkedDocuments(
         clearTimeout(timeoutId)
       }
 
-      console.log(`[eld:fetch] ${res.status} ct=${res.headers.get("content-type")?.slice(0,30)}`)
+      const rawCt = res.headers.get("content-type") ?? ""
+      console.log(`[eld:fetch] ${res.status} ct=${rawCt.slice(0,40)}`)
 
-      if (!res.ok) { console.warn(`[eld:fail] status=${res.status}`); continue }
+      if (!res.ok) {
+        outcome = `http_${res.status}`
+        console.warn(`[eld:fail] status=${res.status}`)
+        debug?.results.push({ url, outcome })
+        continue
+      }
 
-      let contentType = normalizeMime(res.headers.get("content-type") ?? "")
-
+      let contentType = normalizeMime(rawCt)
       const isOctetStream = contentType === "application/octet-stream"
       if (!RELEVANT_MIME_TYPES.has(contentType) && !isOctetStream) {
-        console.warn(`[eld:skip] ct=${contentType.slice(0, 40)}`)
+        outcome = `bad_ct:${contentType.slice(0, 40)}`
+        console.warn(`[eld:skip] ct=${contentType}`)
+        debug?.results.push({ url, outcome })
         continue
       }
 
       const buf = Buffer.from(await res.arrayBuffer())
       const size = buf.byteLength
       if (size < MIN_FILE_SIZE || size > MAX_FILE_SIZE) {
+        outcome = `bad_size:${size}`
         console.warn(`[eld:skip] size=${size}`)
+        debug?.results.push({ url, outcome })
         continue
       }
 
       if (isOctetStream || !RELEVANT_MIME_TYPES.has(contentType)) {
         const detected = detectMimeFromBytes(buf)
-        if (!detected) { console.warn(`[eld:skip] magic unknown`); continue }
+        if (!detected) {
+          outcome = "bad_magic"
+          console.warn(`[eld:skip] magic unknown`)
+          debug?.results.push({ url, outcome })
+          continue
+        }
         contentType = detected
       }
 
@@ -465,10 +487,14 @@ export async function extractLinkedDocuments(
       const base64 = buf.toString("base64")
       const hash = createHash("sha256").update(buf).digest("hex")
 
+      outcome = `ok:${contentType}:${size}b`
       console.log(`[eld:ok] ${filename} ${contentType} ${size}b`)
+      debug?.results.push({ url, outcome })
       result.push({ filename, mimeType: contentType, base64, size, source: "link", hash })
     } catch (e) {
-      console.warn(`[eld:err]`, e instanceof Error ? e.message.slice(0, 60) : String(e).slice(0, 60))
+      outcome = `err:${e instanceof Error ? e.message.slice(0, 60) : String(e).slice(0, 60)}`
+      console.warn(`[eld:err]`, outcome)
+      debug?.results.push({ url, outcome })
     }
   }
 
