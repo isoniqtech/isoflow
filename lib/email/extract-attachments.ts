@@ -272,15 +272,27 @@ export function htmlBodyAsText(parsedEmail: ParsedMail): string | null {
 
 const DOWNLOAD_LINK_URL_PATTERNS = [
   /\.(pdf|jpg|jpeg|png)(\?[^"'\s]*)?$/i,
-  /\/(download|invoice|fatura|factura|document|ficheiro|file|attachment|anexo)\b/i,
+  /\/(download|invoice|fatura|factura|document|documento|ficheiro|file|attachment|anexo|partilha|share|view)\b/i,
 ]
 
 const DOWNLOAD_LINK_TEXT_KEYWORDS = [
   "download", "descarregar", "baixar",
   "fatura", "factura", "invoice", "recibo", "receipt",
-  "documento", "document", "pdf", "ver fatura", "abrir fatura",
-  "visualizar", "clique aqui", "click here",
+  "documento", "document", "pdf",
+  "ver", "abrir", "aceder", "acesso", "consultar", "visualizar",
+  "partilha", "partilhado", "clique aqui", "click here",
 ]
+
+function detectMimeFromBytes(buf: Buffer): string | null {
+  if (buf.length < 4) return null
+  // PDF: %PDF
+  if (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46) return "application/pdf"
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xFF && buf[1] === 0xD8 && buf[2] === 0xFF) return "image/jpeg"
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) return "image/png"
+  return null
+}
 
 /**
  * Caso 9 - email sem anexos mas com links de download no corpo HTML.
@@ -335,12 +347,23 @@ export async function extractLinkedDocuments(
 
       if (!res.ok) continue
 
-      const contentType = normalizeMime(res.headers.get("content-type") ?? "")
-      if (!RELEVANT_MIME_TYPES.has(contentType)) continue
+      let contentType = normalizeMime(res.headers.get("content-type") ?? "")
+
+      // Rejeitar imediatamente tipos claramente irrelevantes (HTML, JSON, etc.)
+      // sem ler o body - mas deixar passar octet-stream para verificar magic bytes
+      const isOctetStream = contentType === "application/octet-stream"
+      if (!RELEVANT_MIME_TYPES.has(contentType) && !isOctetStream) continue
 
       const buf = Buffer.from(await res.arrayBuffer())
       const size = buf.byteLength
       if (size < MIN_FILE_SIZE || size > MAX_FILE_SIZE) continue
+
+      // Detetar tipo real quando o servidor devolve octet-stream
+      if (isOctetStream || !RELEVANT_MIME_TYPES.has(contentType)) {
+        const detected = detectMimeFromBytes(buf)
+        if (!detected) continue
+        contentType = detected
+      }
 
       const disposition = res.headers.get("content-disposition") ?? ""
       const filenameMatch = disposition.match(/filename[*]?=(?:UTF-8'')?["']?([^"';\r\n]+)/i)
