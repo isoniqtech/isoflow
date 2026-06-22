@@ -304,87 +304,112 @@ function detectMimeFromBytes(buf: Buffer): string | null {
   return null
 }
 
-/** Extrai URLs candidatas de um bloco de HTML. */
-function extractCandidatesFromHtml(html: string): string[] {
+// URLs que nunca são documentos - excluídas no fallback
+const SKIP_URL_PATTERNS = [
+  /unsubscribe/i, /optout/i, /opt-out/i,
+  /[?&]track/i, /\/pixel/i, /\/beacon/i,
+  /facebook\.com/i, /twitter\.com/i, /linkedin\.com/i,
+  /instagram\.com/i, /youtube\.com/i,
+]
+
+function isHttpUrl(url: string): boolean {
+  return url.startsWith("http://") || url.startsWith("https://")
+}
+
+/** Extrai todos os hrefs http(s) de HTML. */
+function allHrefsFromHtml(html: string): string[] {
+  const urls: string[] = []
+  const hrefRegex = /href=["']([^"'#][^"']*?)["']/gi
+  let m: RegExpExecArray | null
+  while ((m = hrefRegex.exec(html)) !== null) {
+    const url = decodeHtmlEntities(m[1].trim())
+    if (isHttpUrl(url)) urls.push(url)
+  }
+  return urls
+}
+
+/** Extrai todos os URLs http(s) em bruto de texto plano. */
+function allUrlsFromText(text: string): string[] {
+  return (text.match(/https?:\/\/[^\s<>"']+/g) ?? [])
+}
+
+/** Extrai URLs "fortes" de HTML: link cujo URL ou texto ancora sugere documento. */
+function strongCandidatesFromHtml(html: string): string[] {
   const candidates: string[] = []
   const linkRegex = /<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
   let m: RegExpExecArray | null
   while ((m = linkRegex.exec(html)) !== null) {
     const url = decodeHtmlEntities(m[1].trim())
+    if (!isHttpUrl(url)) continue
     const text = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
-    if (!url.startsWith("http://") && !url.startsWith("https://")) continue
-    const urlMatchesPattern = DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(url))
-    const textMatchesKeyword = DOWNLOAD_LINK_TEXT_KEYWORDS.some((k) => text.includes(k))
-    if (urlMatchesPattern || textMatchesKeyword) candidates.push(url)
+    const urlMatch = DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(url))
+    const textMatch = DOWNLOAD_LINK_TEXT_KEYWORDS.some((k) => text.includes(k))
+    if (urlMatch || textMatch) candidates.push(url)
   }
   return candidates
 }
 
-/** Extrai URLs em bruto do texto plano (fallback quando HTML não tem links). */
-function extractCandidatesFromText(text: string): string[] {
-  const rawUrlRegex = /https?:\/\/[^\s<>"']+/g
-  const urls = text.match(rawUrlRegex) ?? []
-  return urls.filter((url) =>
-    DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(url))
-  )
-}
-
-/**
- * Caso 9 - email sem anexos mas com links de download no corpo HTML ou texto.
- * Procura também em emails RFC822 aninhados (emails reencaminhados dentro de reencaminhados).
- * Faz fetch dos links encontrados e devolve os ficheiros como EmailAttachment[].
- * Só é chamada quando extractAllAttachments devolve lista vazia.
- */
-export async function extractLinkedDocuments(
-  parsedEmail: ParsedMail,
-): Promise<EmailAttachment[]> {
-  const allCandidates: string[] = []
-
-  // 1. HTML do email exterior
-  if (parsedEmail.html && typeof parsedEmail.html === "string") {
-    allCandidates.push(...extractCandidatesFromHtml(parsedEmail.html))
-  }
-
-  // 2. Texto plano do email exterior (URLs em bruto, padrão mais restrito)
-  if (parsedEmail.text && typeof parsedEmail.text === "string") {
-    allCandidates.push(...extractCandidatesFromText(parsedEmail.text))
-  }
-
-  // 3. Emails RFC822 aninhados (forwards dentro de forwards)
-  for (const att of parsedEmail.attachments ?? []) {
+/** Recolhe todos os emails de um ParsedMail até depth níveis de RFC822. */
+async function collectEmails(root: ParsedMail, depth = 2): Promise<ParsedMail[]> {
+  const emails: ParsedMail[] = [root]
+  if (depth <= 0) return emails
+  for (const att of root.attachments ?? []) {
     const mime = normalizeMime(att.contentType)
     if (FORWARDED_MIME_TYPES.has(mime) && att.content) {
       try {
         const nested = await simpleParser(att.content as Buffer)
-        if (nested.html && typeof nested.html === "string") {
-          allCandidates.push(...extractCandidatesFromHtml(nested.html))
-        }
-        if (nested.text && typeof nested.text === "string") {
-          allCandidates.push(...extractCandidatesFromText(nested.text))
-        }
-        // Um nível extra de profundidade (triple-forward)
-        for (const inner of nested.attachments ?? []) {
-          const innerMime = normalizeMime(inner.contentType)
-          if (FORWARDED_MIME_TYPES.has(innerMime) && inner.content) {
-            try {
-              const deep = await simpleParser(inner.content as Buffer)
-              if (deep.html && typeof deep.html === "string") {
-                allCandidates.push(...extractCandidatesFromHtml(deep.html))
-              }
-              if (deep.text && typeof deep.text === "string") {
-                allCandidates.push(...extractCandidatesFromText(deep.text))
-              }
-            } catch { /* ignorar */ }
-          }
-        }
-      } catch (e) {
-        console.warn("[extractLinkedDocuments] nested parse failed:", e instanceof Error ? e.message : String(e))
+        const children = await collectEmails(nested, depth - 1)
+        emails.push(...children)
+      } catch { /* ignorar */ }
+    }
+  }
+  return emails
+}
+
+/**
+ * Caso 9 - email sem anexos mas com links de download.
+ * Estratégia em dois passos:
+ *   1. Candidatos fortes (URL pattern + texto ancora) em todos os níveis RFC822
+ *   2. Fallback: todos os https links de todos os níveis, excluindo não-documentos
+ * O content-type da resposta HTTP é o árbitro final.
+ */
+export async function extractLinkedDocuments(
+  parsedEmail: ParsedMail,
+): Promise<EmailAttachment[]> {
+  // Recolher todos os emails aninhados (até 2 níveis de forward)
+  const emails = await collectEmails(parsedEmail, 2)
+
+  // Passo 1: candidatos fortes
+  const strong: string[] = []
+  for (const email of emails) {
+    if (email.html && typeof email.html === "string") {
+      strong.push(...strongCandidatesFromHtml(email.html))
+    }
+    if (email.text && typeof email.text === "string") {
+      const textUrls = allUrlsFromText(email.text)
+      strong.push(...textUrls.filter((u) => DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(u))))
+    }
+  }
+
+  // Passo 2: fallback - todos os links (se passo 1 ficou vazio)
+  const fallback: string[] = []
+  if (strong.length === 0) {
+    for (const email of emails) {
+      if (email.html && typeof email.html === "string") {
+        fallback.push(...allHrefsFromHtml(email.html))
+      }
+      if (email.text && typeof email.text === "string") {
+        fallback.push(...allUrlsFromText(email.text))
       }
     }
   }
 
-  const unique = [...new Set(allCandidates)].slice(0, 5)
-  console.log(`[extractLinkedDocuments] links candidatos (${unique.length}):`, unique)
+  const pool = strong.length > 0 ? strong : fallback
+  const unique = [...new Set(pool)]
+    .filter((u) => !SKIP_URL_PATTERNS.some((p) => p.test(u)))
+    .slice(0, 8)
+
+  console.log(`[extractLinkedDocuments] emails=${emails.length} strong=${strong.length} fallback=${fallback.length} a_tentar=${unique.length}:`, unique)
   if (!unique.length) return []
 
   const result: EmailAttachment[] = []
