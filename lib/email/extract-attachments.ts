@@ -409,7 +409,8 @@ export async function extractLinkedDocuments(
     .filter((u) => !SKIP_URL_PATTERNS.some((p) => p.test(u)))
     .slice(0, 8)
 
-  console.log(`[extractLinkedDocuments] emails=${emails.length} strong=${strong.length} fallback=${fallback.length} a_tentar=${unique.length}:`, unique)
+  console.log(`[eld] e=${emails.length} str=${strong.length} fb=${fallback.length} try=${unique.length}`)
+  unique.forEach((u, i) => console.log(`[eld:${i}] ${u.slice(0, 100)}`))
   if (!unique.length) return []
 
   const result: EmailAttachment[] = []
@@ -430,37 +431,28 @@ export async function extractLinkedDocuments(
         clearTimeout(timeoutId)
       }
 
-      console.log(`[extractLinkedDocuments] ${url} → status=${res.status} content-type=${res.headers.get("content-type")}`)
+      console.log(`[eld:fetch] ${res.status} ct=${res.headers.get("content-type")?.slice(0,30)}`)
 
-      if (!res.ok) {
-        console.warn(`[extractLinkedDocuments] resposta não-ok (${res.status}) para ${url}`)
-        continue
-      }
+      if (!res.ok) { console.warn(`[eld:fail] status=${res.status}`); continue }
 
       let contentType = normalizeMime(res.headers.get("content-type") ?? "")
 
-      // Rejeitar imediatamente tipos claramente irrelevantes (HTML, JSON, etc.)
-      // sem ler o body - mas deixar passar octet-stream para verificar magic bytes
       const isOctetStream = contentType === "application/octet-stream"
       if (!RELEVANT_MIME_TYPES.has(contentType) && !isOctetStream) {
-        console.warn(`[extractLinkedDocuments] content-type rejeitado: ${contentType} para ${url}`)
+        console.warn(`[eld:skip] ct=${contentType.slice(0, 40)}`)
         continue
       }
 
       const buf = Buffer.from(await res.arrayBuffer())
       const size = buf.byteLength
       if (size < MIN_FILE_SIZE || size > MAX_FILE_SIZE) {
-        console.warn(`[extractLinkedDocuments] tamanho fora dos limites: ${size} bytes para ${url}`)
+        console.warn(`[eld:skip] size=${size}`)
         continue
       }
 
-      // Detetar tipo real quando o servidor devolve octet-stream ou tipo desconhecido
       if (isOctetStream || !RELEVANT_MIME_TYPES.has(contentType)) {
         const detected = detectMimeFromBytes(buf)
-        if (!detected) {
-          console.warn(`[extractLinkedDocuments] magic bytes não reconhecidos para ${url}`)
-          continue
-        }
+        if (!detected) { console.warn(`[eld:skip] magic unknown`); continue }
         contentType = detected
       }
 
@@ -473,10 +465,10 @@ export async function extractLinkedDocuments(
       const base64 = buf.toString("base64")
       const hash = createHash("sha256").update(buf).digest("hex")
 
-      console.log(`[extractLinkedDocuments] ficheiro obtido: ${filename} (${contentType}, ${size} bytes)`)
+      console.log(`[eld:ok] ${filename} ${contentType} ${size}b`)
       result.push({ filename, mimeType: contentType, base64, size, source: "link", hash })
     } catch (e) {
-      console.warn(`[extractLinkedDocuments] fetch falhou para ${url}:`, e instanceof Error ? e.message : String(e))
+      console.warn(`[eld:err]`, e instanceof Error ? e.message.slice(0, 60) : String(e).slice(0, 60))
     }
   }
 
