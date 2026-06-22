@@ -433,7 +433,11 @@ export async function extractLinkedDocuments(
         res = await fetch(url, {
           signal: controller.signal,
           redirect: "follow",
-          headers: { "User-Agent": "ISOFlow-InvoiceProcessor/1.0" },
+          headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "application/pdf,image/*,application/octet-stream,*/*;q=0.8",
+            "Accept-Language": "pt-PT,pt;q=0.9,en;q=0.8",
+          },
         })
       } finally {
         clearTimeout(timeoutId)
