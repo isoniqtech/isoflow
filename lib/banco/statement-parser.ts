@@ -218,40 +218,119 @@ export async function parseCsv(text: string): Promise<ParseResult> {
 
 // ── PDF ──────────────────────────────────────────────────────────────────────
 
-export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
-  try {
-    const { PDFParse } = await import("pdf-parse")
-    /* eslint-disable */
-    const parser = new (PDFParse as any)({ buffer: Buffer.from(buffer) })
-    const result = await parser.getText()
-    const text = (result as { text: string }).text
-    /* eslint-enable */
+// Regex para valor monetário em formato PT: 1.234,56 ou 1234,56 ou 10,40
+const PT_AMOUNT_RE = /\d{1,3}(?:\.\d{3})*,\d{2}/g
 
-    // Split by lines and try to find transaction rows
-    const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean)
-    const rows: unknown[][] = lines.map((line: string) => line.split(/\s{2,}|\t/))
+/**
+ * Parser específico para extratos PT com colunas DÉBITO / CRÉDITO / SALDO separadas.
+ * Usa a diferença de saldo entre linhas para inferir o sinal do movimento.
+ * Funciona com CA (Crédito Agrícola), CGD, BPI e formatos similares.
+ */
+function parseBankTextWithBalance(text: string): { txs: ParsedTransaction[]; errors: string[] } {
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean)
+  const txs: ParsedTransaction[] = []
+  const errors: string[] = []
 
-    const map = detectColumns(rows)
-    if (!map) {
-      // Fallback: regex scan for date + amount patterns
-      const txs: ParsedTransaction[] = []
-      const errors: string[] = ["Formato PDF não reconhecido automaticamente — a usar deteção por padrão."]
+  // Padrão: linha começa com data (DD-MM-YYYY ou DD/MM/YYYY) - pode ter 1 ou 2 datas
+  const DATE_PREFIX = /^(\d{2}[-\/]\d{2}[-\/]\d{4})\s+(?:\d{2}[-\/]\d{2}[-\/]\d{4}\s+)?(.+)$/
 
-      const dateAmountRe = /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+(.+?)\s+([-+]?\d[\d.,]+)\s*(?:EUR|€)?/g
-      let match
-      while ((match = dateAmountRe.exec(text)) !== null) {
-        const date = parsePortugueseDate(match[1])
-        if (!date) continue
-        const amount = parseAmount(match[3])
-        if (amount === null) continue
-        txs.push({ date, description: match[2].trim(), amount, raw: match[0] })
-      }
+  let prevBalance: number | null = null
 
-      return { transactions: txs, errors, format: "pdf", rowsScanned: lines.length }
+  for (const line of lines) {
+    const m = line.match(DATE_PREFIX)
+    if (!m) continue
+
+    const dateStr = m[1]
+    const rest = m[2].trim()
+
+    // Extrair todos os valores monetários PT presentes na linha
+    const amounts = [...rest.matchAll(new RegExp(PT_AMOUNT_RE.source, "g"))].map((a) => parseAmount(a[0]))
+    if (amounts.length === 0) continue
+
+    // Último valor = saldo corrente; penúltimo = montante da transação
+    const balance = amounts[amounts.length - 1]
+    if (balance === null) continue
+
+    if (amounts.length < 2) {
+      // Linha sem transação (ex: saldo inicial, totais)
+      prevBalance = balance
+      continue
     }
 
-    const { txs, errors } = rowsToTransactions(rows, map)
-    return { transactions: txs, errors, format: "pdf", rowsScanned: rows.length }
+    const txAmount = amounts[amounts.length - 2]
+    if (txAmount === null || txAmount === 0) {
+      prevBalance = balance
+      continue
+    }
+
+    // Descrição = tudo antes do primeiro valor monetário
+    const firstAmountIdx = rest.search(/\d{1,3}(?:\.\d{3})*,\d{2}/)
+    const description = (firstAmountIdx > 0 ? rest.slice(0, firstAmountIdx) : rest).trim()
+
+    // Usar diferença de saldo para determinar sinal (crédito ou débito)
+    let signedAmount: number
+    if (prevBalance !== null) {
+      const diff = balance - prevBalance
+      if (Math.abs(diff - txAmount) < 0.02) {
+        signedAmount = txAmount       // crédito (saldo subiu)
+      } else if (Math.abs(diff + txAmount) < 0.02) {
+        signedAmount = -txAmount      // débito (saldo baixou)
+      } else {
+        // Diferença não bate — guardar com sinal negativo e avisar
+        signedAmount = -txAmount
+        errors.push(`Linha "${line.slice(0, 60)}": saldo não confere, assumido débito`)
+      }
+    } else {
+      // Sem saldo anterior não conseguimos inferir — assumir negativo (mais conservador)
+      signedAmount = -txAmount
+    }
+
+    const date = parsePortugueseDate(dateStr)
+    if (!date) continue
+
+    txs.push({ date, description: description || "—", amount: signedAmount, raw: line })
+    prevBalance = balance
+  }
+
+  return { txs, errors }
+}
+
+export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
+  try {
+    const { extractText } = await import("unpdf")
+    const { text: pages } = await extractText(new Uint8Array(buffer))
+    const text = Array.isArray(pages) ? pages.join("\n") : String(pages)
+
+    const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean)
+
+    // Tentar parser estruturado com saldo
+    const { txs: balanceTxs, errors: balanceErrors } = parseBankTextWithBalance(text)
+    if (balanceTxs.length > 0) {
+      return { transactions: balanceTxs, errors: balanceErrors, format: "pdf", rowsScanned: lines.length }
+    }
+
+    // Fallback 1: deteção de colunas por cabeçalho
+    const rows: unknown[][] = lines.map((line: string) => line.split(/\s{2,}|\t/))
+    const map = detectColumns(rows)
+    if (map) {
+      const { txs, errors } = rowsToTransactions(rows, map)
+      return { transactions: txs, errors, format: "pdf", rowsScanned: rows.length }
+    }
+
+    // Fallback 2: regex data + montante
+    const txs: ParsedTransaction[] = []
+    const errors: string[] = ["Formato PDF não reconhecido automaticamente - a usar deteção por padrão."]
+    const dateAmountRe = /(\d{2}[\/\-]\d{2}[\/\-]\d{4})\s+(.+?)\s+([-+]?\d[\d.,]+)\s*(?:EUR|€)?/g
+    let match
+    while ((match = dateAmountRe.exec(text)) !== null) {
+      const date = parsePortugueseDate(match[1])
+      if (!date) continue
+      const amount = parseAmount(match[3])
+      if (amount === null) continue
+      txs.push({ date, description: match[2].trim(), amount, raw: match[0] })
+    }
+
+    return { transactions: txs, errors, format: "pdf", rowsScanned: lines.length }
   } catch (e) {
     return {
       transactions: [],
