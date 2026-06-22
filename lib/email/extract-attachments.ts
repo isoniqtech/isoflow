@@ -283,6 +283,16 @@ const DOWNLOAD_LINK_TEXT_KEYWORDS = [
   "partilha", "partilhado", "clique aqui", "click here",
 ]
 
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+}
+
 function detectMimeFromBytes(buf: Buffer): string | null {
   if (buf.length < 4) return null
   // PDF: %PDF
@@ -311,7 +321,7 @@ export async function extractLinkedDocuments(
   let m: RegExpExecArray | null
 
   while ((m = linkRegex.exec(html)) !== null) {
-    const url = m[1].trim()
+    const url = decodeHtmlEntities(m[1].trim())
     const text = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
 
     if (!url.startsWith("http://") && !url.startsWith("https://")) continue
@@ -325,6 +335,7 @@ export async function extractLinkedDocuments(
   }
 
   const unique = [...new Set(candidates)].slice(0, 5)
+  console.log(`[extractLinkedDocuments] links candidatos (${unique.length}):`, unique)
   if (!unique.length) return []
 
   const result: EmailAttachment[] = []
@@ -345,23 +356,37 @@ export async function extractLinkedDocuments(
         clearTimeout(timeoutId)
       }
 
-      if (!res.ok) continue
+      console.log(`[extractLinkedDocuments] ${url} → status=${res.status} content-type=${res.headers.get("content-type")}`)
+
+      if (!res.ok) {
+        console.warn(`[extractLinkedDocuments] resposta não-ok (${res.status}) para ${url}`)
+        continue
+      }
 
       let contentType = normalizeMime(res.headers.get("content-type") ?? "")
 
       // Rejeitar imediatamente tipos claramente irrelevantes (HTML, JSON, etc.)
       // sem ler o body - mas deixar passar octet-stream para verificar magic bytes
       const isOctetStream = contentType === "application/octet-stream"
-      if (!RELEVANT_MIME_TYPES.has(contentType) && !isOctetStream) continue
+      if (!RELEVANT_MIME_TYPES.has(contentType) && !isOctetStream) {
+        console.warn(`[extractLinkedDocuments] content-type rejeitado: ${contentType} para ${url}`)
+        continue
+      }
 
       const buf = Buffer.from(await res.arrayBuffer())
       const size = buf.byteLength
-      if (size < MIN_FILE_SIZE || size > MAX_FILE_SIZE) continue
+      if (size < MIN_FILE_SIZE || size > MAX_FILE_SIZE) {
+        console.warn(`[extractLinkedDocuments] tamanho fora dos limites: ${size} bytes para ${url}`)
+        continue
+      }
 
-      // Detetar tipo real quando o servidor devolve octet-stream
+      // Detetar tipo real quando o servidor devolve octet-stream ou tipo desconhecido
       if (isOctetStream || !RELEVANT_MIME_TYPES.has(contentType)) {
         const detected = detectMimeFromBytes(buf)
-        if (!detected) continue
+        if (!detected) {
+          console.warn(`[extractLinkedDocuments] magic bytes não reconhecidos para ${url}`)
+          continue
+        }
         contentType = detected
       }
 
@@ -374,9 +399,10 @@ export async function extractLinkedDocuments(
       const base64 = buf.toString("base64")
       const hash = createHash("sha256").update(buf).digest("hex")
 
+      console.log(`[extractLinkedDocuments] ficheiro obtido: ${filename} (${contentType}, ${size} bytes)`)
       result.push({ filename, mimeType: contentType, base64, size, source: "link", hash })
     } catch (e) {
-      console.warn(`extractLinkedDocuments: fetch failed for ${url}:`, e instanceof Error ? e.message : String(e))
+      console.warn(`[extractLinkedDocuments] fetch falhou para ${url}:`, e instanceof Error ? e.message : String(e))
     }
   }
 
