@@ -371,6 +371,71 @@ export interface LinkExtractionDebug {
   results: Array<{ url: string; outcome: string }>
 }
 
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept-Language": "pt-PT,pt;q=0.9,en;q=0.8",
+}
+
+/**
+ * Quando uma pagina HTML serve um documento num iframe/embed,
+ * extrai o URL do ficheiro embebido para segundo fetch.
+ * Suporta: iFrameUrl = '...', <iframe src="...">, <embed src="...">.
+ */
+function extractEmbeddedDocUrl(html: string, sourceUrl: string): string | null {
+  let origin = ""
+  try { origin = new URL(sourceUrl).origin } catch { return null }
+  const resolve = (path: string) => {
+    if (path.startsWith("http://") || path.startsWith("https://")) return path
+    if (path.startsWith("/")) return origin + path
+    return null
+  }
+  const iframeVar = html.match(/iFrameUrl\s*=\s*['"]([^'"]+)['"]/i)
+  if (iframeVar) { const r = resolve(iframeVar[1].split("#")[0]); if (r) return r }
+  const iframeTag = html.match(/<iframe[^>]+src=["']([^"']+)["']/i)
+  if (iframeTag) { const r = resolve(decodeHtmlEntities(iframeTag[1])); if (r) return r }
+  const embed = html.match(/<embed[^>]+src=["']([^"']+)["']/i)
+  if (embed) { const r = resolve(decodeHtmlEntities(embed[1])); if (r) return r }
+  return null
+}
+
+/** Faz fetch de um URL esperando ficheiro direto; devolve EmailAttachment ou null. */
+async function fetchDocumentFile(url: string, referer?: string): Promise<EmailAttachment | null> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15_000)
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        ...BROWSER_HEADERS,
+        "Accept": "application/pdf,image/*,application/octet-stream,*/*;q=0.8",
+        ...(referer ? { "Referer": referer } : {}),
+      },
+    })
+    if (!res.ok) return null
+    let contentType = normalizeMime(res.headers.get("content-type") ?? "")
+    const isOctetStream = contentType === "application/octet-stream"
+    if (!RELEVANT_MIME_TYPES.has(contentType) && !isOctetStream) return null
+    const buf = Buffer.from(await res.arrayBuffer())
+    if (buf.byteLength < MIN_FILE_SIZE || buf.byteLength > MAX_FILE_SIZE) return null
+    if (isOctetStream) {
+      const detected = detectMimeFromBytes(buf)
+      if (!detected) return null
+      contentType = detected
+    }
+    const disposition = res.headers.get("content-disposition") ?? ""
+    const filenameMatch = disposition.match(/filename[*]?=(?:UTF-8'')?["']?([^"';\r\n]+)/i)
+    const urlFilename = url.split("/").pop()?.split("?")[0] ?? ""
+    const rawFilename = filenameMatch?.[1]?.trim() ?? urlFilename
+    const filename = rawFilename || `documento.${extensionForMime(contentType)}`
+    const base64 = buf.toString("base64")
+    const hash = createHash("sha256").update(buf).digest("hex")
+    return { filename, mimeType: contentType, base64, size: buf.byteLength, source: "link", hash }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 /**
  * Caso 9 - email sem anexos mas com links de download.
  * Estratégia em dois passos:
@@ -427,37 +492,54 @@ export async function extractLinkedDocuments(
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 15_000)
-
       let res: Response
       try {
         res = await fetch(url, {
           signal: controller.signal,
           redirect: "follow",
-          headers: {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "application/pdf,image/*,application/octet-stream,*/*;q=0.8",
-            "Accept-Language": "pt-PT,pt;q=0.9,en;q=0.8",
-          },
+          headers: { ...BROWSER_HEADERS, "Accept": "application/pdf,image/*,application/octet-stream,*/*;q=0.8" },
         })
       } finally {
         clearTimeout(timeoutId)
       }
 
       const rawCt = res.headers.get("content-type") ?? ""
-      console.log(`[eld:fetch] ${res.status} ct=${rawCt.slice(0,40)}`)
+      console.log(`[eld:fetch] ${res.status} ct=${rawCt.slice(0, 40)}`)
 
       if (!res.ok) {
         outcome = `http_${res.status}`
-        console.warn(`[eld:fail] status=${res.status}`)
         debug?.results.push({ url, outcome })
         continue
       }
 
-      let contentType = normalizeMime(rawCt)
+      const contentType = normalizeMime(rawCt)
+
+      // Drill-through: pagina HTML pode embeber o PDF num iframe/embed
+      if (contentType === "text/html") {
+        const htmlBody = await res.text()
+        const embeddedUrl = extractEmbeddedDocUrl(htmlBody, url)
+        if (embeddedUrl) {
+          console.log(`[eld:drill] ${embeddedUrl.slice(0, 100)}`)
+          const att = await fetchDocumentFile(embeddedUrl, url)
+          if (att) {
+            outcome = `drill:ok:${att.mimeType}:${att.size}b`
+            console.log(`[eld:drill:ok] ${att.filename} ${att.size}b`)
+            debug?.results.push({ url, outcome })
+            result.push(att)
+          } else {
+            outcome = `drill:fail`
+            debug?.results.push({ url, outcome })
+          }
+        } else {
+          outcome = `bad_ct:text/html`
+          debug?.results.push({ url, outcome })
+        }
+        continue
+      }
+
       const isOctetStream = contentType === "application/octet-stream"
       if (!RELEVANT_MIME_TYPES.has(contentType) && !isOctetStream) {
         outcome = `bad_ct:${contentType.slice(0, 40)}`
-        console.warn(`[eld:skip] ct=${contentType}`)
         debug?.results.push({ url, outcome })
         continue
       }
@@ -466,35 +548,29 @@ export async function extractLinkedDocuments(
       const size = buf.byteLength
       if (size < MIN_FILE_SIZE || size > MAX_FILE_SIZE) {
         outcome = `bad_size:${size}`
-        console.warn(`[eld:skip] size=${size}`)
         debug?.results.push({ url, outcome })
         continue
       }
 
-      if (isOctetStream || !RELEVANT_MIME_TYPES.has(contentType)) {
+      let finalMime = contentType
+      if (isOctetStream) {
         const detected = detectMimeFromBytes(buf)
-        if (!detected) {
-          outcome = "bad_magic"
-          console.warn(`[eld:skip] magic unknown`)
-          debug?.results.push({ url, outcome })
-          continue
-        }
-        contentType = detected
+        if (!detected) { outcome = "bad_magic"; debug?.results.push({ url, outcome }); continue }
+        finalMime = detected
       }
 
       const disposition = res.headers.get("content-disposition") ?? ""
       const filenameMatch = disposition.match(/filename[*]?=(?:UTF-8'')?["']?([^"';\r\n]+)/i)
       const urlFilename = url.split("/").pop()?.split("?")[0] ?? ""
       const rawFilename = filenameMatch?.[1]?.trim() ?? urlFilename
-      const filename = rawFilename || `documento.${extensionForMime(contentType)}`
-
+      const filename = rawFilename || `documento.${extensionForMime(finalMime)}`
       const base64 = buf.toString("base64")
       const hash = createHash("sha256").update(buf).digest("hex")
 
-      outcome = `ok:${contentType}:${size}b`
-      console.log(`[eld:ok] ${filename} ${contentType} ${size}b`)
+      outcome = `ok:${finalMime}:${size}b`
+      console.log(`[eld:ok] ${filename} ${finalMime} ${size}b`)
       debug?.results.push({ url, outcome })
-      result.push({ filename, mimeType: contentType, base64, size, source: "link", hash })
+      result.push({ filename, mimeType: finalMime, base64, size, source: "link", hash })
     } catch (e) {
       outcome = `err:${e instanceof Error ? e.message.slice(0, 60) : String(e).slice(0, 60)}`
       console.warn(`[eld:err]`, outcome)
