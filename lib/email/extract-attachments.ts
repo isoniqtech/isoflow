@@ -304,37 +304,86 @@ function detectMimeFromBytes(buf: Buffer): string | null {
   return null
 }
 
+/** Extrai URLs candidatas de um bloco de HTML. */
+function extractCandidatesFromHtml(html: string): string[] {
+  const candidates: string[] = []
+  const linkRegex = /<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
+  let m: RegExpExecArray | null
+  while ((m = linkRegex.exec(html)) !== null) {
+    const url = decodeHtmlEntities(m[1].trim())
+    const text = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
+    if (!url.startsWith("http://") && !url.startsWith("https://")) continue
+    const urlMatchesPattern = DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(url))
+    const textMatchesKeyword = DOWNLOAD_LINK_TEXT_KEYWORDS.some((k) => text.includes(k))
+    if (urlMatchesPattern || textMatchesKeyword) candidates.push(url)
+  }
+  return candidates
+}
+
+/** Extrai URLs em bruto do texto plano (fallback quando HTML não tem links). */
+function extractCandidatesFromText(text: string): string[] {
+  const rawUrlRegex = /https?:\/\/[^\s<>"']+/g
+  const urls = text.match(rawUrlRegex) ?? []
+  return urls.filter((url) =>
+    DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(url))
+  )
+}
+
 /**
- * Caso 9 - email sem anexos mas com links de download no corpo HTML.
- * Extrai URLs candidatas, faz fetch e devolve os ficheiros descarregados
- * como EmailAttachment[] (source: "link").
+ * Caso 9 - email sem anexos mas com links de download no corpo HTML ou texto.
+ * Procura também em emails RFC822 aninhados (emails reencaminhados dentro de reencaminhados).
+ * Faz fetch dos links encontrados e devolve os ficheiros como EmailAttachment[].
  * Só é chamada quando extractAllAttachments devolve lista vazia.
  */
 export async function extractLinkedDocuments(
   parsedEmail: ParsedMail,
 ): Promise<EmailAttachment[]> {
-  const html = parsedEmail.html
-  if (!html || typeof html !== "string") return []
+  const allCandidates: string[] = []
 
-  const linkRegex = /<a\s[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi
-  const candidates: string[] = []
-  let m: RegExpExecArray | null
+  // 1. HTML do email exterior
+  if (parsedEmail.html && typeof parsedEmail.html === "string") {
+    allCandidates.push(...extractCandidatesFromHtml(parsedEmail.html))
+  }
 
-  while ((m = linkRegex.exec(html)) !== null) {
-    const url = decodeHtmlEntities(m[1].trim())
-    const text = m[2].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase()
+  // 2. Texto plano do email exterior (URLs em bruto, padrão mais restrito)
+  if (parsedEmail.text && typeof parsedEmail.text === "string") {
+    allCandidates.push(...extractCandidatesFromText(parsedEmail.text))
+  }
 
-    if (!url.startsWith("http://") && !url.startsWith("https://")) continue
-
-    const urlMatchesPattern = DOWNLOAD_LINK_URL_PATTERNS.some((p) => p.test(url))
-    const textMatchesKeyword = DOWNLOAD_LINK_TEXT_KEYWORDS.some((k) => text.includes(k))
-
-    if (urlMatchesPattern || textMatchesKeyword) {
-      candidates.push(url)
+  // 3. Emails RFC822 aninhados (forwards dentro de forwards)
+  for (const att of parsedEmail.attachments ?? []) {
+    const mime = normalizeMime(att.contentType)
+    if (FORWARDED_MIME_TYPES.has(mime) && att.content) {
+      try {
+        const nested = await simpleParser(att.content as Buffer)
+        if (nested.html && typeof nested.html === "string") {
+          allCandidates.push(...extractCandidatesFromHtml(nested.html))
+        }
+        if (nested.text && typeof nested.text === "string") {
+          allCandidates.push(...extractCandidatesFromText(nested.text))
+        }
+        // Um nível extra de profundidade (triple-forward)
+        for (const inner of nested.attachments ?? []) {
+          const innerMime = normalizeMime(inner.contentType)
+          if (FORWARDED_MIME_TYPES.has(innerMime) && inner.content) {
+            try {
+              const deep = await simpleParser(inner.content as Buffer)
+              if (deep.html && typeof deep.html === "string") {
+                allCandidates.push(...extractCandidatesFromHtml(deep.html))
+              }
+              if (deep.text && typeof deep.text === "string") {
+                allCandidates.push(...extractCandidatesFromText(deep.text))
+              }
+            } catch { /* ignorar */ }
+          }
+        }
+      } catch (e) {
+        console.warn("[extractLinkedDocuments] nested parse failed:", e instanceof Error ? e.message : String(e))
+      }
     }
   }
 
-  const unique = [...new Set(candidates)].slice(0, 5)
+  const unique = [...new Set(allCandidates)].slice(0, 5)
   console.log(`[extractLinkedDocuments] links candidatos (${unique.length}):`, unique)
   if (!unique.length) return []
 
