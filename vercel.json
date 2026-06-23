@@ -3,8 +3,8 @@
     { "path": "/api/cron/email", "schedule": "0 8 * * *" },
     { "path": "/api/cron/email", "schedule": "0 13 * * *" },
     { "path": "/api/cron/email", "schedule": "0 19 * * *" },
-    { "path": "/api/cron/reprocess-failed", "schedule": "30 9 * * *" },
-    { "path": "/api/cron/reprocess-failed", "schedule": "30 14 * * *" },
-    { "path": "/api/cron/reprocess-failed", "schedule": "30 20 * * *" }
+    { "path": "/api/cron/reprocess-failed", "schedule": "30 8 * * *" },
+    { "path": "/api/cron/reprocess-failed", "schedule": "30 13 * * *" },
+    { "path": "/api/cron/reprocess-failed", "schedule": "30 19 * * *" }
   ]
 }
