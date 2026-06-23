@@ -45,6 +45,18 @@ export async function POST() {
     0,
   )
 
+  const allInvoiceIds = summary.results.flatMap((r) => r.invoiceIds)
+  let invoiceNumbers: string[] = []
+  if (allInvoiceIds.length > 0) {
+    const { data: rows } = await admin
+      .from("invoices")
+      .select("invoice_number")
+      .in("id", allInvoiceIds)
+    invoiceNumbers = (rows ?? [])
+      .map((r) => r.invoice_number)
+      .filter((n): n is string => !!n)
+  }
+
   await log(admin, {
     action: "email.synced",
     tenantId: ctx.tenantId,
@@ -54,6 +66,7 @@ export async function POST() {
       manual: true,
       emails_fetched: summary.emailsFetched,
       invoices_created: invoicesCreated,
+      invoice_numbers: invoiceNumbers,
       duplicates,
       errors_count: summary.errors.length,
     },

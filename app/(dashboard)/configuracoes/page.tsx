@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Building2, ChevronRight, CreditCard, Plug, Users } from "lucide-react"
+import { Building2, ChevronRight, ClipboardList, CreditCard, Plug, Users } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { CompanyForm } from "./company-form"
 import { getCurrentSession } from "@/lib/queries/current-session"
@@ -47,6 +47,12 @@ export default async function ConfiguracoesPage() {
       label: "Plano e créditos",
       description: "Subscrição, consumo e packs avulso",
       icon: CreditCard,
+    },
+    canManageIntegrations && {
+      href: "/configuracoes/audit-logs",
+      label: "Audit Logs",
+      description: "Histórico de sincronizações e ações na plataforma",
+      icon: ClipboardList,
     },
   ].filter(Boolean) as Array<{
     href: string

@@ -88,6 +88,17 @@ export async function GET(req: Request) {
         errors: summary.errors.length,
       })
       if (summary.emailsFetched > 0 || summary.errors.length > 0) {
+        const allInvoiceIds = summary.results.flatMap((r) => r.invoiceIds)
+        let invoiceNumbers: string[] = []
+        if (allInvoiceIds.length > 0) {
+          const { data: rows } = await admin
+            .from("invoices")
+            .select("invoice_number")
+            .in("id", allInvoiceIds)
+          invoiceNumbers = (rows ?? [])
+            .map((r) => r.invoice_number)
+            .filter((n): n is string => !!n)
+        }
         await log(admin, {
           action: "email.synced",
           tenantId,
@@ -99,6 +110,7 @@ export async function GET(req: Request) {
             until: dateRange.until.toISOString(),
             emails_fetched: summary.emailsFetched,
             invoices_created: invoicesCreated,
+            invoice_numbers: invoiceNumbers,
             errors_count: summary.errors.length,
           },
         })
