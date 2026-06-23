@@ -266,7 +266,9 @@ export type Database = {
       }
       invoices: {
         Row: {
+          ai_attempts: number
           ai_confidence: number | null
+          ai_last_attempt_at: string | null
           ai_processed_at: string | null
           ai_raw_response: Json | null
           at_communicated: boolean | null
@@ -318,7 +320,9 @@ export type Database = {
           vat_rate: number | null
         }
         Insert: {
+          ai_attempts?: number
           ai_confidence?: number | null
+          ai_last_attempt_at?: string | null
           ai_processed_at?: string | null
           ai_raw_response?: Json | null
           at_communicated?: boolean | null
@@ -370,7 +374,9 @@ export type Database = {
           vat_rate?: number | null
         }
         Update: {
+          ai_attempts?: number
           ai_confidence?: number | null
+          ai_last_attempt_at?: string | null
           ai_processed_at?: string | null
           ai_raw_response?: Json | null
           at_communicated?: boolean | null

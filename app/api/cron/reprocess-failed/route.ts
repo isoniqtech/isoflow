@@ -28,7 +28,7 @@ export async function GET(req: Request) {
   let totalErrors = 0
 
   for (const tenant of tenants) {
-    const failedIds = await findFailedExtractions(tenant.id, admin, 7, 10)
+    const failedIds = await findFailedExtractions(tenant.id, admin, 10)
     if (!failedIds.length) continue
 
     for (const invoiceId of failedIds) {
