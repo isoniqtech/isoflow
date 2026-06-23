@@ -7,11 +7,11 @@ export const runtime = "nodejs"
 export const maxDuration = 300
 
 /**
- * Cron job — executado 3x/dia: 8h, 13h, 19h UTC (vercel.json).
- * Cada execução cobre um intervalo diferente com margem de 5 minutos:
- *   08h UTC → emails das 18:55 do dia anterior até às 08:05
- *   13h UTC → emails das 07:55 às 13:05
- *   19h UTC → emails das 12:55 às 19:05
+ * Cron job — executado 3x/dia (horarios PT = UTC+1):
+ *   9h PT  (8h UTC)  → emails das 20h PT do dia anterior ate as 9h PT
+ *   14h PT (13h UTC) → emails das 9h PT ate as 14h PT
+ *   20h PT (19h UTC) → emails das 14h PT ate as 20h PT
+ * Margem de 5 minutos em cada extremo para evitar gaps entre janelas.
  */
 function getCronDateRange(): DateRange {
   const now = new Date()
@@ -21,18 +21,18 @@ function getCronDateRange(): DateRange {
 
   let since: Date
   if (hour >= 8 && hour < 13) {
-    // Cron das 8h → desde as 19h de ontem
+    // 9h PT (8h UTC) → desde as 20h PT de ontem (19h UTC)
     const prev = new Date(now)
     prev.setUTCDate(prev.getUTCDate() - 1)
     prev.setUTCHours(19, 0, 0, 0)
     since = new Date(prev.getTime() - MARGIN)
   } else if (hour >= 13 && hour < 19) {
-    // Cron das 13h → desde as 8h de hoje
+    // 14h PT (13h UTC) → desde as 9h PT de hoje (8h UTC)
     const start = new Date(now)
     start.setUTCHours(8, 0, 0, 0)
     since = new Date(start.getTime() - MARGIN)
   } else {
-    // Cron das 19h (ou fora de janela) → desde as 13h de hoje
+    // 20h PT (19h UTC) → desde as 14h PT de hoje (13h UTC)
     const start = new Date(now)
     start.setUTCHours(13, 0, 0, 0)
     since = new Date(start.getTime() - MARGIN)
