@@ -104,7 +104,7 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
   }
 
   return (
-    <>
+    <div className="relative">
       {tooltip && (
         <div
           style={{
@@ -230,6 +230,6 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
           </TableBody>
         </Table>
       </div>
-    </>
+    </div>
   )
 }
