@@ -9,6 +9,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { StatusBadge } from "@/components/faturas/status-badge"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
@@ -82,19 +88,71 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
     <div className="rounded-lg border bg-background overflow-x-auto">
       <Table>
         <TableHeader>
+          <TooltipProvider delayDuration={300}>
           <TableRow>
             <TableHead className="w-10"></TableHead>
-            <TableHead>Fornecedor</TableHead>
-            <TableHead className="hidden md:table-cell">Nº Fatura</TableHead>
-            <TableHead className="hidden lg:table-cell">Data</TableHead>
-            <TableHead className="hidden lg:table-cell">FC ERP</TableHead>
-            <TableHead className="hidden md:table-cell">Projeto</TableHead>
-            <TableHead className="text-right">Valor</TableHead>
-            <TableHead>Estado</TableHead>
-            <TableHead className="hidden xl:table-cell">Bancário</TableHead>
-            <TableHead className="hidden xl:table-cell">AT</TableHead>
-            <TableHead className="hidden sm:table-cell">Origem</TableHead>
+            <TableHead>
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Fornecedor</TooltipTrigger>
+                <TooltipContent>Nome e NIF do fornecedor da fatura</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="hidden md:table-cell">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Nº Fatura</TooltipTrigger>
+                <TooltipContent>Numero de identificacao da fatura emitida pelo fornecedor</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="hidden lg:table-cell">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Data</TooltipTrigger>
+                <TooltipContent>Data de emissao da fatura</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="hidden lg:table-cell">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">FC ERP</TooltipTrigger>
+                <TooltipContent>Numero do documento no TOCONLINE (Fatura de Compra). Preenchido apos sincronizacao com o ERP.</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="hidden md:table-cell">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Projeto</TooltipTrigger>
+                <TooltipContent>Obra ou projeto ao qual esta fatura esta associada</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="text-right">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Valor</TooltipTrigger>
+                <TooltipContent>Valor total da fatura com IVA incluido</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead>
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Estado</TooltipTrigger>
+                <TooltipContent>Estado atual do processamento da fatura (pendente, paga, rejeitada, etc.)</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="hidden xl:table-cell">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Bancario</TooltipTrigger>
+                <TooltipContent>Indica se a fatura foi conciliada com um movimento bancario importado</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="hidden xl:table-cell">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">AT</TooltipTrigger>
+                <TooltipContent>Indica se a fatura esta registada na e-Fatura da Autoridade Tributaria</TooltipContent>
+              </Tooltip>
+            </TableHead>
+            <TableHead className="hidden sm:table-cell">
+              <Tooltip>
+                <TooltipTrigger className="cursor-default">Origem</TooltipTrigger>
+                <TooltipContent>Canal por onde a fatura foi recebida - email, WhatsApp ou upload manual</TooltipContent>
+              </Tooltip>
+            </TableHead>
           </TableRow>
+          </TooltipProvider>
         </TableHeader>
         <TableBody>
           {invoices.map((inv) => {
