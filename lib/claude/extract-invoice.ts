@@ -166,7 +166,7 @@ async function compressImageForClaude(
 
 // Erros transitórios da Claude API que valem a pena fazer retry.
 const RETRYABLE_STATUS = new Set([429, 503, 529])
-const RETRY_DELAYS_MS = [2000, 6000, 15000]
+const RETRY_DELAYS_MS = [3000, 10000, 30000, 60000]
 
 async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
   let lastErr: unknown
