@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useTransition, useCallback } from "react"
+import { useState, useTransition, useCallback, useRef } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { AlertTriangle, FileText, Loader2, Mail, MessageCircle, Send, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -53,9 +54,24 @@ const TIPS: Record<string, string> = {
 }
 
 export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
+  const router = useRouter()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
   const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  function startPolling(invoiceIds: string[]) {
+    let attempts = 0
+    const MAX = 20 // 60 segundos (20 x 3s)
+    pollRef.current = setInterval(async () => {
+      attempts++
+      router.refresh()
+      if (attempts >= MAX) {
+        clearInterval(pollRef.current!)
+        pollRef.current = null
+      }
+    }, 3000)
+  }
 
   const showTip = useCallback((e: React.MouseEvent<HTMLTableCellElement>, key: string) => {
     const r = e.currentTarget.getBoundingClientRect()
@@ -82,18 +98,24 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
 
   function handleCreateFC() {
     if (!selected.size) return
+    const ids = Array.from(selected)
     startTransition(async () => {
       try {
         const res = await fetch("/api/faturas/create-fc", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invoice_ids: Array.from(selected) }),
+          body: JSON.stringify({ invoice_ids: ids }),
         })
         const json = await res.json()
         if (!res.ok) { toast.error(json.error ?? "Erro ao criar FC"); return }
-        const { queued, skipped } = json as { queued: number; skipped: number }
-        toast.success(`${queued} fatura${queued !== 1 ? "s" : ""} enviada${queued !== 1 ? "s" : ""} ao ERP${skipped ? ` (${skipped} já processadas)` : ""}`)
+        const { queued, skipped, errors } = json as { queued: number; skipped: number; errors?: string[] }
+        if (errors?.length) {
+          toast.error(`Erro ao enviar: ${errors[0]}`)
+          return
+        }
+        toast.success(`${queued} fatura${queued !== 1 ? "s" : ""} enviada${queued !== 1 ? "s" : ""} ao ERP${skipped ? ` (${skipped} já processadas)` : ""} - a aguardar confirmação...`)
         setSelected(new Set())
+        if (queued > 0) startPolling(ids)
       } catch { toast.error("Erro de ligação ao servidor") }
     })
   }
