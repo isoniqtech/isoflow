@@ -11,9 +11,8 @@ import {
 
 export function ExportDropdown({ exportUrl }: { exportUrl: string }) {
   function buildUrl(format: "csv" | "xlsx" | "pdf") {
-    const url = new URL(exportUrl, window.location.origin)
-    url.searchParams.set("format", format)
-    return url.toString()
+    const sep = exportUrl.includes("?") ? "&" : "?"
+    return `${exportUrl}${sep}format=${format}`
   }
 
   return (
