@@ -100,8 +100,9 @@ export function InvoiceDetail({
 
   const aiFailedNoData =
     invoice.file_path &&
-    invoice.supplier_name === null &&
-    (invoice.ai_confidence === null || invoice.ai_confidence === 0)
+    (invoice.needs_review ||
+      (invoice.supplier_name === null &&
+        (invoice.ai_confidence === null || invoice.ai_confidence === 0)))
 
   async function handleReprocess() {
     setReprocessing(true)
