@@ -311,20 +311,20 @@ export async function processEmailInvoice(
       }
 
       // Nível 3 — dados lógicos já existem?
-      if (
-        extraction.supplier_nif &&
-        extraction.invoice_number &&
-        extraction.invoice_date
-      ) {
-        const { data: existingByData } = await supabase
+      // Verifica por NIF+numero+data (ideal) ou só numero+data quando NIF desconhecido.
+      if (extraction.invoice_number && extraction.invoice_date) {
+        let query = supabase
           .from("invoices")
           .select("id")
           .eq("tenant_id", tenantId)
-          .eq("supplier_nif", extraction.supplier_nif)
           .eq("invoice_number", extraction.invoice_number)
           .eq("invoice_date", extraction.invoice_date)
           .neq("status", "rejected")
-          .maybeSingle()
+        if (extraction.supplier_nif) {
+          // Com NIF: fatura exata do mesmo fornecedor
+          query = query.eq("supplier_nif", extraction.supplier_nif)
+        }
+        const { data: existingByData } = await query.maybeSingle()
         if (existingByData) {
           result.duplicatesSkipped += 1
           result.details.push({
