@@ -3,8 +3,7 @@ import { z } from "zod"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 const bodySchema = z.object({
-  fc_id: z.string().min(1),
-  fc_number: z.string().optional().nullable(),
+  fc_number: z.string().min(1),
   tenant_id: z.string().uuid(),
 })
 
@@ -27,7 +26,7 @@ export async function POST(
   const now = new Date().toISOString()
   const { error } = await admin.from("invoices")
     .update({
-      toconline_fc_id: parsed.data.fc_number ?? parsed.data.fc_id,
+      toconline_fc_id: parsed.data.fc_number,
       erp_synced: true,
       erp_synced_at: now,
       updated_at: now,
