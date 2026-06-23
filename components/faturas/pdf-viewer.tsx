@@ -2,10 +2,10 @@
 
 export function PdfViewer({ url }: { url: string }) {
   return (
-    <iframe
-      src={url}
-      className="w-full h-full min-h-[500px] rounded border-0"
-      title="Fatura PDF"
+    <embed
+      src={`${url}#toolbar=1&navpanes=0&scrollbar=1`}
+      type="application/pdf"
+      className="w-full h-full min-h-[500px] rounded"
     />
   )
 }
