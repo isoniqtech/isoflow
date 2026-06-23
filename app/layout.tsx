@@ -35,7 +35,6 @@ export const metadata: Metadata = {
     shortcut: [{ url: "/icon.png", type: "image/png" }],
   },
   appleWebApp: {
-    capable: true,
     statusBarStyle: "default",
     title: "ISOFlow",
   },

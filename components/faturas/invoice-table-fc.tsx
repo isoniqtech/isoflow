@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useState, useTransition, useCallback } from "react"
 import Link from "next/link"
 import { AlertTriangle, FileText, Loader2, Mail, MessageCircle, Send, Upload } from "lucide-react"
 import { toast } from "sonner"
@@ -40,9 +40,28 @@ function ATBadge({ inv }: { inv: InvoiceListItem }) {
   return <span className="text-xs text-muted-foreground">Sem FC</span>
 }
 
+const TIPS: Record<string, string> = {
+  supplier: "Nome e NIF do fornecedor da fatura",
+  number:   "Numero de identificacao da fatura emitida pelo fornecedor",
+  date:     "Data de emissao da fatura",
+  erp:      "Numero do documento no TOCONLINE (Fatura de Compra)",
+  project:  "Obra ou projeto ao qual esta fatura esta associada",
+  value:    "Valor total da fatura com IVA incluido",
+  status:   "Estado atual do processamento da fatura",
+  bank:     "Indica se a fatura foi conciliada com um movimento bancario",
+  at:       "Indica se a fatura esta registada na e-Fatura da Autoridade Tributaria",
+}
+
 export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [isPending, startTransition] = useTransition()
+  const [tip, setTip] = useState<{ text: string; x: number; y: number } | null>(null)
+
+  const showTip = useCallback((e: React.MouseEvent<HTMLTableCellElement>, key: string) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setTip({ text: TIPS[key] ?? key, x: r.left + r.width / 2, y: r.bottom + 6 })
+  }, [])
+  const hideTip = useCallback(() => setTip(null), [])
 
   // Apenas faturas incoming sem FC são elegíveis
   const eligible = invoices.filter(i => i.type === "incoming" && !i.toconline_fc_id)
@@ -81,6 +100,11 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-2">
+      {tip && (
+        <div style={{ position: "fixed", left: tip.x, top: tip.y, transform: "translateX(-50%)", zIndex: 9999, pointerEvents: "none", whiteSpace: "nowrap", background: "#111827", color: "#fff", padding: "4px 10px", borderRadius: "6px", fontSize: "12px", lineHeight: "1.5", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
+          {tip.text}
+        </div>
+      )}
       {invoices.length === 0 ? (
         <div className="flex-1 border rounded-lg p-12 flex flex-col items-center text-center bg-background">
           <FileText className="h-10 w-10 text-muted-foreground mb-3" />
@@ -119,15 +143,15 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
                   />
                 )}
               </TableHead>
-              <TableHead>Fornecedor</TableHead>
-              <TableHead className="hidden md:table-cell">Nº Fatura</TableHead>
-              <TableHead className="hidden lg:table-cell">Data</TableHead>
-              <TableHead className="hidden lg:table-cell">FC ERP</TableHead>
-              <TableHead className="hidden md:table-cell">Projeto</TableHead>
-              <TableHead className="text-right">Valor</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead className="hidden xl:table-cell">Bancário</TableHead>
-              <TableHead className="hidden xl:table-cell">AT</TableHead>
+              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
+              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "number")} onMouseLeave={hideTip}>Nr. Fatura</TableHead>
+              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
+              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>FC ERP</TableHead>
+              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
+              <TableHead className="text-right cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
+              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "status")} onMouseLeave={hideTip}>Estado</TableHead>
+              <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "bank")} onMouseLeave={hideTip}>Bancario</TableHead>
+              <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "at")} onMouseLeave={hideTip}>AT</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

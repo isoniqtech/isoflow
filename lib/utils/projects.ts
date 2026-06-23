@@ -11,6 +11,69 @@ function normalize(text: string): string {
     .trim()
 }
 
+type ProjectRow = { id: string; name: string; name_aliases: string[] | null }
+
+function matchByString(text: string, projects: ProjectRow[]): string | null {
+  const haystack = ` ${normalize(text)} `
+  for (const project of projects) {
+    const candidates = [project.name, ...(project.name_aliases ?? [])]
+      .filter((c): c is string => Boolean(c))
+      .map(normalize)
+      .filter((c) => c.length >= 2)
+    for (const candidate of candidates) {
+      if (haystack.includes(` ${candidate} `)) return project.id
+    }
+  }
+  return null
+}
+
+async function matchByAI(text: string, projects: ProjectRow[]): Promise<string | null> {
+  if (!text?.trim()) return null
+  try {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default
+    const client = new Anthropic()
+
+    const projectList = projects
+      .map((p) => {
+        const aliases = p.name_aliases?.length ? ` (tambem: ${p.name_aliases.join(", ")})` : ""
+        return `${p.id}: ${p.name}${aliases}`
+      })
+      .join("\n")
+
+    const response = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 100,
+      messages: [
+        {
+          role: "user",
+          content: `Analisa este email e determina se menciona explicitamente um projeto ou obra ao qual as faturas devem ser associadas.
+
+Email:
+${text.slice(0, 1500)}
+
+Projetos disponiveis (ID: Nome):
+${projectList}
+
+Responde APENAS com o UUID do projeto mencionado, ou a palavra "null" se nenhum projeto for claramente identificado. Sem texto adicional.`,
+        },
+      ],
+    })
+
+    const answer = response.content
+      .filter((b) => b.type === "text")
+      .map((b) => (b as { type: "text"; text: string }).text)
+      .join("")
+      .trim()
+
+    if (!answer || answer === "null") return null
+
+    // Validar que o ID devolvido corresponde a um projeto real
+    return projects.find((p) => p.id === answer)?.id ?? null
+  } catch {
+    return null
+  }
+}
+
 /**
  * Tenta identificar o projeto referido num texto livre (ex: mensagem WhatsApp,
  * assunto de email). Devolve o id do projeto se houver match com o nome ou
@@ -31,21 +94,32 @@ export async function matchProjectFromText(
 
   if (!projects?.length) return null
 
-  const haystack = ` ${normalize(text)} `
+  return matchByString(text, projects)
+}
 
-  for (const project of projects) {
-    const candidates = [project.name, ...(project.name_aliases ?? [])]
-      .filter((c): c is string => Boolean(c))
-      .map(normalize)
-      .filter((c) => c.length >= 2)
+/**
+ * Versao com fallback via IA: tenta string-match primeiro (rapido, sem custo),
+ * e se nao encontrar usa Claude Haiku para interpretar mencoes naturais de
+ * projeto no texto (ex: "estas faturas sao para a obra do Mercado").
+ * Usar em contextos de email/WhatsApp onde o remetente pode mencionar o
+ * projeto em linguagem natural.
+ */
+export async function matchProjectFromTextWithAI(
+  text: string,
+  tenantId: string,
+  supabase: Client,
+): Promise<string | null> {
+  if (!text) return null
 
-    for (const candidate of candidates) {
-      const needle = ` ${candidate} `
-      if (haystack.includes(needle)) return project.id
-    }
-  }
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name, name_aliases")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
 
-  return null
+  if (!projects?.length) return null
+
+  return matchByString(text, projects) ?? matchByAI(text, projects)
 }
 
 /**

@@ -15,7 +15,7 @@ import {
   type InvoiceExtraction,
   type InvoiceFileType,
 } from "@/lib/claude/extract-invoice"
-import { matchProjectFromText } from "@/lib/utils/projects"
+import { matchProjectFromTextWithAI } from "@/lib/utils/projects"
 import { debitCredits } from "@/lib/utils/credits"
 import { log as auditLog } from "@/lib/utils/audit"
 import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
@@ -119,22 +119,23 @@ export async function processEmailInvoice(
     details: [],
   }
 
-  // 1. Nível 1 — email já processado com sucesso?
-  // Só consideramos "já processado" quando houve invoice criada ou duplicado
-  // detectado. Falhas (sem créditos, parsing falhado, etc.) devem poder
-  // ser retentadas em próximas sincronizações.
+  // 1. Nível 1 — email já processado com SUCESSO COMPLETO?
+  // Só bloqueamos quando status='success' E houve fatura criada ou duplicado
+  // detectado. Runs parciais (partial/error) podem ser retentadas - os níveis
+  // 2 (hash) e 3 (dados) impedem recriar faturas já existentes.
   const { data: existing } = await supabase
     .from("email_processing_log")
-    .select("id, invoices_created, duplicates_skipped")
+    .select("id, status, invoices_created, duplicates_skipped")
     .eq("tenant_id", tenantId)
     .eq("email_message_id", messageId)
+    .eq("status", "success")
     .or("invoices_created.gt.0,duplicates_skipped.gt.0")
     .maybeSingle()
   if (existing) {
     return { ...result, skipped: true, reason: "already_processed" }
   }
 
-  // 2. Verificar créditos
+  // 2. Verificar créditos (mínimo 1; verificação exata por anexo feita antes de cada insert)
   const { data: tenant } = await supabase
     .from("tenants")
     .select("credits_balance, app_name, name")
@@ -144,8 +145,7 @@ export async function processEmailInvoice(
     return { ...result, skipped: true, reason: "tenant_not_found" }
   }
   if ((tenant.credits_balance ?? 0) < CREDITS_PER_INVOICE) {
-    // Log sem processar (poderíamos enviar email aviso ao owner aqui).
-    await supabase.from("email_processing_log").insert({
+    await supabase.from("email_processing_log").upsert({
       tenant_id: tenantId,
       email_message_id: messageId,
       from_email: sender.email,
@@ -157,7 +157,7 @@ export async function processEmailInvoice(
       errors: 0,
       status: "error",
       details: [{ status: "skipped", message: "Sem créditos" }] as unknown as Database["public"]["Tables"]["email_processing_log"]["Insert"]["details"],
-    })
+    }, { onConflict: "tenant_id,email_message_id" })
     return { ...result, skipped: true, reason: "no_credits" }
   }
 
@@ -188,7 +188,7 @@ export async function processEmailInvoice(
   if (attachments.length === 0) {
     htmlText = htmlBodyAsText(email)
     if (!htmlText) {
-      await supabase.from("email_processing_log").insert({
+      await supabase.from("email_processing_log").upsert({
         tenant_id: tenantId,
         email_message_id: messageId,
         from_email: sender.email,
@@ -200,14 +200,16 @@ export async function processEmailInvoice(
         errors: 0,
         status: "success",
         details: [],
-      })
+      }, { onConflict: "tenant_id,email_message_id" })
       return { ...result, skipped: true, reason: "no_relevant_attachments" }
     }
   }
 
   // Match de projeto pelo texto do email (assunto + corpo).
+  // Tenta string-match primeiro; se falhar usa Claude Haiku para interpretar
+  // mencoes naturais como "estas faturas sao para a obra X".
   const matchText = bodyText(email)
-  const projectId = await matchProjectFromText(matchText, tenantId, supabase)
+  const projectId = await matchProjectFromTextWithAI(matchText, tenantId, supabase)
 
   // 4. Processar cada anexo (ou HTML body como uma "fatura")
   const items: Array<EmailAttachment | { html: string }> =
@@ -395,16 +397,15 @@ export async function processEmailInvoice(
         continue
       }
 
-      // Debitar 1 crédito
+      // Debitar 1 crédito por fatura criada
       const debit = await debitCredits(supabase, {
         tenantId,
         amount: CREDITS_PER_INVOICE,
-        description: `Fatura email — ${inserted.supplier_name ?? sender.email}`,
+        description: `Fatura email - ${inserted.supplier_name ?? sender.email}`,
         referenceId: inserted.id,
         referenceType: "invoice",
       })
       if (!debit.ok) {
-        // Não rollback automático — manda só log e continua
         console.warn("debit credits failed:", debit)
       }
 
@@ -456,7 +457,7 @@ export async function processEmailInvoice(
           ? "error"
           : "success"
 
-  await supabase.from("email_processing_log").insert({
+  await supabase.from("email_processing_log").upsert({
     tenant_id: tenantId,
     email_message_id: messageId,
     from_email: sender.email,
@@ -468,7 +469,7 @@ export async function processEmailInvoice(
     errors: result.errors,
     status,
     details: result.details as unknown as Database["public"]["Tables"]["email_processing_log"]["Insert"]["details"],
-  })
+  }, { onConflict: "tenant_id,email_message_id" })
 
   return result
 }
