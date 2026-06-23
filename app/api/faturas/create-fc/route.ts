@@ -49,32 +49,32 @@ export async function POST(request: Request) {
   if (!pending.length)
     return NextResponse.json({ queued: 0, skipped: alreadyDone })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://isoflow-seven.vercel.app"
   const cronSecret = process.env.CRON_SECRET ?? ""
 
-  // Fire and forget — n8n chama /api/faturas/{id}/update-fc quando terminar
-  fetch(n8nUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tenant_id: session.tenant.id,
-      callback_url: `${appUrl}/api/faturas`,
-      callback_secret: cronSecret,
-      invoices: pending.map((inv) => ({
-        id: inv.id,
-        supplier_name: inv.supplier_name,
-        supplier_nif: inv.supplier_nif,
-        invoice_number: inv.invoice_number,
-        invoice_date: inv.invoice_date,
-        subtotal: inv.subtotal,
-        vat_rate: inv.vat_rate,
-        vat_amount: inv.vat_amount,
-        total: inv.total,
-        description: inv.description,
-        currency: inv.currency ?? "EUR",
-      })),
-    }),
-  }).catch(() => null)
+  // Um request por fatura — n8n nao precisa de split
+  for (const inv of pending) {
+    fetch(n8nUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tenant_id: session.tenant.id,
+        callback_secret: cronSecret,
+        invoice: {
+          id: inv.id,
+          supplier_name: inv.supplier_name,
+          supplier_nif: inv.supplier_nif,
+          invoice_number: inv.invoice_number,
+          invoice_date: inv.invoice_date,
+          subtotal: inv.subtotal,
+          vat_rate: inv.vat_rate,
+          vat_amount: inv.vat_amount,
+          total: inv.total,
+          description: inv.description,
+          currency: inv.currency ?? "EUR",
+        },
+      }),
+    }).catch(() => null)
+  }
 
   return NextResponse.json({ queued: pending.length, skipped: alreadyDone })
 }
