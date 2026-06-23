@@ -205,10 +205,11 @@ export async function processEmailInvoice(
     }
   }
 
-  // Match de projeto pelo texto do email (assunto + corpo).
-  // Tenta string-match primeiro; se falhar usa Claude Haiku para interpretar
-  // mencoes naturais como "estas faturas sao para a obra X".
-  const matchText = bodyText(email)
+  // Match de projeto apenas pelo assunto do email.
+  // Usar o corpo completo causava falsos positivos: palavras curtas como "CLUB"
+  // apareciam no HTML dos emails de notificacao (TOCONLINE, etc.) sem relacao
+  // com o projeto.
+  const matchText = email.subject ?? ""
   const projectId = await matchProjectFromTextWithAI(matchText, tenantId, supabase)
 
   // 4. Processar cada anexo (ou HTML body como uma "fatura")
