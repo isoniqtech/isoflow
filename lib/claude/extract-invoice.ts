@@ -164,8 +164,30 @@ async function compressImageForClaude(
   return { base64: fallback.toString("base64"), mediaType: "image/jpeg" }
 }
 
+// Erros transitórios da Claude API que valem a pena fazer retry.
+const RETRYABLE_STATUS = new Set([429, 503, 529])
+const RETRY_DELAYS_MS = [2000, 6000, 15000]
+
+async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+  let lastErr: unknown
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fn()
+    } catch (err) {
+      lastErr = err
+      const status = (err as { status?: number })?.status
+      if (!status || !RETRYABLE_STATUS.has(status)) throw err
+      if (attempt < RETRY_DELAYS_MS.length) {
+        await new Promise(r => setTimeout(r, RETRY_DELAYS_MS[attempt]))
+      }
+    }
+  }
+  throw lastErr
+}
+
 /**
  * Envia ficheiro base64 para Claude e devolve dados estruturados.
+ * Retries automaticos para erros 429/503/529 (overloaded/rate-limit).
  * Throws se ANTHROPIC_API_KEY não estiver definida.
  */
 export async function extractInvoiceData(
@@ -210,11 +232,13 @@ export async function extractInvoiceData(
     { type: "text", text: INVOICE_EXTRACTION_PROMPT },
   ]
 
-  const response = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 2000,
-    messages: [{ role: "user", content }],
-  })
+  const response = await withRetry(() =>
+    client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 2000,
+      messages: [{ role: "user", content }],
+    }),
+  )
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -232,21 +256,23 @@ export async function extractInvoiceFromText(
   text: string,
 ): Promise<InvoiceExtraction> {
   const client = getClient()
-  const response = await client.messages.create({
-    model: CLAUDE_MODEL,
-    max_tokens: 2000,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: `${INVOICE_EXTRACTION_PROMPT}\n\nA fatura está no corpo de email abaixo (texto):\n\n${text}`,
-          },
-        ],
-      },
-    ],
-  })
+  const response = await withRetry(() =>
+    client.messages.create({
+      model: CLAUDE_MODEL,
+      max_tokens: 2000,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `${INVOICE_EXTRACTION_PROMPT}\n\nA fatura está no corpo de email abaixo (texto):\n\n${text}`,
+            },
+          ],
+        },
+      ],
+    }),
+  )
 
   const out = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")

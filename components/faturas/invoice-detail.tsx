@@ -10,6 +10,7 @@ import {
   FileText,
   Loader2,
   Pencil,
+  RefreshCw,
   Save,
   X,
 } from "lucide-react"
@@ -92,9 +93,33 @@ export function InvoiceDetail({
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [reprocessing, setReprocessing] = useState(false)
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [fileType, setFileType] = useState<string | null>(null)
   const [fileLoading, setFileLoading] = useState(false)
+
+  const aiFailedNoData =
+    invoice.file_path &&
+    invoice.supplier_name === null &&
+    (invoice.ai_confidence === null || invoice.ai_confidence === 0)
+
+  async function handleReprocess() {
+    setReprocessing(true)
+    try {
+      const res = await fetch(`/api/faturas/${invoice.id}/reprocess`, { method: "POST" })
+      const body = await res.json()
+      if (!res.ok) {
+        toast.error("Reprocessamento falhou", { description: body.error ?? `HTTP ${res.status}` })
+        return
+      }
+      toast.success("Fatura reprocessada com sucesso")
+      router.refresh()
+    } catch (e) {
+      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setReprocessing(false)
+    }
+  }
 
   const { control, handleSubmit, reset, formState: { errors } } = useForm<EditForm>({
     resolver: zodResolver(editSchema),
@@ -204,10 +229,22 @@ export function InvoiceDetail({
             Dados da fatura
           </h2>
           {canEdit && !editing && (
-            <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
-              <Pencil className="h-3.5 w-3.5 mr-1.5" />
-              Editar
-            </Button>
+            <div className="flex gap-2">
+              {aiFailedNoData && (
+                <Button variant="outline" size="sm" onClick={handleReprocess} disabled={reprocessing}>
+                  {reprocessing ? (
+                    <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                  )}
+                  Reprocessar com AI
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                Editar
+              </Button>
+            </div>
           )}
           {editing && (
             <div className="flex gap-2">
