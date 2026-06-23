@@ -1,5 +1,7 @@
 "use client"
 
+import { useState } from "react"
+import { createPortal } from "react-dom"
 import Link from "next/link"
 import { AlertTriangle, FileText, Mail, MessageCircle, Upload } from "lucide-react"
 import {
@@ -14,21 +16,33 @@ import { Badge } from "@/components/ui/badge"
 import { StatusBadge } from "@/components/faturas/status-badge"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
+import type { InvoiceListItem } from "@/lib/queries/invoices"
+import type { InvoiceSource } from "@/types"
 
 function Th({ children, tip, className }: { children: React.ReactNode; tip: string; className?: string }) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   return (
-    <TableHead className={className}>
-      <span className="group/th relative inline-flex cursor-default">
-        {children}
-        <span className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white opacity-0 shadow-md transition-opacity duration-150 group-hover/th:opacity-100 dark:bg-gray-100 dark:text-gray-900">
+    <TableHead
+      className={cn("cursor-default", className)}
+      onMouseEnter={(e) => {
+        const r = e.currentTarget.getBoundingClientRect()
+        setPos({ x: r.left + r.width / 2, y: r.top })
+      }}
+      onMouseLeave={() => setPos(null)}
+    >
+      {children}
+      {pos && createPortal(
+        <div
+          className="pointer-events-none fixed z-[9999] -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-gray-900 px-2.5 py-1.5 text-xs text-white shadow-md dark:bg-gray-100 dark:text-gray-900"
+          style={{ left: pos.x, top: pos.y - 6 }}
+        >
           {tip}
-        </span>
-      </span>
+        </div>,
+        document.body,
+      )}
     </TableHead>
   )
 }
-import type { InvoiceListItem } from "@/lib/queries/invoices"
-import type { InvoiceSource } from "@/types"
 
 const SOURCE_ICONS: Record<InvoiceSource, typeof FileText> = {
   whatsapp: MessageCircle,
