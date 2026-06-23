@@ -91,6 +91,7 @@ export default async function AuditLogsPage({
                       year: "numeric",
                       hour: "2-digit",
                       minute: "2-digit",
+                      timeZone: "Europe/Lisbon",
                     })
                   : "-"
 
@@ -98,6 +99,7 @@ export default async function AuditLogsPage({
                   d.toLocaleTimeString("pt-PT", {
                     hour: "2-digit",
                     minute: "2-digit",
+                    timeZone: "Europe/Lisbon",
                   })
 
                 return (
