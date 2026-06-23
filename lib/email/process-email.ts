@@ -15,7 +15,7 @@ import {
   type InvoiceExtraction,
   type InvoiceFileType,
 } from "@/lib/claude/extract-invoice"
-import { matchProjectFromText } from "@/lib/utils/projects"
+import { matchProjectFromTextWithAI } from "@/lib/utils/projects"
 import { debitCredits } from "@/lib/utils/credits"
 import { log as auditLog } from "@/lib/utils/audit"
 import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
@@ -134,7 +134,7 @@ export async function processEmailInvoice(
     return { ...result, skipped: true, reason: "already_processed" }
   }
 
-  // 2. Verificar créditos
+  // 2. Verificar créditos (mínimo 1; verificação exata por anexo feita antes de cada insert)
   const { data: tenant } = await supabase
     .from("tenants")
     .select("credits_balance, app_name, name")
@@ -144,7 +144,6 @@ export async function processEmailInvoice(
     return { ...result, skipped: true, reason: "tenant_not_found" }
   }
   if ((tenant.credits_balance ?? 0) < CREDITS_PER_INVOICE) {
-    // Log sem processar (poderíamos enviar email aviso ao owner aqui).
     await supabase.from("email_processing_log").insert({
       tenant_id: tenantId,
       email_message_id: messageId,
@@ -206,8 +205,10 @@ export async function processEmailInvoice(
   }
 
   // Match de projeto pelo texto do email (assunto + corpo).
+  // Tenta string-match primeiro; se falhar usa Claude Haiku para interpretar
+  // mencoes naturais como "estas faturas sao para a obra X".
   const matchText = bodyText(email)
-  const projectId = await matchProjectFromText(matchText, tenantId, supabase)
+  const projectId = await matchProjectFromTextWithAI(matchText, tenantId, supabase)
 
   // 4. Processar cada anexo (ou HTML body como uma "fatura")
   const items: Array<EmailAttachment | { html: string }> =
@@ -395,16 +396,15 @@ export async function processEmailInvoice(
         continue
       }
 
-      // Debitar 1 crédito
+      // Debitar 1 crédito por fatura criada
       const debit = await debitCredits(supabase, {
         tenantId,
         amount: CREDITS_PER_INVOICE,
-        description: `Fatura email — ${inserted.supplier_name ?? sender.email}`,
+        description: `Fatura email - ${inserted.supplier_name ?? sender.email}`,
         referenceId: inserted.id,
         referenceType: "invoice",
       })
       if (!debit.ok) {
-        // Não rollback automático — manda só log e continua
         console.warn("debit credits failed:", debit)
       }
 
