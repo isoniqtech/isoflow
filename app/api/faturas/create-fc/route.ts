@@ -50,31 +50,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ queued: 0, skipped: alreadyDone })
 
   const cronSecret = process.env.CRON_SECRET ?? ""
+  const errors: string[] = []
 
-  // Um request por fatura — n8n nao precisa de split
-  for (const inv of pending) {
-    fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tenant_id: session.tenant.id,
-        callback_secret: cronSecret,
-        invoice: {
-          id: inv.id,
-          supplier_name: inv.supplier_name,
-          supplier_nif: inv.supplier_nif,
-          invoice_number: inv.invoice_number,
-          invoice_date: inv.invoice_date,
-          subtotal: inv.subtotal,
-          vat_rate: inv.vat_rate,
-          vat_amount: inv.vat_amount,
-          total: inv.total,
-          description: inv.description,
-          currency: inv.currency ?? "EUR",
-        },
-      }),
-    }).catch(() => null)
-  }
+  // Um request por fatura em paralelo — awaited para garantir que chegam ao n8n
+  await Promise.all(
+    pending.map(async (inv) => {
+      try {
+        const res = await fetch(n8nUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            tenant_id: session.tenant.id,
+            callback_secret: cronSecret,
+            invoice: {
+              id: inv.id,
+              supplier_name: inv.supplier_name,
+              supplier_nif: inv.supplier_nif,
+              invoice_number: inv.invoice_number,
+              invoice_date: inv.invoice_date,
+              subtotal: inv.subtotal,
+              vat_rate: inv.vat_rate,
+              vat_amount: inv.vat_amount,
+              total: inv.total,
+              description: inv.description,
+              currency: inv.currency ?? "EUR",
+            },
+          }),
+        })
+        if (!res.ok) {
+          const text = await res.text().catch(() => "")
+          errors.push(`${inv.invoice_number ?? inv.id}: HTTP ${res.status} ${text.slice(0, 200)}`)
+        }
+      } catch (e) {
+        errors.push(`${inv.invoice_number ?? inv.id}: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }),
+  )
 
-  return NextResponse.json({ queued: pending.length, skipped: alreadyDone })
+  const queued = pending.length - errors.length
+  return NextResponse.json({ queued, skipped: alreadyDone, errors })
 }
