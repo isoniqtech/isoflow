@@ -80,6 +80,7 @@ export default async function AuditLogsPage({
                   ? (meta.invoice_numbers as string[])
                   : []
                 const errorsCount = Number(meta.errors_count ?? 0)
+                const syncError = typeof meta.sync_error === "string" ? meta.sync_error : null
                 const since = meta.since ? new Date(meta.since as string) : null
                 const until = meta.until ? new Date(meta.until as string) : null
 
@@ -119,6 +120,9 @@ export default async function AuditLogsPage({
                             {errorsCount} erro{errorsCount !== 1 ? "s" : ""}
                           </Badge>
                         )}
+                        {!manual && emailsFetched === 0 && errorsCount === 0 && (
+                          <span className="text-xs text-muted-foreground">Sem emails novos</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <Clock className="h-3 w-3" />
@@ -137,6 +141,12 @@ export default async function AuditLogsPage({
                         </span>
                       )}
                     </div>
+
+                    {syncError && (
+                      <div className="text-xs text-destructive font-mono bg-destructive/5 rounded px-2 py-1 mt-1">
+                        {syncError}
+                      </div>
+                    )}
 
                     {invoiceNumbers.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pt-1">

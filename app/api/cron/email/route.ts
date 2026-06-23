@@ -75,51 +75,54 @@ export async function GET(req: Request) {
   }> = []
 
   for (const tenantId of tenantIds) {
+    let emailsFetched = 0
+    let invoicesCreated = 0
+    let errorsCount = 0
+    let invoiceNumbers: string[] = []
+    let syncError: string | null = null
+
     try {
       const summary = await syncTenantEmails(admin, tenantId, dateRange)
-      const invoicesCreated = summary.results.reduce(
-        (n, r) => n + r.invoicesCreated,
-        0,
-      )
-      out.push({
-        tenantId,
-        emailsFetched: summary.emailsFetched,
-        invoicesCreated,
-        errors: summary.errors.length,
-      })
-      if (summary.emailsFetched > 0 || summary.errors.length > 0) {
-        const allInvoiceIds = summary.results.flatMap((r) => r.invoiceIds)
-        let invoiceNumbers: string[] = []
-        if (allInvoiceIds.length > 0) {
-          const { data: rows } = await admin
-            .from("invoices")
-            .select("invoice_number")
-            .in("id", allInvoiceIds)
-          invoiceNumbers = (rows ?? [])
-            .map((r) => r.invoice_number)
-            .filter((n): n is string => !!n)
-        }
-        await log(admin, {
-          action: "email.synced",
-          tenantId,
-          userId: null,
-          resourceType: "tenant_integration",
-          metadata: {
-            manual: false,
-            since: dateRange.since.toISOString(),
-            until: dateRange.until.toISOString(),
-            emails_fetched: summary.emailsFetched,
-            invoices_created: invoicesCreated,
-            invoice_numbers: invoiceNumbers,
-            errors_count: summary.errors.length,
-          },
-        })
+      invoicesCreated = summary.results.reduce((n, r) => n + r.invoicesCreated, 0)
+      emailsFetched = summary.emailsFetched
+      errorsCount = summary.errors.length
+
+      const allInvoiceIds = summary.results.flatMap((r) => r.invoiceIds)
+      if (allInvoiceIds.length > 0) {
+        const { data: rows } = await admin
+          .from("invoices")
+          .select("invoice_number")
+          .in("id", allInvoiceIds)
+        invoiceNumbers = (rows ?? [])
+          .map((r) => r.invoice_number)
+          .filter((n): n is string => !!n)
       }
+
+      out.push({ tenantId, emailsFetched, invoicesCreated, errors: errorsCount })
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error(`cron sync tenant=${tenantId} failed:`, msg)
+      syncError = e instanceof Error ? e.message : String(e)
+      errorsCount = 1
+      console.error(`cron sync tenant=${tenantId} failed:`, syncError)
       out.push({ tenantId, emailsFetched: 0, invoicesCreated: 0, errors: 1 })
     }
+
+    // Registar sempre — mesmo sem emails, para confirmar que o cron correu
+    await log(admin, {
+      action: "email.synced",
+      tenantId,
+      userId: null,
+      resourceType: "tenant_integration",
+      metadata: {
+        manual: false,
+        since: dateRange.since.toISOString(),
+        until: dateRange.until.toISOString(),
+        emails_fetched: emailsFetched,
+        invoices_created: invoicesCreated,
+        invoice_numbers: invoiceNumbers,
+        errors_count: errorsCount,
+        ...(syncError ? { sync_error: syncError } : {}),
+      },
+    })
   }
 
   return Response.json({
