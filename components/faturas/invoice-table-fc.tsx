@@ -62,13 +62,26 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
 
   function startPolling(invoiceIds: string[]) {
     let attempts = 0
-    const MAX = 20 // 60 segundos (20 x 3s)
+    const MAX = 20 // max 60s (20 x 3s)
     pollRef.current = setInterval(async () => {
       attempts++
-      router.refresh()
+      try {
+        const res = await fetch(`/api/faturas/check-fc?ids=${invoiceIds.join(",")}`)
+        if (res.ok) {
+          const { allDone } = await res.json() as { allDone: boolean }
+          if (allDone) {
+            clearInterval(pollRef.current!)
+            pollRef.current = null
+            router.refresh()
+            toast.success("FC criada no TOConline")
+            return
+          }
+        }
+      } catch { /* silencioso */ }
       if (attempts >= MAX) {
         clearInterval(pollRef.current!)
         pollRef.current = null
+        router.refresh()
       }
     }, 3000)
   }
