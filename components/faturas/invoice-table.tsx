@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { AlertTriangle, FileText, Mail, MessageCircle, Upload } from "lucide-react"
 import {
