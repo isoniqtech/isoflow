@@ -197,10 +197,6 @@ export function ImportStatementModal({
           {result && (
             <div className="rounded-md border bg-muted/30 p-3 space-y-1.5 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Linhas analisadas</span>
-                <span className="font-medium">{result.rowsScanned}</span>
-              </div>
-              <div className="flex justify-between">
                 <span className="text-muted-foreground">Movimentos importados</span>
                 <span className="font-medium text-emerald-700 dark:text-emerald-400">{result.imported}</span>
               </div>
