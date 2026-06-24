@@ -92,8 +92,8 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
   }, [])
   const hideTip = useCallback(() => setTip(null), [])
 
-  // Apenas faturas incoming sem FC são elegíveis
-  const eligible = invoices.filter(i => i.type === "incoming" && !i.toconline_fc_id)
+  // Apenas faturas incoming sem FC e sem sync ERP são elegíveis
+  const eligible = invoices.filter(i => i.type === "incoming" && !i.toconline_fc_id && !i.erp_synced)
   const allSelected = eligible.length > 0 && eligible.every(i => selected.has(i.id))
   const someSelected = selected.size > 0 && !allSelected
 
