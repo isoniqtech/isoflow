@@ -395,6 +395,28 @@ function extractEmbeddedDocUrl(html: string, sourceUrl: string): string | null {
   if (iframeTag) { const r = resolve(decodeHtmlEntities(iframeTag[1])); if (r) return r }
   const embed = html.match(/<embed[^>]+src=["']([^"']+)["']/i)
   if (embed) { const r = resolve(decodeHtmlEntities(embed[1])); if (r) return r }
+
+  // Scan script tags - SPAs como React/Vue embutem às vezes o URL do documento em JS
+  const scriptContent = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((m) => m[1]).join("\n")
+  const jsDocUrl = scriptContent.match(
+    /["'](?:pdfUrl|documentUrl|fileUrl|pdf_url|file_url|download_url|document_url|documentLink|fileLink|blobUrl|blob_url)["']\s*[=:]\s*["'](https?:\/\/[^"']+)["']/i
+  )
+  if (jsDocUrl) { const r = resolve(jsDocUrl[1]); if (r) return r }
+  const pdfInScript = scriptContent.match(/"(https?:\/\/[^"]+\.pdf(?:\?[^"]*)?)"/)
+  if (pdfInScript) { return pdfInScript[1] }
+
+  // Link <a> com href direto para PDF
+  const pdfLink = html.match(/<a[^>]+href=["'](https?:\/\/[^"']+\.pdf(?:\?[^"']*)?)["']/i)
+  if (pdfLink) return pdfLink[1]
+
+  // Link <a download ...> indica download de ficheiro
+  const dlLink = (
+    html.match(/<a[^>]+download[^>]+href=["'](https?:\/\/[^"']+)["']/i) ??
+    html.match(/<a[^>]+href=["'](https?:\/\/[^"']+)["'][^>]+download/i)
+  )
+  if (dlLink) { const r = resolve(dlLink[1]); if (r) return r }
+
   return null
 }
 
@@ -514,7 +536,7 @@ export async function extractLinkedDocuments(
 
       const contentType = normalizeMime(rawCt)
 
-      // Drill-through: pagina HTML pode embeber o PDF num iframe/embed
+      // Drill-through: pagina HTML pode embeber o PDF num iframe/embed ou SPA
       if (contentType === "text/html") {
         const htmlBody = await res.text()
         const embeddedUrl = extractEmbeddedDocUrl(htmlBody, url)
@@ -530,7 +552,25 @@ export async function extractLinkedDocuments(
             outcome = `drill:fail`
             debug?.results.push({ url, outcome })
           }
-        } else {
+          continue
+        }
+
+        // SPA sem URL embebido: tentar sufixos de download comuns
+        const cleanUrl = url.replace(/[#?].*$/, "").replace(/\/$/, "")
+        let foundViaSuffix = false
+        for (const suffix of ["/download", "/pdf", "/file"]) {
+          console.log(`[eld:suffix] ${suffix}`)
+          const att = await fetchDocumentFile(cleanUrl + suffix, url)
+          if (att) {
+            outcome = `suffix${suffix}:ok:${att.mimeType}:${att.size}b`
+            console.log(`[eld:suffix:ok] ${att.filename} ${att.size}b`)
+            debug?.results.push({ url, outcome })
+            result.push(att)
+            foundViaSuffix = true
+            break
+          }
+        }
+        if (!foundViaSuffix) {
           outcome = `bad_ct:text/html`
           debug?.results.push({ url, outcome })
         }
