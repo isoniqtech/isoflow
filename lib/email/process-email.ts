@@ -138,7 +138,7 @@ export async function processEmailInvoice(
   // 2. Verificar créditos (mínimo 1; verificação exata por anexo feita antes de cada insert)
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("credits_balance, app_name, name")
+    .select("credits_balance, app_name, name, auto_erp_send")
     .eq("id", tenantId)
     .maybeSingle()
   if (!tenant) {
@@ -410,13 +410,15 @@ export async function processEmailInvoice(
         console.warn("debit credits failed:", debit)
       }
 
-      // n8n forwarder — forwardInvoiceToN8N trata de tudo (decrypt secret,
-      // gerar signed URL, atualizar invoice.erp_synced).
+      // n8n forwarder — só envia se auto_erp_send estiver ativo e fatura não precisa revisão
       let n8nForward: Awaited<ReturnType<typeof forwardInvoiceToN8N>> | null = null
-      try {
-        n8nForward = await forwardInvoiceToN8N(supabase, inserted.id, tenantId)
-      } catch (e) {
-        console.warn("n8n forward failed:", e)
+      const needsReview = extraction.needs_review || extraction.confidence < 0.7
+      if (tenant.auto_erp_send && !needsReview) {
+        try {
+          n8nForward = await forwardInvoiceToN8N(supabase, inserted.id, tenantId)
+        } catch (e) {
+          console.warn("n8n forward failed:", e)
+        }
       }
 
       result.invoicesCreated += 1
