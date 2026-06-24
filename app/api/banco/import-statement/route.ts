@@ -93,7 +93,13 @@ export async function POST(request: Request) {
 
   const existingSet = new Set((existing ?? []).map((r) => r.external_id))
 
-  const novos = candidatos.filter((c) => !existingSet.has(c.externalId))
+  // Deduplicar por external_id (pode haver linhas iguais no mesmo extrato)
+  const seen = new Set<string>()
+  const novos = candidatos.filter((c) => {
+    if (existingSet.has(c.externalId) || seen.has(c.externalId)) return false
+    seen.add(c.externalId)
+    return true
+  })
   const skipped = candidatos.length - novos.length
 
   if (novos.length === 0) {
@@ -120,7 +126,6 @@ export async function POST(request: Request) {
     currency: "EUR",
     description: tx.description,
     type: tx.amount < 0 ? "debit" : "credit",
-    external_status: "BOOKED",
   }))
 
   // Inserir em lotes de 50

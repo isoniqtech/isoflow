@@ -164,8 +164,8 @@ function rowsToTransactions(rows: unknown[][], map: ColumnMap): { txs: ParsedTra
       }
     }
 
-    if (amount === null) {
-      errors.push(`Linha ${r + 1}: valor não reconhecido`)
+    if (amount === null || amount === 0) {
+      // Linha com valor 0 ou não reconhecido - ignorar silenciosamente
       continue
     }
 
@@ -218,8 +218,8 @@ export async function parseCsv(text: string): Promise<ParseResult> {
 
 // ── PDF ──────────────────────────────────────────────────────────────────────
 
-// Regex para valor monetário em formato PT: 1.234,56 ou 1234,56 ou 10,40
-const PT_AMOUNT_RE = /\d{1,3}(?:\.\d{3})*,\d{2}/g
+// Regex para valor monetário em formato PT: 1.234,56 ou 1234,56 ou 10,40 (saldo pode ser negativo)
+const PT_AMOUNT_RE = /-?\d{1,3}(?:\.\d{3})*,\d{2}/g
 
 /**
  * Parser específico para extratos PT com colunas DÉBITO / CRÉDITO / SALDO separadas.
