@@ -46,15 +46,15 @@ async function matchByAI(text: string, projects: ProjectRow[]): Promise<string |
       messages: [
         {
           role: "user",
-          content: `Analisa este email e determina se menciona explicitamente um projeto ou obra ao qual as faturas devem ser associadas.
+          content: `Verifica se o texto abaixo menciona LITERALMENTE o nome de um dos projetos listados (ou um alias). Nao inferas, nao adivinhes, nao associates por exclusao. Se o nome do projeto nao aparecer escrito no texto, responde null.
 
-Email:
+Texto:
 ${text.slice(0, 1500)}
 
-Projetos disponiveis (ID: Nome):
+Projetos (ID: Nome):
 ${projectList}
 
-Responde APENAS com o UUID do projeto mencionado, ou a palavra "null" se nenhum projeto for claramente identificado. Sem texto adicional.`,
+Responde APENAS com o UUID do projeto cujo nome aparece escrito no texto, ou "null" se nao houver mencao literal. Sem texto adicional.`,
         },
       ],
     })
