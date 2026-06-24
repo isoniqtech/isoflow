@@ -164,8 +164,8 @@ function rowsToTransactions(rows: unknown[][], map: ColumnMap): { txs: ParsedTra
       }
     }
 
-    if (amount === null) {
-      errors.push(`Linha ${r + 1}: valor não reconhecido`)
+    if (amount === null || amount === 0) {
+      // Linha com valor 0 ou não reconhecido - ignorar silenciosamente
       continue
     }
 

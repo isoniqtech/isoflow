@@ -120,7 +120,6 @@ export async function POST(request: Request) {
     currency: "EUR",
     description: tx.description,
     type: tx.amount < 0 ? "debit" : "credit",
-    external_status: "BOOKED",
   }))
 
   // Inserir em lotes de 50
