@@ -119,7 +119,7 @@ export default async function BancoPage({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Banco</h1>
             <p className="text-muted-foreground text-sm">
-              {periodTotal.toLocaleString("pt-PT")} movimentos · {periodMatched} conciliados — {label}
+              {periodTotal.toLocaleString("pt-PT")} movimentos · {periodMatched} conciliados · {label}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">

@@ -153,10 +153,10 @@ export function BancoPeriodControls({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="1">T1 — Jan/Mar</SelectItem>
-            <SelectItem value="2">T2 — Abr/Jun</SelectItem>
-            <SelectItem value="3">T3 — Jul/Set</SelectItem>
-            <SelectItem value="4">T4 — Out/Dez</SelectItem>
+            <SelectItem value="1">1.º trimestre (Jan-Mar)</SelectItem>
+            <SelectItem value="2">2.º trimestre (Abr-Jun)</SelectItem>
+            <SelectItem value="3">3.º trimestre (Jul-Set)</SelectItem>
+            <SelectItem value="4">4.º trimestre (Out-Dez)</SelectItem>
           </SelectContent>
         </Select>
       )}
