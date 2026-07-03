@@ -12,8 +12,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { useTenant } from "@/hooks/use-tenant"
-import { SidebarNav } from "./sidebar"
-import { CreditsWidget } from "@/components/dashboard/credits-widget"
+import { SidebarNav, SidebarFooter } from "./sidebar"
 
 export function MobileNav() {
   const [open, setOpen] = useState(false)
@@ -53,9 +52,7 @@ export function MobileNav() {
           className="flex-1 px-3 py-4 overflow-y-auto"
           onNavigate={() => setOpen(false)}
         />
-        <div className="border-t p-3">
-          <CreditsWidget />
-        </div>
+        <SidebarFooter onNavigate={() => setOpen(false)} />
       </SheetContent>
     </Sheet>
   )

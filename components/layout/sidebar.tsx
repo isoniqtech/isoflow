@@ -1,12 +1,34 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
+import {
+  LogOut,
+  Palette,
+  Settings,
+  ShieldCheck,
+} from "lucide-react"
+import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { useTenant } from "@/hooks/use-tenant"
 import { usePermissions } from "@/hooks/use-permissions"
 import { NAV_ITEMS, type NavItem } from "./nav-items"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ThemeRadioGroup } from "@/components/theme-toggle"
+import { createClient } from "@/lib/supabase/client"
+
 export function Sidebar({ className }: { className?: string }) {
   return (
     <aside
@@ -17,6 +39,7 @@ export function Sidebar({ className }: { className?: string }) {
     >
       <SidebarBrand />
       <SidebarNav className="flex-1 px-3 py-4 overflow-y-auto" />
+      <SidebarFooter />
     </aside>
   )
 }
@@ -111,6 +134,107 @@ function NavLink({
   )
 }
 
+export function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
+  const { user } = useTenant()
+  const { hasPermission } = usePermissions()
+  const pathname = usePathname()
+  const router = useRouter()
+  const initials = getInitials(user.name || user.email)
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      toast.error("Nao foi possivel terminar sessao", { description: error.message })
+      return
+    }
+    router.push("/login")
+    router.refresh()
+  }
+
+  const configActive = isActive(pathname, "/configuracoes")
+
+  return (
+    <div className="border-t p-3 space-y-1">
+      {hasPermission("configuracoes", "view_all") && (
+        <Link
+          href="/configuracoes"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            configActive
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          <Settings className="h-4 w-4" />
+          Configuracoes
+        </Link>
+      )}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors">
+            <Avatar className="h-6 w-6 shrink-0">
+              {user.avatar_url && (
+                <AvatarImage src={user.avatar_url} alt={user.name} />
+              )}
+              <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
+            </Avatar>
+            <span className="flex-1 min-w-0 text-left truncate">{user.name || user.email}</span>
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent side="right" align="end" sideOffset={8} className="w-56">
+          <DropdownMenuLabel className="font-normal">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium">{user.name}</span>
+              <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+            </div>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className="cursor-pointer">
+              <Palette className="mr-2 h-4 w-4" />
+              Tema
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <ThemeRadioGroup />
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          {user.is_super_admin && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/admin" className="cursor-pointer">
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  Admin (ISONIQ TECH)
+                </Link>
+              </DropdownMenuItem>
+            </>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            onClick={handleSignOut}
+            className="cursor-pointer text-destructive focus:text-destructive"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            Terminar sessao
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  )
+}
+
 function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`)
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((s) => s.charAt(0))
+    .join("")
+    .toUpperCase()
 }

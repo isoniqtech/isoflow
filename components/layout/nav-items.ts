@@ -6,7 +6,6 @@ import {
   Landmark,
   LayoutDashboard,
   LifeBuoy,
-  Settings,
 } from "lucide-react"
 import type { Action, Resource } from "@/lib/utils/permissions"
 
@@ -55,11 +54,5 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Suporte",
     icon: LifeBuoy,
     requires: [{ resource: "suporte", action: "create" }],
-  },
-  {
-    href: "/configuracoes",
-    label: "Configurações",
-    icon: Settings,
-    requires: [{ resource: "configuracoes", action: "view_all" }],
   },
 ]
