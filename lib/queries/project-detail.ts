@@ -89,7 +89,7 @@ export async function getProjectDetail(
   const { data: invoiceRows } = await supabase
     .from("invoices")
     .select(
-      "id, supplier_name, invoice_number, invoice_date, total, subtotal, status, source, category, created_at",
+      "id, supplier_name, invoice_number, invoice_date, total, subtotal, status, source, category",
     )
     .eq("tenant_id", tenantId)
     .eq("project_id", id)
@@ -151,35 +151,63 @@ export async function getProjectDetail(
 }
 
 function buildMonthly(
-  rows: Array<{ created_at: string | null; total: number | null }>,
+  rows: Array<{ invoice_date: string | null; total: number | null; subtotal: number | null }>,
 ): ProjectChartPoint[] {
   const now = new Date()
-  const buckets = new Map<string, { count: number; value: number }>()
+  const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 
-  for (let i = 5; i >= 0; i--) {
+  // Find the earliest invoice_date in the project
+  let earliestKey = nowKey
+  for (const row of rows) {
+    if (!row.invoice_date) continue
+    const key = row.invoice_date.slice(0, 7) // "YYYY-MM"
+    if (key < earliestKey) earliestKey = key
+  }
+
+  // Build window: from earliestKey to today, capped at 24 months
+  const [ey, em] = earliestKey.split("-").map(Number)
+  const [ny, nm] = nowKey.split("-").map(Number)
+  const totalMonths = (ny - ey) * 12 + (nm - em) + 1
+  const windowMonths = Math.min(totalMonths, 24)
+
+  // Start from enough months back
+  const buckets = new Map<string, { count: number; value: number }>()
+  for (let i = windowMonths - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
     buckets.set(key, { count: 0, value: 0 })
   }
+  // Make sure the earliest month is in the buckets even if > 24 months ago
+  if (!buckets.has(earliestKey)) {
+    // Rebuild from the actual earliest date
+    const allKeys = new Set<string>()
+    for (const row of rows) {
+      if (row.invoice_date) allKeys.add(row.invoice_date.slice(0, 7))
+    }
+    for (const key of allKeys) {
+      if (!buckets.has(key)) buckets.set(key, { count: 0, value: 0 })
+    }
+  }
 
   for (const row of rows) {
-    if (!row.created_at) continue
-    const d = new Date(row.created_at)
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+    if (!row.invoice_date) continue
+    const key = row.invoice_date.slice(0, 7)
     const b = buckets.get(key)
     if (!b) continue
     b.count += 1
     b.value += Number(row.total ?? 0)
   }
 
-  return Array.from(buckets.entries()).map(([key, v]) => {
-    const monthIdx = parseInt(key.split("-")[1], 10) - 1
-    return {
-      month: PT_MONTHS[monthIdx] ?? key,
-      count: v.count,
-      value: v.value,
-    }
-  })
+  return Array.from(buckets.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, v]) => {
+      const monthIdx = parseInt(key.split("-")[1], 10) - 1
+      return {
+        month: PT_MONTHS[monthIdx] ?? key,
+        count: v.count,
+        value: v.value,
+      }
+    })
 }
 
 function buildByCategory(invoices: ProjectInvoiceRow[]): CategorySlice[] {

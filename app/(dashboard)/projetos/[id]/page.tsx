@@ -82,7 +82,7 @@ export default async function ProjetoDetailPage({
     percentagem: number
     valor_estimado: number | null
   }> = []
-  let allInvestidores: Array<{ id: string; nome: string; email: string }> = []
+  let allInvestidores: Array<{ id: string; nome: string; email: string; capital_disponivel: number }> = []
 
   if (canViewInvestidores) {
     const { createClient } = await import("@/lib/supabase/server")
@@ -106,7 +106,7 @@ export default async function ProjetoDetailPage({
       }
     })
     const allFull = await listInvestidores(session.tenant.id)
-    allInvestidores = allFull.map((i) => ({ id: i.id, nome: i.nome, email: i.email }))
+    allInvestidores = allFull.map((i) => ({ id: i.id, nome: i.nome, email: i.email, capital_disponivel: i.capital_disponivel }))
   }
 
   const overThreshold =
@@ -253,7 +253,7 @@ export default async function ProjetoDetailPage({
           projectId={project.id}
           budget={project.budget}
           linked={linkedInvestidores}
-          available={allInvestidores.map((i) => ({ id: i.id, nome: i.nome, email: i.email }))}
+          available={allInvestidores}
           canEdit={canEditInvestidores}
         />
       )}
