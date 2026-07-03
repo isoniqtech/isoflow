@@ -101,6 +101,13 @@ export async function POST(req: Request) {
         return getTwiMLResponse('❌ Número não configurado. Contacta suporte.')
       }
 
+      // Aviso imediato ao utilizador
+      try {
+        await sendWhatsAppReply(from, '⏳ Recebi a imagem! A extrair dados com IA, aguarda um momento...')
+      } catch (e) {
+        console.warn('Aviso inicial falhou:', e)
+      }
+
       try {
         const { buffer, contentType } = await downloadTwilioMedia(mediaUrl0)
         const fileType = parseTwilioMediaType(contentType)
