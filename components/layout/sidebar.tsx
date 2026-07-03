@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import Image from "next/image"
 import {
+  LifeBuoy,
   LogOut,
   Palette,
   Settings,
@@ -153,9 +154,27 @@ export function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
   }
 
   const configActive = isActive(pathname, "/configuracoes")
+  const suporteActive = isActive(pathname, "/suporte")
 
   return (
     <div className="border-t p-3 space-y-1">
+      {hasPermission("suporte", "create") && (
+        <Link
+          href="/suporte"
+          onClick={onNavigate}
+          className={cn(
+            "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+            suporteActive
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+        >
+          <span className="h-6 w-6 flex items-center justify-center shrink-0">
+            <LifeBuoy className="h-4 w-4" />
+          </span>
+          Suporte
+        </Link>
+      )}
       {hasPermission("configuracoes", "view_all") && (
         <Link
           href="/configuracoes"

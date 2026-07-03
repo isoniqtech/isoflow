@@ -57,12 +57,6 @@ export const NAV_ITEMS: NavItem[] = [
     requires: [{ resource: "banco", action: "view_all" }],
   },
   {
-    href: "/suporte",
-    label: "Suporte",
-    icon: LifeBuoy,
-    requires: [{ resource: "suporte", action: "create" }],
-  },
-  {
     href: "/investidores",
     label: "Investidores",
     icon: Users,
