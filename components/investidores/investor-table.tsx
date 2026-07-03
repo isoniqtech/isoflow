@@ -103,7 +103,7 @@ export function InvestorTable({
         {canEdit && (
           <Link href="/configuracoes/utilizadores">
             <Button className="mt-4" size="sm" variant="outline">
-              Convidar investidor em Configuracoes
+              Convidar investidor em Configurações
             </Button>
           </Link>
         )}

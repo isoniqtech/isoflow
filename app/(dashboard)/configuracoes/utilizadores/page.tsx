@@ -86,7 +86,7 @@ export default async function UtilizadoresPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Configuracoes
+          Configurações
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>

@@ -87,7 +87,7 @@ export default async function PlanoPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Configuracoes
+          Configurações
         </Link>
         <h1 className="text-2xl font-semibold tracking-tight">Plano</h1>
         <p className="text-muted-foreground text-sm">
