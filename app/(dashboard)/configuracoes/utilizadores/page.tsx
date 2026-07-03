@@ -44,6 +44,11 @@ const ROLE_STYLES: Record<UserRole, { label: string; className: string }> = {
     className:
       "bg-slate-100 text-slate-900 border-slate-200 dark:bg-slate-900/20 dark:text-slate-200 dark:border-slate-900/40",
   },
+  investidor: {
+    label: "Investidor",
+    className:
+      "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40",
+  },
 }
 
 function getInitials(name: string): string {

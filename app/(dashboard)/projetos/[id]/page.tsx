@@ -15,8 +15,10 @@ import { ProjectMonthlyChart } from "@/components/projetos/project-monthly-chart
 import { ProjectCategoryChart } from "@/components/projetos/project-category-chart"
 import { ProjectInvoices } from "@/components/projetos/project-invoices"
 import { ProjectActions } from "@/components/projetos/project-actions"
+import { ProjectInvestorBlock } from "@/components/investidores/project-investor-block"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { getProjectDetail } from "@/lib/queries/project-detail"
+import { listInvestidores } from "@/lib/queries/investidores"
 import { hasPermission } from "@/lib/utils/permissions"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
@@ -70,6 +72,43 @@ export default async function ProjetoDetailPage({
   const canEdit = hasPermission(session.role, "projetos", "edit")
   const canDelete = hasPermission(session.role, "projetos", "delete")
   const canExportReport = hasPermission(session.role, "relatorios", "view_all")
+  const canViewInvestidores = hasPermission(session.role, "investidores", "view_all")
+  const canEditInvestidores = hasPermission(session.role, "investidores", "edit")
+
+  let linkedInvestidores: Array<{
+    investidor_id: string
+    nome: string
+    email: string
+    percentagem: number
+    valor_estimado: number | null
+  }> = []
+  let allInvestidores: Array<{ id: string; nome: string; email: string }> = []
+
+  if (canViewInvestidores) {
+    const { createClient } = await import("@/lib/supabase/server")
+    const sb = createClient()
+    const { data: piRows } = await sb
+      .from("projeto_investidores")
+      .select("investidor_id, percentagem, investidores(id, nome, email)")
+      .eq("projeto_id", params.id)
+
+    const budget = project.budget !== null ? Number(project.budget) : null
+    linkedInvestidores = (piRows ?? []).map((r) => {
+      const rawInv = r.investidores
+      const inv = (Array.isArray(rawInv) ? rawInv[0] : rawInv) as { id: string; nome: string; email: string } | null
+      const pct = Number(r.percentagem)
+      return {
+        investidor_id: r.investidor_id,
+        nome: inv?.nome ?? "",
+        email: inv?.email ?? "",
+        percentagem: pct,
+        valor_estimado: budget !== null ? (budget * pct) / 100 : null,
+      }
+    })
+    const allFull = await listInvestidores(session.tenant.id)
+    allInvestidores = allFull.map((i) => ({ id: i.id, nome: i.nome, email: i.email }))
+  }
+
   const overThreshold =
     kpis.pct_used !== null && kpis.pct_used >= project.budget_alert_threshold
   const overBudget = kpis.pct_used !== null && kpis.pct_used >= 100
@@ -208,6 +247,16 @@ export default async function ProjetoDetailPage({
         </div>
         <ProjectCategoryChart data={by_category} />
       </div>
+
+      {canViewInvestidores && (
+        <ProjectInvestorBlock
+          projectId={project.id}
+          budget={project.budget}
+          linked={linkedInvestidores}
+          available={allInvestidores.map((i) => ({ id: i.id, nome: i.nome, email: i.email }))}
+          canEdit={canEditInvestidores}
+        />
+      )}
 
       <ProjectInvoices invoices={invoices} projectId={project.id} />
     </div>

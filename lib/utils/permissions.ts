@@ -11,6 +11,7 @@ export type Resource =
   | "integracoes"
   | "billing"
   | "suporte"
+  | "investidores"
 
 export type Action = "view_all" | "view_own" | "create" | "edit" | "delete"
 
@@ -26,6 +27,7 @@ const PERMISSIONS: Record<UserRole, Partial<Record<Resource, Action[]>>> = {
     integracoes: ["view_all", "create", "edit", "delete"],
     billing: ["view_all", "edit"],
     suporte: ["view_all", "create"],
+    investidores: ["view_all", "create", "edit", "delete"],
   },
   admin: {
     faturas: ["view_all", "view_own", "create", "edit", "delete"],
@@ -36,6 +38,7 @@ const PERMISSIONS: Record<UserRole, Partial<Record<Resource, Action[]>>> = {
     utilizadores: ["view_all", "create", "edit", "delete"],
     configuracoes: ["view_all", "edit"],
     suporte: ["view_all", "create"],
+    investidores: ["view_all", "create", "edit", "delete"],
   },
   accountant: {
     faturas: ["view_all", "view_own", "create"],
@@ -44,10 +47,16 @@ const PERMISSIONS: Record<UserRole, Partial<Record<Resource, Action[]>>> = {
     conciliacao: ["view_all", "create", "edit"],
     relatorios: ["view_all"],
     suporte: ["view_all", "create"],
+    investidores: ["view_all"],
   },
   member: {
     faturas: ["view_own", "create"],
     projetos: ["view_own"],
+    suporte: ["create"],
+  },
+  investidor: {
+    projetos: ["view_own"],
+    relatorios: ["view_all"],
     suporte: ["create"],
   },
 }
