@@ -354,11 +354,11 @@ function buildAnnualChart(
     ebitda: 0,
   }))
 
-  // Fill revenue from snapshots for past months
+  // Fill revenue from snapshots where available (current year only)
   if (displayYear === currentYear) {
     for (let m = 1; m <= 12; m++) {
-      if (m < currentMonth) {
-        result[m - 1].revenue = snapshotRevenue.get(m) ?? 0
+      if (m < currentMonth && snapshotRevenue.has(m)) {
+        result[m - 1].revenue = snapshotRevenue.get(m)!
       } else if (m === currentMonth && mode === "mensal") {
         result[m - 1].revenue = periodRevenue
       }
@@ -373,9 +373,14 @@ function buildAnnualChart(
     const amount = Number(row.subtotal ?? row.total ?? 0)
     if (row.type === "incoming") {
       result[m - 1].expenses += amount
-    } else if (row.type === "outgoing" && displayYear !== currentYear) {
-      // For past years fill revenue from invoice rows directly (no snapshots)
-      result[m - 1].revenue += amount
+    } else if (row.type === "outgoing") {
+      if (displayYear !== currentYear) {
+        // Anos anteriores: receita sempre das faturas
+        result[m - 1].revenue += amount
+      } else if (!snapshotRevenue.has(m) && !(m === currentMonth && mode === "mensal")) {
+        // Ano atual sem snapshot: fallback para faturas (evita dupla contagem com periodRevenue)
+        result[m - 1].revenue += amount
+      }
     }
     result[m - 1].count += 1
     result[m - 1].value += amount
