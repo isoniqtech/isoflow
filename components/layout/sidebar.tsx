@@ -181,7 +181,12 @@ export function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
               )}
               <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
             </Avatar>
-            <span className="flex-1 min-w-0 text-left truncate">{user.name || user.email}</span>
+            <div className="flex-1 min-w-0 text-left">
+              <p className="truncate text-sm font-medium leading-none">{user.name || user.email}</p>
+              {user.name && (
+                <p className="truncate text-[11px] text-muted-foreground/60 mt-0.5">{user.email}</p>
+              )}
+            </div>
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent side="right" align="end" sideOffset={8} className="w-56">
