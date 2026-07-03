@@ -25,15 +25,14 @@ import type { InvestidorEstado, TipoNegocio } from "@/types"
 const schema = z.object({
   capital_disponivel: z.number().min(0, "Valor deve ser >= 0"),
   tipo_negocio: z.array(z.enum(["terreno", "casa", "edificio"])),
-  estado: z.enum(["pronto_para_investir", "em_investimento", "nao_disponivel"]),
+  estado: z.enum(["pronto_para_investir", "nao_disponivel"]),
   notas: z.string().max(2000).optional(),
 })
 
 type FormData = z.infer<typeof schema>
 
-const ESTADO_LABELS: Record<InvestidorEstado, string> = {
+const ESTADO_LABELS: Partial<Record<InvestidorEstado, string>> = {
   pronto_para_investir: "Pronto para investir",
-  em_investimento: "Em investimento",
   nao_disponivel: "Nao disponivel",
 }
 
@@ -58,12 +57,12 @@ export function InvestorProfileForm({ profile }: { profile: ProfileData }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
 
-  const { register, handleSubmit, watch, setValue, formState: { errors, isDirty } } = useForm<FormData>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isDirty } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       capital_disponivel: profile.capital_disponivel,
       tipo_negocio: profile.tipo_negocio,
-      estado: profile.estado,
+      estado: profile.estado === "em_investimento" ? "pronto_para_investir" : profile.estado,
       notas: profile.notas ?? "",
     },
   })
@@ -164,8 +163,8 @@ export function InvestorProfileForm({ profile }: { profile: ProfileData }) {
           <div className="space-y-1.5">
             <Label>Estado</Label>
             <Select
-              defaultValue={profile.estado}
-              onValueChange={(v) => setValue("estado", v as InvestidorEstado, { shouldDirty: true })}
+              defaultValue={profile.estado === "em_investimento" ? "pronto_para_investir" : profile.estado}
+              onValueChange={(v) => setValue("estado", v as "pronto_para_investir" | "nao_disponivel", { shouldDirty: true })}
             >
               <SelectTrigger>
                 <SelectValue />

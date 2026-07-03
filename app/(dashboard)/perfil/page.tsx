@@ -1,37 +1,17 @@
 import { redirect } from "next/navigation"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { hasPermission } from "@/lib/utils/permissions"
+import { getInvestidorByUserId } from "@/lib/queries/investidores"
 import { InvestorProfileForm } from "@/components/investidores/investor-profile-form"
-import type { InvestidorEstado, TipoNegocio } from "@/types"
 
 export const metadata = { title: "Perfil - ISOFlow" }
-
-type UntypedClient = {
-  from: (table: string) => {
-    select: (cols: string) => {
-      eq: (col: string, val: unknown) => {
-        maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>
-        [key: string]: unknown
-      }
-      [key: string]: unknown
-    }
-  }
-}
 
 export default async function PerfilPage() {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
   if (!hasPermission(session.role, "investidor_perfil", "view_all")) redirect("/dashboard")
 
-  const { createClient } = await import("@/lib/supabase/server")
-  const supabase = createClient()
-  const raw = supabase as unknown as UntypedClient
-
-  const { data: inv } = await raw
-    .from("investidores")
-    .select("id, nome, email, estado, capital_disponivel, tipo_negocio, notas")
-    .eq("user_id", session.user.id)
-    .maybeSingle()
+  const inv = await getInvestidorByUserId(session.user.id)
 
   if (!inv) {
     return (
@@ -43,27 +23,21 @@ export default async function PerfilPage() {
     )
   }
 
-  // Capital alocado em projetos (soma dos valor_alocado)
-  type LinkRow = { valor_alocado: number | null }
-  const { data: links } = await supabase
-    .from("projeto_investidores" as "project_members")
-    .select("valor_alocado")
-    .eq("investidor_id" as "project_id", inv.id as string)
-
-  const capitalAlocado = ((links ?? []) as unknown as LinkRow[]).reduce(
-    (s, l) => s + Number(l.valor_alocado ?? 0),
+  // Capital alocado = soma dos valores estimados por projeto (budget × percentagem / 100)
+  const capitalAlocado = inv.projetos.reduce(
+    (s, p) => s + (p.valor_estimado ?? 0),
     0,
   )
 
   const profile = {
-    id: inv.id as string,
-    nome: inv.nome as string,
-    email: inv.email as string,
-    estado: (inv.estado as InvestidorEstado) ?? "pronto_para_investir",
+    id: inv.id,
+    nome: inv.nome,
+    email: inv.email,
+    estado: inv.estado,
     capital_disponivel: Number(inv.capital_disponivel ?? 0),
     capital_alocado: capitalAlocado,
-    tipo_negocio: (inv.tipo_negocio as TipoNegocio[]) ?? [],
-    notas: (inv.notas as string | null) ?? null,
+    tipo_negocio: inv.tipo_negocio ?? [],
+    notas: inv.notas ?? null,
   }
 
   return (
