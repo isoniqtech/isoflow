@@ -51,7 +51,7 @@ const PLANS: PlanDef[] = [
   {
     id: "pro",
     name: "Investor",
-    price_monthly: 149,
+    price_monthly: 129,
     features: [
       "Tudo do Business",
       "Ate 50 utilizadores",
