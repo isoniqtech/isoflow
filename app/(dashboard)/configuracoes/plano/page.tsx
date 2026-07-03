@@ -31,7 +31,6 @@ const PLANS: PlanDef[] = [
       "Comunicacao AT",
       "Integracao ERP",
       "Suporte por ticket",
-      "Setup inicial",
     ],
   },
   {
@@ -45,7 +44,6 @@ const PLANS: PlanDef[] = [
       "Ate 15 utilizadores",
       "Ate 5 GB de espaco",
       "Suporte por ticket",
-      "Setup inicial",
     ],
   },
   {
@@ -57,7 +55,6 @@ const PLANS: PlanDef[] = [
       "Ate 50 utilizadores",
       "Ate 15 GB de espaco",
       "Suporte assistido",
-      "Setup inicial",
     ],
   },
   {
@@ -69,7 +66,6 @@ const PLANS: PlanDef[] = [
       "Utilizadores custom",
       "Espaco custom",
       "Suporte assistido",
-      "Setup inicial",
     ],
   },
 ]
@@ -175,6 +171,10 @@ export default async function PlanoPage() {
           })}
         </div>
       </section>
+
+      <p className="text-xs text-muted-foreground">
+        Todos os planos requerem um setup inicial que inclui configuracao do ERP e dados financeiros iniciais, WhatsApp e email.
+      </p>
     </div>
   )
 }
