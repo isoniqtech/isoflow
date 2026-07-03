@@ -49,9 +49,12 @@ export async function listInvestidores(tenantId: string): Promise<InvestidorList
 
   const ids = rows.map((r) => r.id)
 
-  const { data: links } = await supabase
+  type LinkRow = { investidor_id: string; percentagem: number; projeto_id: string; valor_alocado: number | null }
+  const { data: links } = await (supabase as unknown as {
+    from: (t: string) => { select: (c: string) => { in: (k: string, v: unknown[]) => Promise<{ data: LinkRow[] | null }> } }
+  })
     .from("projeto_investidores")
-    .select("investidor_id, percentagem, projeto_id")
+    .select("investidor_id, percentagem, projeto_id, valor_alocado")
     .in("investidor_id", ids)
 
   const { data: projsRaw } = await supabase
@@ -65,9 +68,13 @@ export async function listInvestidores(tenantId: string): Promise<InvestidorList
   const byInvestidor = new Map<string, { count: number; alocado: number }>()
   for (const link of links ?? []) {
     const cur = byInvestidor.get(link.investidor_id) ?? { count: 0, alocado: 0 }
-    const budget = budgetMap.get(link.projeto_id) ?? 0
     cur.count += 1
-    cur.alocado += (budget * Number(link.percentagem)) / 100
+    if (link.valor_alocado !== null && link.valor_alocado !== undefined) {
+      cur.alocado += Number(link.valor_alocado)
+    } else {
+      const budget = budgetMap.get(link.projeto_id) ?? 0
+      cur.alocado += (budget * Number(link.percentagem)) / 100
+    }
     byInvestidor.set(link.investidor_id, cur)
   }
 
@@ -102,13 +109,17 @@ export async function getInvestidorDetail(
 
   if (!inv) return null
 
-  const { data: links } = await supabase
+  type DetailLinkRow = { percentagem: number; projeto_id: string; valor_alocado: number | null }
+  const { data: links } = await (supabase as unknown as {
+    from: (t: string) => { select: (c: string) => { eq: (k: string, v: unknown) => Promise<{ data: DetailLinkRow[] | null }> } }
+  })
     .from("projeto_investidores")
-    .select("percentagem, projeto_id")
+    .select("percentagem, projeto_id, valor_alocado")
     .eq("investidor_id", investidorId)
 
   const projetoIds = (links ?? []).map((l) => l.projeto_id)
   const percentMap = new Map((links ?? []).map((l) => [l.projeto_id, Number(l.percentagem)]))
+  const valorAlocadoMap = new Map((links ?? []).map((l) => [l.projeto_id, l.valor_alocado]))
 
   const projetos: InvestidorDetail["projetos"] = []
 
@@ -137,6 +148,10 @@ export async function getInvestidorDetail(
     for (const p of projs ?? []) {
       const pct = percentMap.get(p.id) ?? 0
       const budget = p.budget !== null ? Number(p.budget) : null
+      const valorAlocadoDb = valorAlocadoMap.get(p.id) ?? null
+      const valorEstimado = valorAlocadoDb !== null
+        ? Number(valorAlocadoDb)
+        : (budget !== null ? (budget * pct) / 100 : null)
       projetos.push({
         id: p.id,
         nome: p.name,
@@ -145,7 +160,7 @@ export async function getInvestidorDetail(
         budget,
         color: p.color ?? "#2563EB",
         percentagem: pct,
-        valor_estimado: budget !== null ? (budget * pct) / 100 : null,
+        valor_estimado: valorEstimado,
         total_gasto: gastoMap.get(p.id) ?? 0,
       })
     }
@@ -165,9 +180,12 @@ export async function getInvestidorStats(tenantId: string): Promise<InvestidorSt
     .select("id, estado, capital_disponivel")
     .eq("tenant_id", tenantId)
 
-  const { data: links } = await supabase
+  type StatsLinkRow = { percentagem: number; investidor_id: string; projeto_id: string; valor_alocado: number | null }
+  const { data: statsLinks } = await (supabase as unknown as {
+    from: (t: string) => { select: (c: string) => Promise<{ data: StatsLinkRow[] | null }> }
+  })
     .from("projeto_investidores")
-    .select("percentagem, investidor_id, projeto_id")
+    .select("percentagem, investidor_id, projeto_id, valor_alocado")
 
   const { data: projs } = await supabase
     .from("projects")
@@ -178,8 +196,12 @@ export async function getInvestidorStats(tenantId: string): Promise<InvestidorSt
   const budgetMap = new Map((projs ?? []).map((p) => [p.id, Number(p.budget ?? 0)]))
 
   let capitalAlocado = 0
-  for (const link of links ?? []) {
-    capitalAlocado += (budgetMap.get(link.projeto_id) ?? 0) * Number(link.percentagem) / 100
+  for (const link of statsLinks ?? []) {
+    if (link.valor_alocado !== null && link.valor_alocado !== undefined) {
+      capitalAlocado += Number(link.valor_alocado)
+    } else {
+      capitalAlocado += (budgetMap.get(link.projeto_id) ?? 0) * Number(link.percentagem) / 100
+    }
   }
 
   return {
