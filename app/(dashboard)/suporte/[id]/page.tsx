@@ -4,7 +4,6 @@ import { ChevronLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TicketChat } from "@/components/suporte/ticket-chat"
-import { TicketStatusControl } from "@/components/suporte/ticket-status-control"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { getTicketWithMessages } from "@/lib/queries/tickets"
 import { hasPermission } from "@/lib/utils/permissions"
@@ -113,11 +112,8 @@ export default async function TicketDetailPage({
                 <Badge variant="secondary">{CATEGORY_LABELS[ticket.category]}</Badge>
               )}
               <span>Prioridade: {PRIORITY_LABELS[ticket.priority]}</span>
-              <span>{ticket.credits_charged} créditos</span>
             </div>
           </div>
-
-          <TicketStatusControl ticketId={ticket.id} status={ticket.status} />
         </div>
       </div>
 
@@ -137,6 +133,7 @@ export default async function TicketDetailPage({
             currentUserId={session.user.id}
             initialMessages={messages}
             ticketStatus={ticket.status}
+            isSupport={false}
           />
         </div>
 
@@ -162,10 +159,6 @@ export default async function TicketDetailPage({
                   <span>{CATEGORY_LABELS[ticket.category]}</span>
                 </div>
               )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Créditos</span>
-                <span>{ticket.credits_charged}</span>
-              </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Mensagens</span>
                 <span>{messages.length}</span>

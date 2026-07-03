@@ -44,6 +44,11 @@ const ROLE_STYLES: Record<UserRole, { label: string; className: string }> = {
     className:
       "bg-slate-100 text-slate-900 border-slate-200 dark:bg-slate-900/20 dark:text-slate-200 dark:border-slate-900/40",
   },
+  investidor: {
+    label: "Investidor",
+    className:
+      "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40",
+  },
 }
 
 function getInitials(name: string): string {
@@ -81,7 +86,7 @@ export default async function UtilizadoresPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Configuracoes
+          Configurações
         </Link>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -94,7 +99,7 @@ export default async function UtilizadoresPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         {([
           {
             role: "Owner",
@@ -119,6 +124,12 @@ export default async function UtilizadoresPage() {
             className: "border-slate-200 bg-slate-50 dark:border-slate-800/40 dark:bg-slate-900/20",
             titleClass: "text-slate-900 dark:text-slate-200",
             description: "Envia faturas. Ve apenas as suas proprias faturas e os projetos a que foi atribuido.",
+          },
+          {
+            role: "Investidor",
+            className: "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20",
+            titleClass: "text-amber-900 dark:text-amber-200",
+            description: "Acesso restrito ao portal de investidor. Ve os projetos em que participa e os respetivos relatorios.",
           },
         ] as const).map(({ role, className, titleClass, description }) => (
           <div key={role} className={`rounded-lg border p-3 ${className}`}>
@@ -145,7 +156,9 @@ export default async function UtilizadoresPage() {
               const roleStyle = ROLE_STYLES[(u.role ?? "member") as UserRole]
               const isYou = u.id === session.user.id
               const isOwner = u.role === "owner"
-              const canEdit = canManage && !isYou && !isOwner
+              const isInvestidor = u.role === "investidor"
+              const canEdit = canManage && !isYou && !isOwner && !isInvestidor
+              const canActions = canManage && !isYou && !isOwner
               return (
                 <TableRow key={u.id}>
                   <TableCell>
@@ -220,7 +233,7 @@ export default async function UtilizadoresPage() {
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">
-                      {canEdit && (
+                      {canActions && (
                         <div className="flex items-center justify-end gap-0.5">
                           <UserResetPasswordButton userId={u.id} userName={u.name} />
                           <UserDeactivateButton userId={u.id} userName={u.name} />

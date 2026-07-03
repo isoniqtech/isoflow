@@ -13,13 +13,16 @@ export async function GET(
   const ctx = await getApiContext()
   if (!ctx) return jsonError("Unauthorized", 401)
 
+  const isSupport = process.env.SUPER_ADMIN_USER_ID === ctx.userId
   const supabase = createClient()
-  const { data: ticket } = await supabase
+
+  let ticketQuery = supabase
     .from("support_tickets")
     .select("id")
     .eq("id", params.id)
-    .eq("tenant_id", ctx.tenantId)
-    .maybeSingle()
+  if (!isSupport) ticketQuery = ticketQuery.eq("tenant_id", ctx.tenantId)
+
+  const { data: ticket } = await ticketQuery.maybeSingle()
   if (!ticket) return jsonError("Not found", 404)
 
   const { data, error } = await supabase
@@ -51,16 +54,32 @@ export async function POST(
     return jsonError("Validation error", 400, parsed.error.flatten())
   }
 
+  const isSupport = process.env.SUPER_ADMIN_USER_ID === ctx.userId
   const supabase = createClient()
-  const { data: ticket } = await supabase
+
+  let ticketQuery = supabase
     .from("support_tickets")
     .select("id, status")
     .eq("id", params.id)
-    .eq("tenant_id", ctx.tenantId)
-    .maybeSingle()
+  if (!isSupport) ticketQuery = ticketQuery.eq("tenant_id", ctx.tenantId)
+
+  const { data: ticket } = await ticketQuery.maybeSingle()
   if (!ticket) return jsonError("Not found", 404)
 
-  const isSupport = process.env.SUPER_ADMIN_USER_ID === ctx.userId
+  // Clientes nao podem enviar mensagens consecutivas - devem aguardar resposta do suporte
+  if (!isSupport) {
+    const { data: lastMsg } = await supabase
+      .from("support_messages")
+      .select("sender_type")
+      .eq("ticket_id", params.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (lastMsg && lastMsg.sender_type === "client") {
+      return jsonError("Aguarda a resposta do suporte antes de enviar outra mensagem.", 403)
+    }
+  }
 
   const { data, error } = await supabase
     .from("support_messages")
@@ -79,7 +98,6 @@ export async function POST(
     return jsonError("Could not send message", 500, error.message)
   }
 
-  // Atualiza updated_at do ticket + first_response_at se for support a responder
   const updates: Record<string, unknown> = {
     updated_at: new Date().toISOString(),
   }

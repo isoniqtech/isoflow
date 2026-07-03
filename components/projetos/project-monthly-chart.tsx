@@ -20,7 +20,7 @@ export function ProjectMonthlyChart({ data }: { data: ProjectChartPoint[] }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-sm font-medium">Gastos por mês</CardTitle>
-        <CardDescription>Últimos 6 meses</CardDescription>
+        <CardDescription>Por data da fatura</CardDescription>
       </CardHeader>
       <CardContent>
         <ChartContainer config={config} className="h-56 w-full">

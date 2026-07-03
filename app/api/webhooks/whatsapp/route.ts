@@ -1,7 +1,13 @@
 import { validateTwilioSignature } from '@/lib/twilio/validate'
-import { downloadTwilioMedia, sendWhatsAppReply, parseTwilioMediaType } from '@/lib/twilio/whatsapp'
+import {
+  downloadTwilioMedia,
+  sendWhatsAppReply,
+  parseTwilioMediaType,
+  type TwilioCredentials,
+} from '@/lib/twilio/whatsapp'
+import { decrypt } from '@/lib/utils/encryption'
 import { extractInvoiceData } from '@/lib/claude/extract-invoice'
-import { matchProjectFromText } from '@/lib/utils/projects'
+import { matchProjectFromTextWithAI } from '@/lib/utils/projects'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { log } from '@/lib/utils/audit'
 import { Invoice } from '@/types'
@@ -28,45 +34,12 @@ function escapeXML(str: string): string {
 
 export async function POST(req: Request) {
   try {
-    const authToken = process.env.TWILIO_AUTH_TOKEN
-    if (!authToken) {
-      console.error('TWILIO_AUTH_TOKEN not configured')
-      return getTwiMLResponse('❌ Servidor não configurado')
-    }
-
     const text = await req.text()
     const params = new URLSearchParams(text)
     const paramsObj = Object.fromEntries(params)
 
-    const signature = req.headers.get('X-Twilio-Signature')
-    if (!signature) {
-      console.warn('Missing X-Twilio-Signature header')
-      return getTwiMLResponse('❌ Requisição inválida')
-    }
-
-    const url = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/whatsapp`
-    console.log('🔍 Twilio webhook received:', {
-      from: paramsObj.From,
-      numMedia: paramsObj.NumMedia,
-      signature: signature?.substring(0, 20),
-      url,
-    })
-
-    const isValid = validateTwilioSignature(authToken, url, paramsObj, signature)
-    console.log('📝 Signature validation:', {
-      isValid,
-      paramsCount: Object.keys(paramsObj).length,
-      authTokenLength: authToken.length,
-    })
-
-    if (!isValid) {
-      console.warn('❌ Invalid Twilio signature')
-      // Continuar mesmo com assinatura inválida para debug
-      // return getTwiMLResponse('❌ Assinatura inválida')
-    }
-    console.log('✅ Processando webhook')
-
     const from = paramsObj.From?.replace('whatsapp:', '') || ''
+    const to = paramsObj.To?.replace('whatsapp:', '') || ''
     const body = paramsObj.Body || ''
     const numMedia = parseInt(paramsObj.NumMedia || '0', 10)
     const mediaUrl0 = paramsObj.MediaUrl0
@@ -74,47 +47,98 @@ export async function POST(req: Request) {
 
     const supabase = createAdminClient()
 
-    // Fluxo com mídia (nova fatura)
-    if (numMedia > 0 && mediaUrl0) {
-      let tenantId = process.env.DEMO_TENANT_ID
+    // Find tenant by their configured WhatsApp number
+    // Fetch all active WhatsApp integrations and match by phone_number in config
+    type IntegrationRow = {
+      tenant_id: string
+      api_key_encrypted: string | null
+      api_secret_encrypted: string | null
+      config: unknown
+    }
+    const { data: allIntegrations } = await supabase
+      .from('tenant_integrations')
+      .select('tenant_id, api_key_encrypted, api_secret_encrypted, config')
+      .eq('type', 'whatsapp')
+      .eq('provider', 'twilio')
+      .eq('is_active', true) as unknown as { data: IntegrationRow[] | null }
 
-      if (!tenantId) {
-        try {
-          const { data: integrations, error } = await supabase
-            .from('tenant_integrations')
-            .select('tenant_id')
-            .eq('type', 'whatsapp')
-            .eq('provider', 'twilio')
-            .limit(1)
-            .single()
+    const integration = (allIntegrations ?? []).find((row) => {
+      const cfg = row.config as Record<string, unknown> | null
+      return cfg?.phone_number === to
+    }) ?? null
 
-          if (!error && integrations?.tenant_id) {
-            tenantId = integrations.tenant_id
-          }
-        } catch (e) {
-          console.warn('tenant_integrations lookup failed:', e)
+    if (!integration) {
+      console.warn(`No active WhatsApp integration for number: ${to}`)
+      return getTwiMLResponse('❌ Numero nao configurado. Contacta suporte.')
+    }
+
+    const tenantId = integration.tenant_id
+    let credentials: TwilioCredentials | undefined
+
+    if (integration.api_key_encrypted && integration.api_secret_encrypted) {
+      try {
+        credentials = {
+          accountSid: decrypt(integration.api_key_encrypted),
+          authToken: decrypt(integration.api_secret_encrypted),
+          fromNumber: to,
         }
+      } catch (e) {
+        console.error('Failed to decrypt Twilio credentials:', e)
+        return getTwiMLResponse('❌ Erro de configuracao. Contacta suporte.')
       }
+    }
 
-      if (!tenantId) {
-        console.warn('No tenant found for WhatsApp webhook')
-        return getTwiMLResponse('❌ Número não configurado. Contacta suporte.')
+    // Validate Twilio signature
+    const authTokenForValidation = credentials?.authToken ?? process.env.TWILIO_AUTH_TOKEN
+    if (!authTokenForValidation) {
+      console.error('No auth token available for validation')
+      return getTwiMLResponse('❌ Servidor nao configurado')
+    }
+
+    const signature = req.headers.get('X-Twilio-Signature')
+    if (!signature) {
+      console.warn('Missing X-Twilio-Signature header')
+      return getTwiMLResponse('❌ Requisicao invalida')
+    }
+
+    const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/whatsapp`
+    const isValid = validateTwilioSignature(authTokenForValidation, webhookUrl, paramsObj, signature)
+    console.log('🔍 Webhook received:', { from, to, numMedia, isValid })
+
+    if (!isValid) {
+      console.warn('Invalid Twilio signature - continuing for debug')
+    }
+
+    // Fluxo com midia (nova fatura)
+    if (numMedia > 0 && mediaUrl0) {
+      // Aviso imediato ao utilizador
+      try {
+        await sendWhatsAppReply(
+          from,
+          '⏳ Recebi a imagem! A extrair dados com IA, aguarda um momento...',
+          credentials,
+        )
+      } catch (e) {
+        console.warn('Aviso inicial falhou:', e)
       }
 
       try {
-        const { buffer, contentType } = await downloadTwilioMedia(mediaUrl0)
+        const { buffer, contentType } = await downloadTwilioMedia(mediaUrl0, credentials)
         const fileType = parseTwilioMediaType(contentType)
         const base64 = buffer.toString('base64')
 
         const extraction = await extractInvoiceData(base64, fileType)
 
-        const projectId = await matchProjectFromText(body, tenantId, supabase)
+        const matchText = [body, extraction.description, extraction.supplier_name]
+          .filter(Boolean)
+          .join(' ')
+        const projectId = await matchProjectFromTextWithAI(matchText, tenantId, supabase)
 
         const timestamp = Date.now()
         const filename = `whatsapp_${timestamp}.${fileType}`
         const filePath = `${tenantId}/whatsapp/${filename}`
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from(process.env.INVOICE_FILES_BUCKET || 'invoice-files')
           .upload(filePath, buffer, { contentType, upsert: false })
 
@@ -160,6 +184,9 @@ export async function POST(req: Request) {
           .single()
 
         if (insertError) {
+          if (insertError.code === '23505') {
+            return getTwiMLResponse('⚠️ Esta fatura ja foi registada anteriormente.')
+          }
           console.error('Insert error:', insertError)
           return getTwiMLResponse('❌ Erro ao criar fatura. Tenta novamente.')
         }
@@ -188,16 +215,16 @@ export async function POST(req: Request) {
             .eq('id', projectId)
             .single()
 
-          if (project) {
-            response += `\n✅ Adicionada ao projeto: ${project.name}`
-          }
+          if (project) response += `\n✅ Projeto: ${project.name}`
+        } else if (body.trim()) {
+          response += `\n❓ Nao consegui identificar o projeto "${body.trim()}". Responde com o nome exato.`
         } else {
-          response += '\n📍 Qual é o projeto? Responde com o nome.'
+          response += '\n📍 A que projeto pertence? Responde com o nome.'
         }
 
         if (extraction.needs_review) {
-          response += '\n⚠️ Precisa de revisão manual (baixa confiança).'
-        } else {
+          response += '\n⚠️ Baixa confianca na leitura - verifica os dados na app.'
+        } else if (projectId) {
           response += '\n👇 Responde CONFIRMAR para validar.'
         }
 
@@ -208,18 +235,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // Fluxo sem mídia (confirmação ou nome de projeto)
+    // Fluxo sem midia (confirmacao ou nome de projeto)
     if (numMedia === 0 && body.trim()) {
-      const tenantId = process.env.DEMO_TENANT_ID
-      if (!tenantId) {
-        return getTwiMLResponse('❌ Servidor não configurado')
-      }
-
       try {
         const { data: latestInvoice } = await supabase
           .from('invoices')
           .select('*')
           .eq('sender_phone', from)
+          .eq('tenant_id', tenantId)
           .eq('status', 'pending')
           .order('created_at', { ascending: false })
           .limit(1)
@@ -250,7 +273,7 @@ export async function POST(req: Request) {
 
           return getTwiMLResponse('✅ Fatura confirmada e em processamento!')
         } else {
-          const projectId = await matchProjectFromText(body, tenantId, supabase)
+          const projectId = await matchProjectFromTextWithAI(body, tenantId, supabase)
 
           if (projectId) {
             const { error: updateError } = await supabase
@@ -282,7 +305,7 @@ export async function POST(req: Request) {
               `✅ Fatura associada ao projeto: ${project?.name}\n👇 Responde CONFIRMAR para validar.`,
             )
           } else {
-            return getTwiMLResponse('❌ Projeto não encontrado. Tenta com outro nome.')
+            return getTwiMLResponse('❌ Projeto nao encontrado. Tenta com outro nome.')
           }
         }
       } catch (error) {
@@ -291,7 +314,6 @@ export async function POST(req: Request) {
       }
     }
 
-    // Sem mídia e sem texto
     return getTwiMLResponse('📸 Envia uma foto ou PDF da fatura!')
   } catch (error) {
     console.error('Webhook error:', error)

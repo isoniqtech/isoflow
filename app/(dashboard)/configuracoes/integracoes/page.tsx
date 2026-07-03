@@ -1,13 +1,11 @@
 import { Suspense } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import {
-  ChevronLeft,
-  MessageCircle,
-} from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { IntegrationCard } from "@/components/configuracoes/integration-card"
 import { EmailIntegrationCard } from "@/components/configuracoes/email-integration-card"
 import { ErpIntegrationCard } from "@/components/configuracoes/erp-integration-card"
+import { WhatsAppIntegrationCard } from "@/components/configuracoes/whatsapp-integration-card"
 import { BankAccountsCard } from "@/components/configuracoes/bank-accounts-card"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
 import { getCurrentSession } from "@/lib/queries/current-session"
@@ -85,7 +83,21 @@ export default async function IntegracoesPage() {
     }
   }
 
-  const whatsapp = getStatus("whatsapp")
+  const canEditWhatsapp = hasPermission(session.role, "integracoes", "edit")
+
+  // WhatsApp - load full row to get encrypted credentials flag and phone number
+  const { data: waFullRow } = await supabase
+    .from("tenant_integrations")
+    .select("is_active, api_key_encrypted, config")
+    .eq("tenant_id", session.tenant.id)
+    .eq("type", "whatsapp")
+    .eq("provider", "twilio")
+    .maybeSingle()
+
+  const whatsappActive = waFullRow?.is_active ?? false
+  const whatsappHasCredentials = Boolean(waFullRow?.api_key_encrypted)
+  const whatsappPhoneNumber =
+    ((waFullRow?.config as Record<string, unknown> | null)?.phone_number as string | null) ?? null
 
   // ERP/n8n integration — load full record (config) to populate form.
   const erpRow = byType.get("erp")
@@ -201,16 +213,11 @@ export default async function IntegracoesPage() {
 
         <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
 
-        <IntegrationCard
-          icon={MessageCircle}
-          title="WhatsApp"
-          description="Recebe faturas via WhatsApp. A app processa com IA e associa ao projeto certo."
-          status={whatsapp.status}
-          provider={whatsapp.provider}
-          lastSyncAt={whatsapp.lastSyncAt}
-          onConnectLabel="Configurar WhatsApp"
-          onConnectTitle="Webhook Twilio será ativado depois do core"
-          onConnectDisabled
+        <WhatsAppIntegrationCard
+          isActive={whatsappActive}
+          hasCredentials={whatsappHasCredentials}
+          phoneNumber={whatsappPhoneNumber}
+          canEdit={canEditWhatsapp}
         />
         <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
       </div>

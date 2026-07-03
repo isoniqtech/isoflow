@@ -10,18 +10,9 @@ const ALLOWED_TYPES: Record<string, InvoiceFileType> = {
   "image/webp": "webp",
 }
 
-const AI_CREDIT_COST = 1
-
 export async function POST(req: Request) {
   const ctx = await getApiContext()
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
-  if (ctx.creditsBalance < AI_CREDIT_COST) {
-    return NextResponse.json(
-      { error: `Sem créditos suficientes (necessário: ${AI_CREDIT_COST}, saldo: ${ctx.creditsBalance})` },
-      { status: 402 },
-    )
-  }
 
   const formData = await req.formData().catch(() => null)
   const file = formData?.get("file") as File | null
@@ -59,26 +50,6 @@ export async function POST(req: Request) {
   const fileBase64 = buffer.toString("base64")
   try {
     const extraction = await extractInvoiceData(fileBase64, fileType)
-
-    // Deduct credit atomically — .gte filter ensures no update if balance was spent concurrently
-    const newBalance = ctx.creditsBalance - AI_CREDIT_COST
-    const { data: updated } = await supabase
-      .from("tenants")
-      .update({ credits_balance: newBalance, updated_at: new Date().toISOString() })
-      .eq("id", ctx.tenantId)
-      .gte("credits_balance", AI_CREDIT_COST)
-      .select("id")
-
-    if (updated && updated.length > 0) {
-      await supabase.from("credit_transactions").insert({
-        tenant_id: ctx.tenantId,
-        amount: -AI_CREDIT_COST,
-        type: "usage",
-        description: "Extração IA fatura",
-        reference_type: "invoice_process",
-        balance_after: newBalance,
-      })
-    }
 
     return NextResponse.json({ extraction, file_path: filePath, file_name: file.name, file_type: fileType })
   } catch (err) {

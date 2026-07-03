@@ -14,10 +14,6 @@ const ticketInputSchema = z.object({
   priority: z.enum(["low", "medium", "high", "urgent"]).default("medium"),
 })
 
-const TICKET_COSTS = {
-  normal: 5,
-  urgent: 10,
-} as const
 
 export async function GET() {
   const ctx = await getApiContext()
@@ -60,23 +56,6 @@ export async function POST(req: Request) {
   const supabase = createClient()
   const input = parsed.data
 
-  const cost = input.priority === "urgent" ? TICKET_COSTS.urgent : TICKET_COSTS.normal
-
-  const { data: tenant } = await supabase
-    .from("tenants")
-    .select("credits_balance")
-    .eq("id", ctx.tenantId)
-    .maybeSingle()
-
-  if (!tenant) return jsonError("Tenant not found", 404)
-  const balance = tenant.credits_balance ?? 0
-  if (balance < cost) {
-    return jsonError(
-      `Sem créditos suficientes (necessário: ${cost}, saldo: ${balance})`,
-      402,
-    )
-  }
-
   const { data: ticket, error: insertError } = await supabase
     .from("support_tickets")
     .insert({
@@ -86,7 +65,7 @@ export async function POST(req: Request) {
       description: input.description,
       category: input.category ?? null,
       priority: input.priority,
-      credits_charged: cost,
+      credits_charged: 0,
       status: "open",
     })
     .select("*")
@@ -97,33 +76,13 @@ export async function POST(req: Request) {
     return jsonError("Could not create ticket", 500, insertError.message)
   }
 
-  const newBalance = balance - cost
-  await supabase
-    .from("tenants")
-    .update({
-      credits_balance: newBalance,
-      credits_used_this_month: undefined,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", ctx.tenantId)
-
-  await supabase.from("credit_transactions").insert({
-    tenant_id: ctx.tenantId,
-    amount: -cost,
-    type: "usage",
-    description: `Ticket de suporte: ${input.title}`,
-    reference_id: ticket.id,
-    reference_type: "support_ticket",
-    balance_after: newBalance,
-  })
-
   await log(supabase, {
     action: "ticket.opened",
     tenantId: ctx.tenantId,
     userId: ctx.userId,
     resourceType: "support_ticket",
     resourceId: ticket.id,
-    metadata: { priority: input.priority, credits: cost },
+    metadata: { priority: input.priority },
   })
 
   return Response.json({ data: ticket }, { status: 201 })

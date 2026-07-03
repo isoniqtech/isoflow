@@ -76,9 +76,10 @@ export default async function FaturasPage({
 
   const eFaturaPending = eFaturaPageData.invoices.filter(i => !i.efatura_doc_id).length
 
+  const showEFaturaTab = session.role !== "investidor"
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "todas", label: "Todas", count: total },
-    { id: "efatura", label: "e-Fatura", count: eFaturaPending || undefined },
+    ...(showEFaturaTab ? [{ id: "efatura" as Tab, label: "e-Fatura", count: eFaturaPending || undefined }] : []),
   ]
 
   return (

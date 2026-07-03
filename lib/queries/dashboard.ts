@@ -68,18 +68,10 @@ const PT_MONTHS = [
   "jul", "ago", "set", "out", "nov", "dez",
 ] as const
 
-const PLAN_QUOTA: Record<string, number> = {
-  starter: 500,
-  business: 1500,
-  pro: 5000,
-  enterprise: 10000,
-}
 
 export async function getDashboardData(
   tenantId: string,
   options: {
-    creditsBalance: number
-    plan: string
     vatRegime: VatRegime
     mode: DashboardMode
     month: number
@@ -337,8 +329,6 @@ export async function getDashboardData(
   })
 
   const alerts = buildAlerts({
-    creditsBalance: options.creditsBalance,
-    plan: options.plan,
     activeProjects: active_projects,
   })
 
@@ -364,11 +354,11 @@ function buildAnnualChart(
     ebitda: 0,
   }))
 
-  // Fill revenue from snapshots for past months
+  // Fill revenue from snapshots where available (current year only)
   if (displayYear === currentYear) {
     for (let m = 1; m <= 12; m++) {
-      if (m < currentMonth) {
-        result[m - 1].revenue = snapshotRevenue.get(m) ?? 0
+      if (m < currentMonth && snapshotRevenue.has(m)) {
+        result[m - 1].revenue = snapshotRevenue.get(m)!
       } else if (m === currentMonth && mode === "mensal") {
         result[m - 1].revenue = periodRevenue
       }
@@ -383,9 +373,14 @@ function buildAnnualChart(
     const amount = Number(row.subtotal ?? row.total ?? 0)
     if (row.type === "incoming") {
       result[m - 1].expenses += amount
-    } else if (row.type === "outgoing" && displayYear !== currentYear) {
-      // For past years fill revenue from invoice rows directly (no snapshots)
-      result[m - 1].revenue += amount
+    } else if (row.type === "outgoing") {
+      if (displayYear !== currentYear) {
+        // Anos anteriores: receita sempre das faturas
+        result[m - 1].revenue += amount
+      } else if (!snapshotRevenue.has(m) && !(m === currentMonth && mode === "mensal")) {
+        // Ano atual sem snapshot: fallback para faturas (evita dupla contagem com periodRevenue)
+        result[m - 1].revenue += amount
+      }
     }
     result[m - 1].count += 1
     result[m - 1].value += amount
@@ -400,8 +395,6 @@ function buildAnnualChart(
 }
 
 function buildAlerts(input: {
-  creditsBalance: number
-  plan: string
   activeProjects: RecentProject[]
 }): DashboardAlert[] {
   const alerts: DashboardAlert[] = []
@@ -419,20 +412,6 @@ function buildAlerts(input: {
             ? "Orçamento ultrapassado."
             : `Acima do limite de aviso (${project.budget_alert_threshold}%).`,
         href: `/projetos/${project.id}`,
-      })
-    }
-  }
-
-  const quota = PLAN_QUOTA[input.plan] ?? 0
-  if (quota > 0) {
-    const pct = (input.creditsBalance / quota) * 100
-    if (pct < 30) {
-      alerts.push({
-        id: "low-credits",
-        level: pct < 10 ? "danger" : "warn",
-        title: `Créditos baixos (${Math.round(pct)}%)`,
-        description: `Restam ${input.creditsBalance.toLocaleString("pt-PT")} créditos.`,
-        href: "/configuracoes/plano",
       })
     }
   }

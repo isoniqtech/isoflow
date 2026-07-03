@@ -6,7 +6,8 @@ import {
   Landmark,
   LayoutDashboard,
   LifeBuoy,
-  Settings,
+  UserCircle,
+  Users,
 } from "lucide-react"
 import type { Action, Resource } from "@/lib/utils/permissions"
 
@@ -19,7 +20,12 @@ export type NavItem = {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    requires: [{ resource: "dashboard", action: "view_all" }],
+  },
   {
     href: "/faturas",
     label: "Faturas",
@@ -51,15 +57,15 @@ export const NAV_ITEMS: NavItem[] = [
     requires: [{ resource: "banco", action: "view_all" }],
   },
   {
-    href: "/suporte",
-    label: "Suporte",
-    icon: LifeBuoy,
-    requires: [{ resource: "suporte", action: "create" }],
+    href: "/investidores",
+    label: "Investidores",
+    icon: Users,
+    requires: [{ resource: "investidores", action: "view_all" }],
   },
   {
-    href: "/configuracoes",
-    label: "Configurações",
-    icon: Settings,
-    requires: [{ resource: "configuracoes", action: "view_all" }],
+    href: "/perfil",
+    label: "Perfil",
+    icon: UserCircle,
+    requires: [{ resource: "investidor_perfil", action: "view_all" }],
   },
 ]

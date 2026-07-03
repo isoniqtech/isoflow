@@ -10,7 +10,36 @@ export type TenantStatus = "trial" | "active" | "suspended" | "cancelled"
 export type BillingCycle = "monthly" | "annual"
 export type VatRegime = "isento" | "reduzido" | "intermedio" | "normal"
 
-export type UserRole = "owner" | "admin" | "accountant" | "member"
+export type UserRole = "owner" | "admin" | "accountant" | "member" | "investidor"
+
+export type InvestidorEstado =
+  | "pronto_para_investir"
+  | "em_investimento"
+  | "nao_disponivel"
+
+export type TipoNegocio = "terreno" | "casa" | "edificio"
+
+export interface Investidor {
+  id: string
+  tenant_id: string
+  user_id: string | null
+  nome: string
+  email: string
+  estado: InvestidorEstado
+  capital_disponivel: number
+  tipo_negocio: TipoNegocio[]
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjetoInvestidor {
+  id: string
+  projeto_id: string
+  investidor_id: string
+  percentagem: number
+  created_at: string
+}
 
 export type IntegrationType = "erp" | "banking" | "whatsapp" | "email"
 

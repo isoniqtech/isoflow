@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useTransition, useMemo } from "react"
+import { useState, useTransition, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { FileSpreadsheet, FileText, Loader2, RefreshCw, ChevronDown, Download, Sheet } from "lucide-react"
 import { toast } from "sonner"
@@ -102,12 +102,28 @@ function ATStatusBadge({ status }: { status: string | null }) {
   return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">{status === "Pendente" ? "Pendente" : "Sem associação"}</span>
 }
 
+const HEADERS = [
+  { label: "Fornecedor",    tip: "Nome e NIF do fornecedor, tal como comunicado ao portal e-Fatura pelo próprio fornecedor" },
+  { label: "Nº Documento",  tip: "Número da fatura comunicada ao AT pelo fornecedor - usar para cruzar com a fatura em ISOFlow" },
+  { label: "Data",          tip: "Data da fatura conforme comunicada ao portal e-Fatura" },
+  { label: "Valor",         tip: "Valor total da fatura com IVA incluído, comunicado ao AT" },
+  { label: "Estado AT",     tip: "Estado no portal e-Fatura: Compra Registada (aceite pelo AT) · Não Considerado (rejeitado) · Doc. Contabilidade (em contabilidade) · Sem Associação (fornecedor não reconhecido)" },
+]
+
 export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const { efatura_docs } = data
   const router = useRouter()
 
   const [atFilters, setAtFilters] = useState<string[]>([])
   const [isPendingRefresh, startRefresh] = useTransition()
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null)
+
+  const showTip = useCallback((e: React.MouseEvent<HTMLTableCellElement>, text: string) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    setTooltip({ text, x: r.left + r.width / 2, y: r.bottom + 6 })
+  }, [])
+
+  const hideTip = useCallback(() => setTooltip(null), [])
 
   const filteredDocs = useMemo(() => {
     if (atFilters.length === 0) return efatura_docs
@@ -152,6 +168,28 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-3">
+      {tooltip && (
+        <div
+          style={{
+            position: "fixed",
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: "translateX(-50%)",
+            zIndex: 9999,
+            pointerEvents: "none",
+            maxWidth: 320,
+            background: "#111827",
+            color: "#fff",
+            padding: "4px 10px",
+            borderRadius: "6px",
+            fontSize: "12px",
+            lineHeight: "1.5",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+          }}
+        >
+          {tooltip.text}
+        </div>
+      )}
 
       {/* ── Toolbar — estática ───────────────────────────────── */}
       <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-3">
@@ -214,11 +252,20 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 z-10 bg-background">
                 <TableRow>
-                  <TableHead>Fornecedor</TableHead>
-                  <TableHead className="hidden md:table-cell">Nº Documento</TableHead>
-                  <TableHead className="hidden md:table-cell">Data</TableHead>
-                  <TableHead className="text-right">Valor</TableHead>
-                  <TableHead>Estado AT</TableHead>
+                  {HEADERS.map((h, i) => (
+                    <TableHead
+                      key={h.label}
+                      className={[
+                        "cursor-default select-none",
+                        i === 1 || i === 2 ? "hidden md:table-cell" : "",
+                        i === 3 ? "text-right" : "",
+                      ].filter(Boolean).join(" ")}
+                      onMouseEnter={(e) => showTip(e, h.tip)}
+                      onMouseLeave={hideTip}
+                    >
+                      {h.label}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
