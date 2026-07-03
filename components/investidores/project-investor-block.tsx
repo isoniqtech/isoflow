@@ -119,10 +119,15 @@ export function ProjectInvestorBlock({
     }
     setLoading(true)
     try {
+      const body: Record<string, unknown> = { investidor_id: selectedId, percentagem: finalPct }
+      // Em modo € enviar o valor exato para evitar perda de precisao na reconversao
+      if (mode === "eur" && eurValue !== null) {
+        body.valor_euro = Math.round(eurValue * 100) / 100
+      }
       const res = await fetch(`/api/projetos/${projectId}/investidores`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ investidor_id: selectedId, percentagem: finalPct }),
+        body: JSON.stringify(body),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Erro")

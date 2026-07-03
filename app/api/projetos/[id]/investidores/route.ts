@@ -7,6 +7,7 @@ import { z } from "zod"
 const LinkSchema = z.object({
   investidor_id: z.string().uuid("UUID inválido"),
   percentagem: z.number().min(0.01).max(100),
+  valor_euro: z.number().positive().optional(),
 })
 
 type UntypedClient = {
@@ -67,16 +68,19 @@ export async function POST(
   const budget = proj.budget !== null ? Number(proj.budget) : null
   const capitalDisponivel = Number(inv.capital_disponivel ?? 0)
 
-  // Calcular valor em euros se existir orçamento
+  // Calcular valor em euros: usar valor_euro exato se fornecido (modo €), senao calcular de percentagem
   let valorAlocado: number | null = null
-  if (budget !== null) {
+  if (parsed.data.valor_euro !== undefined) {
+    valorAlocado = Math.round(parsed.data.valor_euro * 100) / 100
+  } else if (budget !== null) {
     valorAlocado = Math.round((budget * parsed.data.percentagem) / 100 * 100) / 100
-    if (capitalDisponivel > 0 && valorAlocado > capitalDisponivel) {
-      return jsonError(
-        `Valor alocado (${valorAlocado}€) excede o capital disponível (${capitalDisponivel}€)`,
-        422,
-      )
-    }
+  }
+
+  if (valorAlocado !== null && capitalDisponivel > 0 && valorAlocado > capitalDisponivel) {
+    return jsonError(
+      `Valor alocado (${valorAlocado}€) excede o capital disponivel (${capitalDisponivel}€)`,
+      422,
+    )
   }
 
   // Inserir sem valor_alocado (coluna opcional de migration 036)
