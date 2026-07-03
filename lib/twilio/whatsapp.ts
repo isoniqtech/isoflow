@@ -1,18 +1,23 @@
 const TWILIO_API_BASE = 'https://api.twilio.com/2010-04-01'
 
-export async function downloadTwilioMedia(mediaUrl: string): Promise<{
-  buffer: Buffer
-  contentType: string
-}> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID
-  const authToken = process.env.TWILIO_AUTH_TOKEN
+export type TwilioCredentials = {
+  accountSid: string
+  authToken: string
+  fromNumber: string
+}
+
+export async function downloadTwilioMedia(
+  mediaUrl: string,
+  credentials?: Pick<TwilioCredentials, 'accountSid' | 'authToken'>,
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const accountSid = credentials?.accountSid ?? process.env.TWILIO_ACCOUNT_SID
+  const authToken = credentials?.authToken ?? process.env.TWILIO_AUTH_TOKEN
 
   if (!accountSid || !authToken) {
     throw new Error('Twilio credentials not configured')
   }
 
   const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64')
-
   const response = await fetch(mediaUrl, {
     headers: { Authorization: `Basic ${auth}` },
   })
@@ -23,14 +28,17 @@ export async function downloadTwilioMedia(mediaUrl: string): Promise<{
 
   const buffer = await response.arrayBuffer()
   const contentType = response.headers.get('content-type') || 'image/jpeg'
-
   return { buffer: Buffer.from(buffer), contentType }
 }
 
-export async function sendWhatsAppReply(to: string, body: string): Promise<void> {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID
-  const authToken = process.env.TWILIO_AUTH_TOKEN
-  const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER
+export async function sendWhatsAppReply(
+  to: string,
+  body: string,
+  credentials?: TwilioCredentials,
+): Promise<void> {
+  const accountSid = credentials?.accountSid ?? process.env.TWILIO_ACCOUNT_SID
+  const authToken = credentials?.authToken ?? process.env.TWILIO_AUTH_TOKEN
+  const fromNumber = credentials?.fromNumber ?? process.env.TWILIO_WHATSAPP_NUMBER
 
   if (!accountSid || !authToken || !fromNumber) {
     throw new Error('Twilio credentials not configured')

@@ -6,32 +6,104 @@ import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
 
 type Props = {
   isActive: boolean
+  hasCredentials: boolean
+  phoneNumber: string | null
   canEdit: boolean
 }
 
-export function WhatsAppIntegrationCard({ isActive: initialActive, canEdit }: Props) {
+export function WhatsAppIntegrationCard({
+  isActive: initialActive,
+  hasCredentials: initialHasCredentials,
+  phoneNumber: initialPhone,
+  canEdit,
+}: Props) {
   const [isActive, setIsActive] = useState(initialActive)
+  const [hasCredentials, setHasCredentials] = useState(initialHasCredentials)
+  const [phoneNumber, setPhoneNumber] = useState(initialPhone)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showForm, setShowForm] = useState(!initialHasCredentials)
 
-  const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/webhooks/whatsapp`
+  const [accountSid, setAccountSid] = useState("")
+  const [authToken, setAuthToken] = useState("")
+  const [phone, setPhone] = useState("")
 
-  async function toggle() {
+  const webhookUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/api/webhooks/whatsapp`
+      : "/api/webhooks/whatsapp"
+
+  async function activate() {
+    if (!accountSid.trim() || !authToken.trim() || !phone.trim()) {
+      toast.error("Preenche todos os campos")
+      return
+    }
     setLoading(true)
     try {
       const res = await fetch("/api/integracoes/whatsapp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: isActive ? "deactivate" : "activate" }),
+        body: JSON.stringify({
+          action: "activate",
+          account_sid: accountSid.trim(),
+          auth_token: authToken.trim(),
+          phone_number: phone.trim(),
+        }),
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? "Erro")
-      setIsActive(json.is_active)
-      toast.success(json.is_active ? "WhatsApp ativado" : "WhatsApp desativado")
+      setIsActive(true)
+      setHasCredentials(true)
+      setPhoneNumber(phone.trim())
+      setShowForm(false)
+      setAccountSid("")
+      setAuthToken("")
+      setPhone("")
+      toast.success("WhatsApp ativado")
+    } catch (e: unknown) {
+      toast.error((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function reactivate() {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/integracoes/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reactivate" }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? "Erro")
+      setIsActive(true)
+      toast.success("WhatsApp ativado")
+    } catch (e: unknown) {
+      toast.error((e as Error).message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function deactivate() {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/integracoes/whatsapp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deactivate" }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? "Erro")
+      setIsActive(false)
+      toast.success("WhatsApp desativado")
     } catch (e: unknown) {
       toast.error((e as Error).message)
     } finally {
@@ -56,7 +128,7 @@ export function WhatsAppIntegrationCard({ isActive: initialActive, canEdit }: Pr
             <div className="min-w-0">
               <p className="font-semibold truncate">WhatsApp</p>
               <p className="text-xs text-muted-foreground">
-                Recebe faturas via WhatsApp. A app processa com IA e associa ao projeto certo.
+                Recebe faturas com a tua conta Twilio. Cada empresa usa as suas proprias credenciais.
               </p>
             </div>
           </div>
@@ -79,32 +151,120 @@ export function WhatsAppIntegrationCard({ isActive: initialActive, canEdit }: Pr
           </Badge>
         </div>
 
+        {isActive && phoneNumber && (
+          <p className="text-xs text-muted-foreground">
+            Numero:{" "}
+            <span className="font-mono text-foreground">{phoneNumber}</span>
+          </p>
+        )}
+
         {isActive && (
           <div className="rounded-md border bg-muted/40 px-3 py-2 space-y-1">
-            <p className="text-xs text-muted-foreground">URL do webhook (configurar no Twilio Console)</p>
+            <p className="text-xs text-muted-foreground">
+              URL do webhook (configurar no Twilio Console)
+            </p>
             <div className="flex items-center gap-2">
-              <code className="text-xs font-mono truncate flex-1 text-foreground">{webhookUrl}</code>
+              <code className="text-xs font-mono truncate flex-1 text-foreground">
+                {webhookUrl}
+              </code>
               <button
                 onClick={copyUrl}
                 className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
                 title="Copiar URL"
               >
-                {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                {copied ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-500" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
               </button>
             </div>
           </div>
         )}
 
+        {canEdit && showForm && (
+          <div className="space-y-2 pt-1">
+            <div className="space-y-1">
+              <Label htmlFor="wa-sid" className="text-xs">
+                Twilio Account SID
+              </Label>
+              <Input
+                id="wa-sid"
+                placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                value={accountSid}
+                onChange={(e) => setAccountSid(e.target.value)}
+                className="h-8 text-xs font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wa-token" className="text-xs">
+                Auth Token
+              </Label>
+              <Input
+                id="wa-token"
+                type="password"
+                placeholder="Token da consola Twilio"
+                value={authToken}
+                onChange={(e) => setAuthToken(e.target.value)}
+                className="h-8 text-xs font-mono"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wa-phone" className="text-xs">
+                Numero WhatsApp (com prefixo +)
+              </Label>
+              <Input
+                id="wa-phone"
+                placeholder="+14155238886"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                className="h-8 text-xs font-mono"
+              />
+            </div>
+          </div>
+        )}
+
         {canEdit && (
-          <div className="flex justify-end pt-1">
-            <Button
-              size="sm"
-              variant={isActive ? "outline" : "default"}
-              onClick={toggle}
-              disabled={loading}
-            >
-              {loading ? "A processar..." : isActive ? "Desativar" : "Ativar WhatsApp"}
-            </Button>
+          <div className="flex items-center justify-between gap-2 pt-1">
+            <div className="flex gap-3">
+              {hasCredentials && !showForm && (
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Editar credenciais
+                </button>
+              )}
+              {showForm && hasCredentials && (
+                <button
+                  onClick={() => setShowForm(false)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+
+            <div className="ml-auto flex gap-2">
+              {isActive ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={deactivate}
+                  disabled={loading}
+                >
+                  {loading ? "A processar..." : "Desativar"}
+                </Button>
+              ) : showForm ? (
+                <Button size="sm" onClick={activate} disabled={loading}>
+                  {loading ? "A guardar..." : "Ativar WhatsApp"}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={reactivate} disabled={loading}>
+                  {loading ? "A processar..." : "Ativar"}
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </CardContent>

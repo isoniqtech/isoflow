@@ -83,9 +83,21 @@ export default async function IntegracoesPage() {
     }
   }
 
-  const whatsappRow = byType.get("whatsapp")
-  const whatsappActive = whatsappRow?.is_active ?? false
   const canEditWhatsapp = hasPermission(session.role, "integracoes", "edit")
+
+  // WhatsApp - load full row to get encrypted credentials flag and phone number
+  const { data: waFullRow } = await supabase
+    .from("tenant_integrations")
+    .select("is_active, api_key_encrypted, config")
+    .eq("tenant_id", session.tenant.id)
+    .eq("type", "whatsapp")
+    .eq("provider", "twilio")
+    .maybeSingle()
+
+  const whatsappActive = waFullRow?.is_active ?? false
+  const whatsappHasCredentials = Boolean(waFullRow?.api_key_encrypted)
+  const whatsappPhoneNumber =
+    ((waFullRow?.config as Record<string, unknown> | null)?.phone_number as string | null) ?? null
 
   // ERP/n8n integration — load full record (config) to populate form.
   const erpRow = byType.get("erp")
@@ -201,7 +213,12 @@ export default async function IntegracoesPage() {
 
         <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
 
-        <WhatsAppIntegrationCard isActive={whatsappActive} canEdit={canEditWhatsapp} />
+        <WhatsAppIntegrationCard
+          isActive={whatsappActive}
+          hasCredentials={whatsappHasCredentials}
+          phoneNumber={whatsappPhoneNumber}
+          canEdit={canEditWhatsapp}
+        />
         <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
       </div>
 
