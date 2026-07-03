@@ -3,7 +3,6 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
-  Coins,
   LogOut,
   Palette,
   Settings,
@@ -56,17 +55,6 @@ export function Header() {
       <CommandTrigger />
       <div className="flex-1" />
       <CommandPalette />
-      <Link
-        href={hasPermission("billing", "view_all") ? "/configuracoes/plano" : "#"}
-        className="hidden sm:flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium hover:bg-muted/50 transition-colors"
-        aria-label="Créditos disponíveis"
-      >
-        <Coins className="h-3.5 w-3.5" />
-        <span className="tabular-nums">
-          {tenant.credits_balance.toLocaleString("pt-PT")}
-        </span>
-      </Link>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="rounded-full p-0 h-9 w-9">

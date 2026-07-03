@@ -7,8 +7,6 @@ import { cn } from "@/lib/utils"
 import { useTenant } from "@/hooks/use-tenant"
 import { usePermissions } from "@/hooks/use-permissions"
 import { NAV_ITEMS, type NavItem } from "./nav-items"
-import { CreditsWidget } from "@/components/dashboard/credits-widget"
-
 export function Sidebar({ className }: { className?: string }) {
   return (
     <aside
@@ -19,9 +17,6 @@ export function Sidebar({ className }: { className?: string }) {
     >
       <SidebarBrand />
       <SidebarNav className="flex-1 px-3 py-4 overflow-y-auto" />
-      <div className="border-t p-3">
-        <CreditsWidget />
-      </div>
     </aside>
   )
 }

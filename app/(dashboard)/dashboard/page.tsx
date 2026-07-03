@@ -45,8 +45,6 @@ export default async function DashboardPage({
   const vatRegime = ((session.tenant as Record<string, unknown>).vat_regime as VatRegime) ?? "normal"
 
   const data = await getDashboardData(session.tenant.id, {
-    creditsBalance: session.tenant.credits_balance,
-    plan: session.tenant.plan,
     vatRegime,
     mode,
     month,

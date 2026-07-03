@@ -16,7 +16,6 @@ import {
   type InvoiceFileType,
 } from "@/lib/claude/extract-invoice"
 import { matchProjectFromTextWithAI } from "@/lib/utils/projects"
-import { debitCredits } from "@/lib/utils/credits"
 import { log as auditLog } from "@/lib/utils/audit"
 import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
 
@@ -26,7 +25,6 @@ export interface ProcessingResult {
   skipped: boolean
   reason?:
     | "already_processed"
-    | "no_credits"
     | "no_relevant_attachments"
     | "tenant_not_found"
   emailMessageId: string
@@ -47,7 +45,6 @@ export interface ProcessingResult {
 }
 
 const BUCKET = process.env.INVOICE_FILES_BUCKET || "invoice-files"
-const CREDITS_PER_INVOICE = 1
 
 function senderAddress(parsed: ParsedMail): {
   name: string | null
@@ -135,30 +132,14 @@ export async function processEmailInvoice(
     return { ...result, skipped: true, reason: "already_processed" }
   }
 
-  // 2. Verificar créditos (mínimo 1; verificação exata por anexo feita antes de cada insert)
+  // 2. Carregar tenant
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("credits_balance, app_name, name, auto_erp_send")
+    .select("app_name, name, auto_erp_send")
     .eq("id", tenantId)
     .maybeSingle()
   if (!tenant) {
     return { ...result, skipped: true, reason: "tenant_not_found" }
-  }
-  if ((tenant.credits_balance ?? 0) < CREDITS_PER_INVOICE) {
-    await supabase.from("email_processing_log").upsert({
-      tenant_id: tenantId,
-      email_message_id: messageId,
-      from_email: sender.email,
-      subject,
-      attachments_found: 0,
-      attachments_processed: 0,
-      invoices_created: 0,
-      duplicates_skipped: 0,
-      errors: 0,
-      status: "error",
-      details: [{ status: "skipped", message: "Sem créditos" }] as unknown as Database["public"]["Tables"]["email_processing_log"]["Insert"]["details"],
-    }, { onConflict: "tenant_id,email_message_id" })
-    return { ...result, skipped: true, reason: "no_credits" }
   }
 
   // 3. Extrair anexos
@@ -396,18 +377,6 @@ export async function processEmailInvoice(
           })
         }
         continue
-      }
-
-      // Debitar 1 crédito por fatura criada
-      const debit = await debitCredits(supabase, {
-        tenantId,
-        amount: CREDITS_PER_INVOICE,
-        description: `Fatura email - ${inserted.supplier_name ?? sender.email}`,
-        referenceId: inserted.id,
-        referenceType: "invoice",
-      })
-      if (!debit.ok) {
-        console.warn("debit credits failed:", debit)
       }
 
       // n8n forwarder — só envia se auto_erp_send estiver ativo e fatura não precisa revisão

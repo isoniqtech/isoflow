@@ -68,18 +68,10 @@ const PT_MONTHS = [
   "jul", "ago", "set", "out", "nov", "dez",
 ] as const
 
-const PLAN_QUOTA: Record<string, number> = {
-  starter: 500,
-  business: 1500,
-  pro: 5000,
-  enterprise: 10000,
-}
 
 export async function getDashboardData(
   tenantId: string,
   options: {
-    creditsBalance: number
-    plan: string
     vatRegime: VatRegime
     mode: DashboardMode
     month: number
@@ -337,8 +329,6 @@ export async function getDashboardData(
   })
 
   const alerts = buildAlerts({
-    creditsBalance: options.creditsBalance,
-    plan: options.plan,
     activeProjects: active_projects,
   })
 
@@ -400,8 +390,6 @@ function buildAnnualChart(
 }
 
 function buildAlerts(input: {
-  creditsBalance: number
-  plan: string
   activeProjects: RecentProject[]
 }): DashboardAlert[] {
   const alerts: DashboardAlert[] = []
@@ -419,20 +407,6 @@ function buildAlerts(input: {
             ? "Orçamento ultrapassado."
             : `Acima do limite de aviso (${project.budget_alert_threshold}%).`,
         href: `/projetos/${project.id}`,
-      })
-    }
-  }
-
-  const quota = PLAN_QUOTA[input.plan] ?? 0
-  if (quota > 0) {
-    const pct = (input.creditsBalance / quota) * 100
-    if (pct < 30) {
-      alerts.push({
-        id: "low-credits",
-        level: pct < 10 ? "danger" : "warn",
-        title: `Créditos baixos (${Math.round(pct)}%)`,
-        description: `Restam ${input.creditsBalance.toLocaleString("pt-PT")} créditos.`,
-        href: "/configuracoes/plano",
       })
     }
   }

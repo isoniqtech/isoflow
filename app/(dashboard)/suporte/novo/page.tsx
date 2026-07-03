@@ -2,8 +2,8 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
 import { TicketForm } from "@/components/suporte/ticket-form"
-import { getCurrentSession } from "@/lib/queries/current-session"
 import { hasPermission } from "@/lib/utils/permissions"
+import { getCurrentSession } from "@/lib/queries/current-session"
 
 export default async function NovoTicketPage() {
   const session = await getCurrentSession()
@@ -30,7 +30,7 @@ export default async function NovoTicketPage() {
       </div>
 
       <div className="rounded-lg border bg-background p-6">
-        <TicketForm creditsBalance={session.tenant.credits_balance} />
+        <TicketForm />
       </div>
     </div>
   )

@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import { AlertTriangle, Coins, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -25,8 +25,6 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form"
-import { cn } from "@/lib/utils"
-
 const formSchema = z.object({
   title: z.string().trim().min(3, "Mínimo 3 caracteres").max(200),
   description: z.string().trim().min(10, "Descreve com mais detalhe").max(5000),
@@ -36,9 +34,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-const COSTS = { normal: 5, urgent: 10 }
-
-export function TicketForm({ creditsBalance }: { creditsBalance: number }) {
+export function TicketForm() {
   const router = useRouter()
   const [submitting, setSubmitting] = useState(false)
 
@@ -51,10 +47,6 @@ export function TicketForm({ creditsBalance }: { creditsBalance: number }) {
       priority: "medium",
     },
   })
-
-  const priority = form.watch("priority")
-  const cost = priority === "urgent" ? COSTS.urgent : COSTS.normal
-  const insufficient = creditsBalance < cost
 
   async function onSubmit(values: FormValues) {
     setSubmitting(true)
@@ -80,9 +72,7 @@ export function TicketForm({ creditsBalance }: { creditsBalance: number }) {
       return
     }
     const { data } = await res.json()
-    toast.success("Ticket criado", {
-      description: `Debitados ${cost} créditos.`,
-    })
+    toast.success("Ticket criado")
     router.push(`/suporte/${data.id}`)
     router.refresh()
   }
@@ -153,7 +143,7 @@ export function TicketForm({ creditsBalance }: { creditsBalance: number }) {
                     <SelectItem value="low">Baixa</SelectItem>
                     <SelectItem value="medium">Média</SelectItem>
                     <SelectItem value="high">Alta</SelectItem>
-                    <SelectItem value="urgent">Urgente (+5 créditos)</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -180,33 +170,6 @@ export function TicketForm({ creditsBalance }: { creditsBalance: number }) {
           )}
         />
 
-        <div
-          className={cn(
-            "rounded-md border p-3 flex items-start gap-3",
-            insufficient
-              ? "border-destructive/40 bg-destructive/5"
-              : "bg-muted/30",
-          )}
-        >
-          {insufficient ? (
-            <AlertTriangle className="h-4 w-4 mt-0.5 text-destructive shrink-0" />
-          ) : (
-            <Coins className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
-          )}
-          <div className="text-sm flex-1">
-            <p className={cn("font-medium", insufficient && "text-destructive")}>
-              Custo: {cost} créditos · Saldo atual: {creditsBalance.toLocaleString("pt-PT")}
-            </p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {insufficient
-                ? "Não tens créditos suficientes. Recarrega em Plano para abrir o ticket."
-                : priority === "urgent"
-                  ? "Tickets urgentes custam 10 créditos. Tempo de resposta < 4h."
-                  : "Tickets normais custam 5 créditos. Tempo de resposta < 24h em dias úteis."}
-            </p>
-          </div>
-        </div>
-
         <div className="flex justify-end gap-2">
           <Button
             type="button"
@@ -216,9 +179,9 @@ export function TicketForm({ creditsBalance }: { creditsBalance: number }) {
           >
             Cancelar
           </Button>
-          <Button type="submit" disabled={submitting || insufficient}>
+          <Button type="submit" disabled={submitting}>
             {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Abrir ticket ({cost} créditos)
+            Abrir ticket
           </Button>
         </div>
       </form>
