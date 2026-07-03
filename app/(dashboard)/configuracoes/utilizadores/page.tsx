@@ -158,6 +158,7 @@ export default async function UtilizadoresPage() {
               const isOwner = u.role === "owner"
               const isInvestidor = u.role === "investidor"
               const canEdit = canManage && !isYou && !isOwner && !isInvestidor
+              const canActions = canManage && !isYou && !isOwner
               return (
                 <TableRow key={u.id}>
                   <TableCell>
@@ -232,7 +233,7 @@ export default async function UtilizadoresPage() {
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">
-                      {canEdit && (
+                      {canActions && (
                         <div className="flex items-center justify-end gap-0.5">
                           <UserResetPasswordButton userId={u.id} userName={u.name} />
                           <UserDeactivateButton userId={u.id} userName={u.name} />
