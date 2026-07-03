@@ -15,40 +15,21 @@ import { createClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
 import type { BankTransaction } from "@/types"
 import type { BankAccountConfig } from "@/app/api/integracoes/banco/route"
-import type { BancoPeriod } from "@/components/banco/banco-period-controls"
-
 const PT_MONTHS_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
-function getPeriodRange(
-  period: BancoPeriod,
-  month: number,
-  quarter: number,
-  year: number,
-): { start: string; end: string; label: string } {
-  if (period === "mensal") {
-    const lastDay = new Date(year, month, 0).getDate()
-    return {
-      start: `${year}-${String(month).padStart(2, "0")}-01`,
-      end: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
-      label: `${PT_MONTHS_SHORT[month - 1]} ${year}`,
-    }
-  }
-  // Trimestral
-  const startMonth = (quarter - 1) * 3 + 1
-  const endMonth = quarter * 3
-  const lastDay = new Date(year, endMonth, 0).getDate()
-  const quarterLabels = ["Jan–Mar", "Abr–Jun", "Jul–Set", "Out–Dez"]
+function getPeriodRange(month: number, year: number): { start: string; end: string; label: string } {
+  const lastDay = new Date(year, month, 0).getDate()
   return {
-    start: `${year}-${String(startMonth).padStart(2, "0")}-01`,
-    end: `${year}-${String(endMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
-    label: `T${quarter} ${year} (${quarterLabels[quarter - 1]})`,
+    start: `${year}-${String(month).padStart(2, "0")}-01`,
+    end: `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+    label: `${PT_MONTHS_SHORT[month - 1]} ${year}`,
   }
 }
 
 export default async function BancoPage({
   searchParams,
 }: {
-  searchParams: { period?: string; month?: string; quarter?: string; year?: string }
+  searchParams: { month?: string; year?: string }
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
@@ -59,15 +40,11 @@ export default async function BancoPage({
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentMonth = now.getMonth() + 1
-  const currentQuarter = Math.ceil(currentMonth / 3)
 
-  const period: BancoPeriod =
-    searchParams.period === "trimestral" ? "trimestral" : "mensal"
   const year = parseInt(searchParams.year ?? String(currentYear), 10) || currentYear
   const month = Math.min(12, Math.max(1, parseInt(searchParams.month ?? String(currentMonth), 10) || currentMonth))
-  const quarter = Math.min(4, Math.max(1, parseInt(searchParams.quarter ?? String(currentQuarter), 10) || currentQuarter))
 
-  const { start, end, label } = getPeriodRange(period, month, quarter, year)
+  const { start, end, label } = getPeriodRange(month, year)
 
   const supabase = createClient()
 
@@ -119,7 +96,7 @@ export default async function BancoPage({
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Banco</h1>
             <p className="text-muted-foreground text-sm">
-              {periodTotal.toLocaleString("pt-PT")} movimentos · {periodMatched} conciliados — {label}
+              {periodTotal.toLocaleString("pt-PT")} movimentos · {periodMatched} conciliados · {label}
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -149,12 +126,7 @@ export default async function BancoPage({
         {hasConfiguredAccounts && (
           <div className="space-y-3">
             <Suspense>
-              <BancoPeriodControls
-                period={period}
-                month={month}
-                quarter={quarter}
-                year={year}
-              />
+              <BancoPeriodControls month={month} year={year} />
             </Suspense>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
