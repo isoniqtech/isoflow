@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Check, ChevronLeft, ExternalLink } from "lucide-react"
+import { Check, ChevronLeft, ExternalLink, ArrowRight } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -156,7 +156,7 @@ export default async function PlanoPage() {
                     }
                   </p>
                 </CardHeader>
-                <CardContent className="flex-1 flex flex-col">
+                <CardContent className="flex-1 flex flex-col gap-4">
                   <ul className="space-y-1.5 text-xs text-muted-foreground flex-1">
                     {plan.features.map((f) => (
                       <li key={f} className="flex items-baseline gap-2">
@@ -165,6 +165,16 @@ export default async function PlanoPage() {
                       </li>
                     ))}
                   </ul>
+                  {isCurrent ? (
+                    <Button size="sm" variant="outline" disabled className="w-full">
+                      Plano atual
+                    </Button>
+                  ) : (
+                    <Button size="sm" className="w-full" disabled title="Checkout em breve">
+                      Escolher plano
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )
