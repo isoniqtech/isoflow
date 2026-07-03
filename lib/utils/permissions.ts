@@ -12,6 +12,7 @@ export type Resource =
   | "billing"
   | "suporte"
   | "investidores"
+  | "investidor_perfil"
 
 export type Action = "view_all" | "view_own" | "create" | "edit" | "delete"
 
@@ -57,6 +58,7 @@ const PERMISSIONS: Record<UserRole, Partial<Record<Resource, Action[]>>> = {
   investidor: {
     projetos: ["view_own"],
     relatorios: ["view_all"],
+    investidor_perfil: ["view_all", "edit"],
   },
 }
 
