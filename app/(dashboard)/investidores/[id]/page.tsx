@@ -60,7 +60,7 @@ const TIPO_OPTIONS: Array<{ value: TipoNegocio; label: string }> = [
 const UpdateSchema = z.object({
   nome: z.string().min(2, "Nome obrigatorio"),
   email: z.string().email("Email invalido"),
-  estado: z.enum(["pronto_para_investir", "em_investimento", "nao_disponivel"]),
+  estado: z.enum(["pronto_para_investir", "nao_disponivel"]),
   capital_disponivel: z.number().min(0),
   tipo_negocio: z.array(z.enum(["terreno", "casa", "edificio"])),
   notas: z.string().optional().nullable(),
@@ -93,7 +93,7 @@ export default function InvestidorDetailPage() {
         reset({
           nome: d.nome,
           email: d.email,
-          estado: d.estado,
+          estado: d.estado === "em_investimento" ? "pronto_para_investir" : d.estado,
           capital_disponivel: d.capital_disponivel,
           tipo_negocio: d.tipo_negocio,
           notas: d.notas ?? "",
@@ -246,7 +246,7 @@ export default function InvestidorDetailPage() {
                   reset({
                     nome: data.nome,
                     email: data.email,
-                    estado: data.estado,
+                    estado: data.estado === "em_investimento" ? "pronto_para_investir" : data.estado,
                     capital_disponivel: data.capital_disponivel,
                     tipo_negocio: data.tipo_negocio,
                     notas: data.notas ?? "",
@@ -327,7 +327,6 @@ export default function InvestidorDetailPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="pronto_para_investir">Pronto para investir</SelectItem>
-                      <SelectItem value="em_investimento">Em investimento</SelectItem>
                       <SelectItem value="nao_disponivel">Nao disponivel</SelectItem>
                     </SelectContent>
                   </Select>

@@ -25,7 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 const Schema = z.object({
   nome: z.string().min(2, "Nome obrigatorio"),
   email: z.string().email("Email invalido"),
-  estado: z.enum(["pronto_para_investir", "em_investimento", "nao_disponivel"]),
+  estado: z.enum(["pronto_para_investir", "nao_disponivel"]),
   capital_disponivel: z.number().min(0, "Valor invalido"),
   tipo_negocio: z.array(z.enum(["terreno", "casa", "edificio"])).min(1, "Seleciona pelo menos um tipo"),
   notas: z.string().optional(),
@@ -138,7 +138,6 @@ export default function NovoInvestidorPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="pronto_para_investir">Pronto para investir</SelectItem>
-                    <SelectItem value="em_investimento">Em investimento</SelectItem>
                     <SelectItem value="nao_disponivel">Nao disponivel</SelectItem>
                   </SelectContent>
                 </Select>
