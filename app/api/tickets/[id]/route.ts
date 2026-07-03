@@ -46,7 +46,7 @@ export async function PATCH(
 ) {
   const ctx = await getApiContext()
   if (!ctx) return jsonError("Unauthorized", 401)
-  if (!hasPermission(ctx.role, "suporte", "create")) {
+  if (process.env.SUPER_ADMIN_USER_ID !== ctx.userId) {
     return jsonError("Forbidden", 403)
   }
 

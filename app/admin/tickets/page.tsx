@@ -120,7 +120,7 @@ export default async function AdminTicketsPage({
                 return (
                   <TableRow key={t.id} className="cursor-pointer">
                     <TableCell>
-                      <Link href={`/suporte/${t.id}`} className="block">
+                      <Link href={`/admin/tickets/${t.id}`} className="block">
                         <p className="font-medium truncate max-w-md">{t.title}</p>
                       </Link>
                     </TableCell>
@@ -130,7 +130,7 @@ export default async function AdminTicketsPage({
                       </Link>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm">
-                      <Link href={`/suporte/${t.id}`} className="block">
+                      <Link href={`/admin/tickets/${t.id}`} className="block">
                         <p className="font-medium truncate">{t.creator.name}</p>
                         <p className="text-xs text-muted-foreground truncate">
                           {t.creator.email}
@@ -138,24 +138,24 @@ export default async function AdminTicketsPage({
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/suporte/${t.id}`} className={cn("block text-sm", p.className)}>
+                      <Link href={`/admin/tickets/${t.id}`} className={cn("block text-sm", p.className)}>
                         {p.label}
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <Link href={`/suporte/${t.id}`} className="block">
+                      <Link href={`/admin/tickets/${t.id}`} className="block">
                         <Badge variant="outline" className={s.className}>
                           {s.label}
                         </Badge>
                       </Link>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-right text-sm">
-                      <Link href={`/suporte/${t.id}`} className="block">
+                      <Link href={`/admin/tickets/${t.id}`} className="block">
                         {t.message_count}
                       </Link>
                     </TableCell>
                     <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">
-                      <Link href={`/suporte/${t.id}`} className="block">
+                      <Link href={`/admin/tickets/${t.id}`} className="block">
                         {formatDate(t.updated_at)}
                       </Link>
                     </TableCell>

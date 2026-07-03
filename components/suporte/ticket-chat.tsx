@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Send } from "lucide-react"
+import { Clock, Loader2, Send } from "lucide-react"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -37,24 +37,26 @@ export function TicketChat({
   currentUserId,
   initialMessages,
   ticketStatus,
+  isSupport,
 }: {
   ticketId: string
   currentUserId: string
   initialMessages: MessageWithSender[]
   ticketStatus: string
+  isSupport: boolean
 }) {
   const router = useRouter()
   const [messages, setMessages] = useState<MessageWithSender[]>(initialMessages)
   const [draft, setDraft] = useState("")
   const [submitting, setSubmitting] = useState(false)
-  const [realtimeStatus, setRealtimeStatus] = useState<
-    "connecting" | "connected" | "error"
-  >("connecting")
+  const [realtimeStatus, setRealtimeStatus] = useState<"connecting" | "connected" | "error">("connecting")
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const isClosed = ticketStatus === "closed" || ticketStatus === "resolved"
 
-  // Realtime subscription a novas mensagens deste ticket.
+  const lastMessage = messages[messages.length - 1]
+  const canReply = isSupport || !lastMessage || lastMessage.sender_type === "support"
+
   useEffect(() => {
     const supabase = createClient()
     const channel = supabase
@@ -71,16 +73,14 @@ export function TicketChat({
           const newMsg = payload.new as SupportMessage
           setMessages((prev) => {
             if (prev.some((m) => m.id === newMsg.id)) return prev
+            const senderName = newMsg.sender_id === currentUserId
+              ? "Tu"
+              : newMsg.sender_type === "support"
+                ? "Suporte"
+                : "Cliente"
             return [
               ...prev,
-              {
-                ...newMsg,
-                sender: {
-                  id: newMsg.sender_id,
-                  name:
-                    newMsg.sender_id === currentUserId ? "Tu" : "Suporte",
-                },
-              },
+              { ...newMsg, sender: { id: newMsg.sender_id, name: senderName } },
             ]
           })
           router.refresh()
@@ -117,7 +117,7 @@ export function TicketChat({
 
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}))
-      toast.error("Não foi possível enviar", {
+      toast.error("Nao foi possivel enviar", {
         description: errBody.error ?? `HTTP ${res.status}`,
       })
       setSubmitting(false)
@@ -127,10 +127,7 @@ export function TicketChat({
     const { data } = await res.json()
     setMessages((prev) => {
       if (prev.some((m) => m.id === data.id)) return prev
-      return [
-        ...prev,
-        { ...data, sender: { id: currentUserId, name: "Tu" } },
-      ]
+      return [...prev, { ...data, sender: { id: currentUserId, name: "Tu" } }]
     })
     setDraft("")
     setSubmitting(false)
@@ -163,19 +160,20 @@ export function TicketChat({
           {realtimeStatus === "connected"
             ? "Tempo real"
             : realtimeStatus === "error"
-              ? "Sem ligação realtime"
+              ? "Sem ligacao realtime"
               : "A ligar..."}
         </span>
       </div>
+
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
-            Sem mensagens. Escreve para iniciar a conversa.
+            Sem mensagens ainda.
           </div>
         ) : (
           messages.map((msg) => {
             const isMine = msg.sender_id === currentUserId
-            const isSupport = msg.sender_type === "support"
+            const isSupportMsg = msg.sender_type === "support"
             return (
               <div
                 key={msg.id}
@@ -188,20 +186,18 @@ export function TicketChat({
                   <AvatarFallback
                     className={cn(
                       "text-[10px]",
-                      isSupport &&
+                      isSupportMsg &&
                         "bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200",
                     )}
                   >
-                    {isSupport ? "ST" : getInitials(msg.sender.name)}
+                    {isSupportMsg ? "ST" : getInitials(msg.sender.name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="space-y-1">
                   <div
                     className={cn(
                       "rounded-lg px-3 py-2 text-sm whitespace-pre-line",
-                      isMine
-                        ? "bg-foreground text-background"
-                        : "bg-muted",
+                      isMine ? "bg-foreground text-background" : "bg-muted",
                     )}
                   >
                     {msg.message}
@@ -212,7 +208,7 @@ export function TicketChat({
                       isMine ? "text-right" : "text-left",
                     )}
                   >
-                    {isSupport ? "Suporte" : msg.sender.name}
+                    {isSupportMsg ? "Suporte" : msg.sender.name}
                     {" · "}
                     {formatTime(msg.created_at)}
                   </div>
@@ -226,8 +222,13 @@ export function TicketChat({
       <div className="border-t p-3 bg-background">
         {isClosed ? (
           <p className="text-center text-sm text-muted-foreground py-2">
-            Este ticket está {ticketStatus === "closed" ? "fechado" : "resolvido"}. Reabre se precisares de mais ajuda.
+            Este ticket esta {ticketStatus === "closed" ? "fechado" : "resolvido"}.
           </p>
+        ) : !canReply ? (
+          <div className="flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4 shrink-0" />
+            A aguardar resposta do suporte...
+          </div>
         ) : (
           <div className="flex items-end gap-2">
             <Textarea

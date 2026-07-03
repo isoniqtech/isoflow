@@ -163,6 +163,63 @@ export async function getTicketWithMessages(
   }
 }
 
+export async function getTicketWithMessagesAdmin(
+  ticketId: string,
+): Promise<TicketWithMessages | null> {
+  const { createAdminClient } = await import("@/lib/supabase/admin")
+  const supabase = createAdminClient()
+
+  const { data: ticket } = await supabase
+    .from("support_tickets")
+    .select("*")
+    .eq("id", ticketId)
+    .maybeSingle()
+  if (!ticket) return null
+
+  const { data: creator } = await supabase
+    .from("users")
+    .select("id, name, email")
+    .eq("id", ticket.created_by)
+    .maybeSingle()
+
+  const { data: messageRows } = await supabase
+    .from("support_messages")
+    .select("*")
+    .eq("ticket_id", ticketId)
+    .order("created_at", { ascending: true })
+
+  const senderIds = Array.from(
+    new Set((messageRows ?? []).map((m) => m.sender_id)),
+  )
+  const { data: senders } = await supabase
+    .from("users")
+    .select("id, name")
+    .in("id", senderIds)
+  const senderMap = new Map((senders ?? []).map((s) => [s.id, s]))
+
+  const messages = (messageRows ?? []).map((m) => ({
+    ...(m as unknown as SupportMessage),
+    sender: {
+      id: m.sender_id,
+      name: m.sender_type === "support"
+        ? "Suporte"
+        : (senderMap.get(m.sender_id)?.name ?? "Cliente"),
+    },
+  }))
+
+  return {
+    ticket: {
+      ...(ticket as SupportTicket),
+      creator: {
+        id: creator?.id ?? ticket.created_by,
+        name: creator?.name ?? "Utilizador",
+        email: creator?.email ?? "",
+      },
+    },
+    messages,
+  }
+}
+
 export const TICKET_CREDIT_COST = {
   normal: 5,
   urgent: 10,

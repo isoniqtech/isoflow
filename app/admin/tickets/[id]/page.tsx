@@ -1,12 +1,12 @@
 import Link from "next/link"
-import { notFound, redirect } from "next/navigation"
+import { notFound } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TicketChat } from "@/components/suporte/ticket-chat"
+import { TicketStatusControl } from "@/components/suporte/ticket-status-control"
 import { getCurrentSession } from "@/lib/queries/current-session"
-import { getTicketWithMessages } from "@/lib/queries/tickets"
-import { hasPermission } from "@/lib/utils/permissions"
+import { getTicketWithMessagesAdmin } from "@/lib/queries/tickets"
 import { formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
 import type {
@@ -18,59 +18,51 @@ import type {
 const STATUS_STYLES: Record<SupportTicketStatus, { label: string; className: string }> = {
   open: {
     label: "Aberto",
-    className:
-      "bg-blue-100 text-blue-900 border-blue-200 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-900/40",
+    className: "bg-blue-100 text-blue-900 border-blue-200 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-900/40",
   },
   in_progress: {
     label: "Em curso",
-    className:
-      "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40",
+    className: "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40",
   },
   waiting_client: {
-    label: "À espera do cliente",
-    className:
-      "bg-purple-100 text-purple-900 border-purple-200 dark:bg-purple-900/20 dark:text-purple-200 dark:border-purple-900/40",
+    label: "A espera do cliente",
+    className: "bg-purple-100 text-purple-900 border-purple-200 dark:bg-purple-900/20 dark:text-purple-200 dark:border-purple-900/40",
   },
   resolved: {
     label: "Resolvido",
-    className:
-      "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40",
+    className: "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40",
   },
   closed: {
     label: "Fechado",
-    className:
-      "bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-800/40 dark:text-zinc-200 dark:border-zinc-700",
+    className: "bg-zinc-200 text-zinc-800 border-zinc-300 dark:bg-zinc-800/40 dark:text-zinc-200 dark:border-zinc-700",
   },
 }
 
 const PRIORITY_LABELS: Record<SupportTicketPriority, string> = {
   low: "Baixa",
-  medium: "Média",
+  medium: "Media",
   high: "Alta",
   urgent: "Urgente",
 }
 
 const CATEGORY_LABELS: Record<SupportTicketCategory, string> = {
-  billing: "Faturação",
-  technical: "Técnico",
-  integration: "Integração",
+  billing: "Faturacao",
+  technical: "Tecnico",
+  integration: "Integracao",
   invoice: "Fatura",
   banking: "Banco",
   other: "Outro",
 }
 
-export default async function TicketDetailPage({
+export default async function AdminTicketDetailPage({
   params,
 }: {
   params: { id: string }
 }) {
   const session = await getCurrentSession()
-  if (!session) redirect("/login")
-  if (!hasPermission(session.role, "suporte", "create")) {
-    redirect("/")
-  }
+  if (!session) return notFound()
 
-  const data = await getTicketWithMessages(params.id, session.tenant.id)
+  const data = await getTicketWithMessagesAdmin(params.id)
   if (!data) notFound()
 
   const { ticket, messages } = data
@@ -80,11 +72,11 @@ export default async function TicketDetailPage({
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-5xl mx-auto">
       <div>
         <Link
-          href="/suporte"
+          href="/admin/tickets"
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-3"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Voltar a suporte
+          Voltar a tickets
         </Link>
 
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -114,6 +106,8 @@ export default async function TicketDetailPage({
               <span>Prioridade: {PRIORITY_LABELS[ticket.priority]}</span>
             </div>
           </div>
+
+          <TicketStatusControl ticketId={ticket.id} status={ticket.status} />
         </div>
       </div>
 
@@ -133,7 +127,7 @@ export default async function TicketDetailPage({
             currentUserId={session.user.id}
             initialMessages={messages}
             ticketStatus={ticket.status}
-            isSupport={false}
+            isSupport={true}
           />
         </div>
 
@@ -169,7 +163,7 @@ export default async function TicketDetailPage({
               </div>
               {ticket.first_response_at && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">1ª resposta</span>
+                  <span className="text-muted-foreground">1a resposta</span>
                   <span>{formatDate(ticket.first_response_at)}</span>
                 </div>
               )}
