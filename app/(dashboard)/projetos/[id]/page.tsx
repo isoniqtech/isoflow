@@ -89,7 +89,7 @@ export default async function ProjetoDetailPage({
     const sb = createClient()
     const { data: piRows } = await sb
       .from("projeto_investidores")
-      .select("investidor_id, percentagem, investidores(id, nome, email)")
+      .select("investidor_id, percentagem, valor_alocado, investidores(id, nome, email)")
       .eq("projeto_id", params.id)
 
     const budget = project.budget !== null ? Number(project.budget) : null
@@ -97,12 +97,15 @@ export default async function ProjetoDetailPage({
       const rawInv = r.investidores
       const inv = (Array.isArray(rawInv) ? rawInv[0] : rawInv) as { id: string; nome: string; email: string } | null
       const pct = Number(r.percentagem)
+      const valorAlocado = r.valor_alocado !== null && r.valor_alocado !== undefined
+        ? Number(r.valor_alocado)
+        : (budget !== null ? (budget * pct) / 100 : null)
       return {
         investidor_id: r.investidor_id,
         nome: inv?.nome ?? "",
         email: inv?.email ?? "",
         percentagem: pct,
-        valor_estimado: budget !== null ? (budget * pct) / 100 : null,
+        valor_estimado: valorAlocado,
       }
     })
     const allFull = await listInvestidores(session.tenant.id)

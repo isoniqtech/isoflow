@@ -83,11 +83,12 @@ export async function POST(
     )
   }
 
-  // Inserir sem valor_alocado (coluna opcional de migration 036)
+  // Inserir com valor_alocado quando disponivel (migration 036)
   const { error: insertErr } = await raw.from("projeto_investidores").insert({
     projeto_id: params.id,
     investidor_id: parsed.data.investidor_id,
     percentagem: parsed.data.percentagem,
+    ...(valorAlocado !== null ? { valor_alocado: valorAlocado } : {}),
   })
 
   if (insertErr) {
@@ -124,10 +125,10 @@ export async function DELETE(
   const supabase = createClient()
   const raw = supabase as unknown as UntypedClient
 
-  // Obter percentagem antes de apagar (para restaurar capital)
+  // Obter percentagem e valor_alocado antes de apagar (para restaurar capital)
   const { data: link } = await raw
     .from("projeto_investidores")
-    .select("percentagem")
+    .select("percentagem, valor_alocado")
     .eq("projeto_id", params.id)
     .eq("investidor_id", investidorId)
     .maybeSingle()
@@ -140,33 +141,40 @@ export async function DELETE(
 
   if (error) return jsonError("Erro ao remover", 500)
 
-  // Restaurar capital: recalcular a partir do orçamento atual do projeto
+  // Restaurar capital: usar valor_alocado exato se disponivel, senao recalcular
   if (link) {
-    const percentagem = Number((link as Record<string, unknown>).percentagem ?? 0)
-    if (percentagem > 0) {
-      const { data: proj } = await raw
-        .from("projects")
-        .select("budget")
-        .eq("id", params.id)
-        .eq("tenant_id", ctx.tenantId)
-        .maybeSingle()
+    const linkData = link as Record<string, unknown>
+    const valorAlocadoStored = linkData.valor_alocado !== null && linkData.valor_alocado !== undefined
+      ? Number(linkData.valor_alocado)
+      : null
 
-      const budget = proj ? Number((proj as Record<string, unknown>).budget ?? 0) : 0
-      const valorARestaurar = budget > 0 ? Math.round((budget * percentagem) / 100 * 100) / 100 : 0
+    let valorARestaurar = valorAlocadoStored
 
-      if (valorARestaurar > 0) {
-        const { data: inv } = await raw
-          .from("investidores")
-          .select("capital_disponivel")
-          .eq("id", investidorId)
+    if (valorARestaurar === null) {
+      const percentagem = Number(linkData.percentagem ?? 0)
+      if (percentagem > 0) {
+        const { data: proj } = await raw
+          .from("projects")
+          .select("budget")
+          .eq("id", params.id)
+          .eq("tenant_id", ctx.tenantId)
           .maybeSingle()
+        const budget = proj ? Number((proj as Record<string, unknown>).budget ?? 0) : 0
+        valorARestaurar = budget > 0 ? Math.round((budget * percentagem) / 100 * 100) / 100 : 0
+      }
+    }
 
-        if (inv) {
-          const novoCapital = Number((inv as Record<string, unknown>).capital_disponivel ?? 0) + valorARestaurar
-          await raw.from("investidores")
-            .update({ capital_disponivel: novoCapital, updated_at: new Date().toISOString() })
-            .eq("id", investidorId)
-        }
+    if (valorARestaurar && valorARestaurar > 0) {
+      const { data: inv } = await raw
+        .from("investidores")
+        .select("capital_disponivel")
+        .eq("id", investidorId)
+        .maybeSingle()
+      if (inv) {
+        const novoCapital = Number((inv as Record<string, unknown>).capital_disponivel ?? 0) + valorARestaurar
+        await raw.from("investidores")
+          .update({ capital_disponivel: novoCapital, updated_at: new Date().toISOString() })
+          .eq("id", investidorId)
       }
     }
   }
