@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getInvestidorProjectIds } from "@/lib/queries/investidores"
 import type {
   InvoiceSource,
   InvoiceStatus,
@@ -126,12 +127,22 @@ export async function listInvoices(
   const { role, userId, filter, page = 1 } = options
   const offset = (page - 1) * PAGE_SIZE
 
+  // Investidor: apenas faturas dos projetos onde esta associado
+  let investidorProjectIds: string[] | null = null
+  if (role === "investidor") {
+    investidorProjectIds = await getInvestidorProjectIds(userId)
+    if (investidorProjectIds.length === 0) {
+      return { invoices: [], total: 0, page, page_size: PAGE_SIZE }
+    }
+  }
+
   let query = supabase
     .from("invoices")
     .select(SELECT_FIELDS, { count: "exact" })
     .eq("tenant_id", tenantId)
 
   if (role === "member") query = query.eq("created_by", userId)
+  if (investidorProjectIds) query = query.in("project_id", investidorProjectIds)
   if (filter?.status && filter.status !== "all") query = query.eq("status", filter.status)
   if (filter?.source && filter.source !== "all") query = query.eq("source", filter.source)
   if (filter?.project_id) {

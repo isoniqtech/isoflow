@@ -207,3 +207,27 @@ export async function getInvestidorByUserId(
 
   return getInvestidorDetail(inv.id, inv.tenant_id)
 }
+
+// IDs dos projetos onde o user (com role investidor) esta associado
+// Usado para filtrar projetos e faturas visiveis ao investidor
+export async function getInvestidorProjectIds(userId: string): Promise<string[]> {
+  const supabase = createClient()
+
+  const { data: inv } = await supabase
+    .from("investidores")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  if (!inv) return []
+
+  type LinkRow = { projeto_id: string }
+  const { data: links } = await (supabase as unknown as {
+    from: (t: string) => { select: (c: string) => { eq: (k: string, v: unknown) => Promise<{ data: LinkRow[] | null }> } }
+  })
+    .from("projeto_investidores")
+    .select("projeto_id")
+    .eq("investidor_id", inv.id)
+
+  return (links ?? []).map((l) => l.projeto_id)
+}

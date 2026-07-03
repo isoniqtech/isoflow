@@ -27,6 +27,7 @@ export default async function DashboardPage({
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
+  if (session.role === "investidor") redirect("/projetos")
 
   const now = new Date()
   const currentYear = now.getFullYear()

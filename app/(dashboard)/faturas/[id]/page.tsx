@@ -14,12 +14,20 @@ export default async function FaturaDetailPage({
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
+  if (!hasPermission(session.role, "faturas", "view_own")) redirect("/projetos")
 
   const invoice = await getInvoiceDetail(params.id, session.tenant.id, {
     restrictToCreatedBy:
       session.role === "member" ? session.user.id : undefined,
   })
   if (!invoice) redirect("/faturas")
+
+  // Investidor: verificar que a fatura pertence a um dos seus projetos
+  if (session.role === "investidor") {
+    const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
+    const allowed = await getInvestidorProjectIds(session.user.id)
+    if (!invoice.project?.id || !allowed.includes(invoice.project.id)) redirect("/faturas")
+  }
 
   const canEdit = hasPermission(session.role, "faturas", "edit")
   const canDelete = hasPermission(session.role, "faturas", "delete")

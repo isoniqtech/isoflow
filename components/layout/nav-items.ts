@@ -20,7 +20,12 @@ export type NavItem = {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    requires: [{ resource: "dashboard", action: "view_all" }],
+  },
   {
     href: "/faturas",
     label: "Faturas",

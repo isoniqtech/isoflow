@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server"
+import { getInvestidorProjectIds } from "@/lib/queries/investidores"
 import type {
   ProjectStatus,
   ProjectType,
@@ -61,6 +62,12 @@ export async function listProjects(
       .select("project_id")
       .eq("user_id", userId)
     const allowedIds = (memberships ?? []).map((m) => m.project_id)
+    if (allowedIds.length === 0) return []
+    query = query.in("id", allowedIds)
+  }
+
+  if (role === "investidor") {
+    const allowedIds = await getInvestidorProjectIds(userId)
     if (allowedIds.length === 0) return []
     query = query.in("id", allowedIds)
   }
