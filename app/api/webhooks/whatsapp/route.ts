@@ -224,7 +224,25 @@ export async function POST(req: Request) {
 
     // Fluxo sem mídia (confirmação ou nome de projeto)
     if (numMedia === 0 && body.trim()) {
-      const tenantId = process.env.DEMO_TENANT_ID
+      let tenantId = process.env.DEMO_TENANT_ID
+
+      if (!tenantId) {
+        try {
+          const { data: integrations } = await supabase
+            .from('tenant_integrations')
+            .select('tenant_id')
+            .eq('type', 'whatsapp')
+            .eq('provider', 'twilio')
+            .limit(1)
+            .single()
+          if (integrations?.tenant_id) {
+            tenantId = integrations.tenant_id
+          }
+        } catch (e) {
+          console.warn('tenant lookup (texto) falhou:', e)
+        }
+      }
+
       if (!tenantId) {
         return getTwiMLResponse('❌ Servidor não configurado')
       }
