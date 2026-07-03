@@ -57,7 +57,6 @@ const PERMISSIONS: Record<UserRole, Partial<Record<Resource, Action[]>>> = {
   investidor: {
     projetos: ["view_own"],
     relatorios: ["view_all"],
-    suporte: ["create"],
   },
 }
 
