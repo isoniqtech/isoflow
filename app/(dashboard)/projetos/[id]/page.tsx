@@ -87,10 +87,11 @@ export default async function ProjetoDetailPage({
   if (canViewInvestidores) {
     const { createClient } = await import("@/lib/supabase/server")
     const sb = createClient()
-    const { data: piRows } = await sb
+    const { data: piRows, error: piErr } = await sb
       .from("projeto_investidores")
       .select("investidor_id, percentagem, valor_alocado, investidores(id, nome, email)")
       .eq("projeto_id", params.id)
+    console.log("[projetos/page] piRows:", JSON.stringify(piRows), "piErr:", piErr?.message)
 
     const budget = project.budget !== null ? Number(project.budget) : null
     linkedInvestidores = (piRows ?? []).map((r) => {

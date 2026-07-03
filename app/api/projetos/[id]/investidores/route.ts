@@ -75,6 +75,7 @@ export async function POST(
   } else if (budget !== null) {
     valorAlocado = Math.round((budget * parsed.data.percentagem) / 100 * 100) / 100
   }
+  console.log("[investidores POST] body recebido:", { pct: parsed.data.percentagem, valor_euro: parsed.data.valor_euro, budget, valorAlocado })
 
   if (valorAlocado !== null && capitalDisponivel > 0 && valorAlocado > capitalDisponivel) {
     return jsonError(
