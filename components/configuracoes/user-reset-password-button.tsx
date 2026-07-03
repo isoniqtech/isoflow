@@ -1,9 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Trash2 } from "lucide-react"
+import { KeyRound } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -17,7 +16,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 
-export function UserDeactivateButton({
+export function UserResetPasswordButton({
   userId,
   userName,
 }: {
@@ -25,17 +24,15 @@ export function UserDeactivateButton({
   userName: string
 }) {
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
 
-  async function handleDelete() {
+  async function handleReset() {
     setLoading(true)
-    const res = await fetch(`/api/utilizadores/${userId}`, { method: "DELETE" })
+    const res = await fetch(`/api/utilizadores/${userId}/reset-password`, { method: "POST" })
     if (res.ok) {
-      toast.success(`${userName} apagado`)
-      router.refresh()
+      toast.success(`Email de reset enviado para ${userName}`)
     } else {
       const err = await res.json().catch(() => ({}))
-      toast.error(err.error ?? "Erro ao apagar utilizador")
+      toast.error(err.error ?? "Erro ao enviar email")
     }
     setLoading(false)
   }
@@ -46,27 +43,23 @@ export function UserDeactivateButton({
         <Button
           variant="ghost"
           size="sm"
-          className="text-muted-foreground hover:text-destructive h-7 px-2"
-          title="Apagar utilizador"
+          className="text-muted-foreground hover:text-foreground h-7 px-2"
+          title="Enviar reset de password"
         >
-          <Trash2 className="h-4 w-4" />
+          <KeyRound className="h-4 w-4" />
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Apagar utilizador</AlertDialogTitle>
+          <AlertDialogTitle>Enviar reset de password</AlertDialogTitle>
           <AlertDialogDescription>
-            Tens a certeza que queres apagar <strong>{userName}</strong>? Esta acao e permanente e nao pode ser revertida. O utilizador tera de ser convidado novamente caso queiras dar-lhe acesso.
+            Vai ser enviado um email a <strong>{userName}</strong> com um link para definir uma nova password. O link e valido durante 1 hora.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancelar</AlertDialogCancel>
-          <AlertDialogAction
-            onClick={handleDelete}
-            disabled={loading}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-          >
-            Apagar
+          <AlertDialogAction onClick={handleReset} disabled={loading}>
+            Enviar email
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

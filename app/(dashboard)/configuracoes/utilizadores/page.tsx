@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils"
 import { InviteUserForm } from "@/components/configuracoes/invite-user-form"
 import { UserRoleSelect } from "@/components/configuracoes/user-role-select"
 import { UserDeactivateButton } from "@/components/configuracoes/user-deactivate-button"
+import { UserResetPasswordButton } from "@/components/configuracoes/user-reset-password-button"
 import type { UserRole } from "@/types"
 
 const ROLE_STYLES: Record<UserRole, { label: string; className: string }> = {
@@ -219,8 +220,11 @@ export default async function UtilizadoresPage() {
                   </TableCell>
                   {canManage && (
                     <TableCell className="text-right">
-                      {canEdit && u.is_active && (
-                        <UserDeactivateButton userId={u.id} userName={u.name} />
+                      {canEdit && (
+                        <div className="flex items-center justify-end gap-0.5">
+                          <UserResetPasswordButton userId={u.id} userName={u.name} />
+                          <UserDeactivateButton userId={u.id} userName={u.name} />
+                        </div>
                       )}
                     </TableCell>
                   )}

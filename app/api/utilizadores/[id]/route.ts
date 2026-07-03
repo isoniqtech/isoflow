@@ -78,13 +78,9 @@ export async function DELETE(
   if (target.role === "owner") return jsonError("Nao podes remover um owner", 400)
 
   const admin = createAdminClient()
-  const { error } = await admin
-    .from("users")
-    .update({ is_active: false, updated_at: new Date().toISOString() })
-    .eq("id", params.id)
-    .eq("tenant_id", ctx.tenantId)
+  const { error } = await admin.auth.admin.deleteUser(params.id)
 
-  if (error) return jsonError("Erro ao desativar", 500, error.message)
+  if (error) return jsonError("Erro ao apagar utilizador", 500, error.message)
 
   return Response.json({ success: true })
 }
