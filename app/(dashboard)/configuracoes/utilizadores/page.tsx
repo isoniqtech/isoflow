@@ -99,7 +99,7 @@ export default async function UtilizadoresPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
         {([
           {
             role: "Owner",
@@ -124,6 +124,12 @@ export default async function UtilizadoresPage() {
             className: "border-slate-200 bg-slate-50 dark:border-slate-800/40 dark:bg-slate-900/20",
             titleClass: "text-slate-900 dark:text-slate-200",
             description: "Envia faturas. Ve apenas as suas proprias faturas e os projetos a que foi atribuido.",
+          },
+          {
+            role: "Investidor",
+            className: "border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/20",
+            titleClass: "text-amber-900 dark:text-amber-200",
+            description: "Acesso restrito ao portal de investidor. Ve os projetos em que participa e os respetivos relatorios.",
           },
         ] as const).map(({ role, className, titleClass, description }) => (
           <div key={role} className={`rounded-lg border p-3 ${className}`}>
