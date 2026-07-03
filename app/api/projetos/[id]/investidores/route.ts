@@ -14,12 +14,10 @@ type UntypedClient = {
     select: (cols: string) => {
       eq: (col: string, val: unknown) => {
         eq: (col: string, val: unknown) => {
-          maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }>
+          maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>
         }
-        maybeSingle: () => Promise<{ data: Record<string, unknown> | null; error: unknown }>
-        single: () => Promise<{ data: Record<string, unknown> | null; error: unknown }>
+        maybeSingle: () => Promise<{ data: Record<string, unknown> | null }>
       }
-      in: (col: string, vals: unknown[]) => Promise<{ data: Record<string, unknown>[] | null }>
     }
     insert: (data: Record<string, unknown>) => Promise<{ error: { code?: string; message: string } | null }>
     update: (data: Record<string, unknown>) => {
@@ -48,7 +46,7 @@ export async function POST(
   const supabase = createClient()
   const raw = supabase as unknown as UntypedClient
 
-  // Verify project belongs to tenant and get budget
+  // Verificar projeto e obter orçamento
   const { data: proj } = await raw
     .from("projects")
     .select("id, budget")
@@ -57,7 +55,7 @@ export async function POST(
     .maybeSingle()
   if (!proj) return jsonError("Projeto não encontrado", 404)
 
-  // Verify investor belongs to tenant and get capital
+  // Verificar investidor e obter capital
   const { data: inv } = await raw
     .from("investidores")
     .select("id, capital_disponivel")
@@ -66,42 +64,42 @@ export async function POST(
     .maybeSingle()
   if (!inv) return jsonError("Investidor não encontrado", 404)
 
-  const budget = inv !== null && proj.budget !== null ? Number(proj.budget) : null
+  const budget = proj.budget !== null ? Number(proj.budget) : null
   const capitalDisponivel = Number(inv.capital_disponivel ?? 0)
-  let valorAlocado: number | null = null
 
+  // Calcular valor em euros se existir orçamento
+  let valorAlocado: number | null = null
   if (budget !== null) {
     valorAlocado = Math.round((budget * parsed.data.percentagem) / 100 * 100) / 100
-
-    // Validar que nao excede o capital disponivel
     if (capitalDisponivel > 0 && valorAlocado > capitalDisponivel) {
       return jsonError(
-        `Valor alocado (${valorAlocado}€) excede o capital disponível do investidor (${capitalDisponivel}€)`,
+        `Valor alocado (${valorAlocado}€) excede o capital disponível (${capitalDisponivel}€)`,
         422,
       )
     }
   }
 
-  // Inserir registo
+  // Inserir sem valor_alocado (coluna opcional de migration 036)
   const { error: insertErr } = await raw.from("projeto_investidores").insert({
     projeto_id: params.id,
     investidor_id: parsed.data.investidor_id,
     percentagem: parsed.data.percentagem,
-    ...(valorAlocado !== null ? { valor_alocado: valorAlocado } : {}),
   })
 
   if (insertErr) {
+    console.error("[projetos/investidores POST] insert error:", insertErr)
     const err = insertErr as { code?: string; message: string }
     if (err.code === "23505") return jsonError("Investidor já associado a este projeto", 409)
-    return jsonError("Erro ao associar", 500)
+    return jsonError("Erro ao associar", 500, err.message)
   }
 
-  // Subtrair do capital disponivel se houver valor alocado
+  // Subtrair do capital disponivel
   if (valorAlocado !== null && capitalDisponivel > 0) {
     const novoCapital = Math.max(0, capitalDisponivel - valorAlocado)
-    await raw.from("investidores")
+    const { error: updErr } = await raw.from("investidores")
       .update({ capital_disponivel: novoCapital, updated_at: new Date().toISOString() })
       .eq("id", parsed.data.investidor_id)
+    if (updErr) console.error("[projetos/investidores POST] capital update error:", updErr)
   }
 
   return Response.json({ ok: true, valor_alocado: valorAlocado }, { status: 201 })
@@ -122,10 +120,10 @@ export async function DELETE(
   const supabase = createClient()
   const raw = supabase as unknown as UntypedClient
 
-  // Buscar o registo para saber o valor_alocado antes de apagar
+  // Obter percentagem antes de apagar (para restaurar capital)
   const { data: link } = await raw
     .from("projeto_investidores")
-    .select("valor_alocado")
+    .select("percentagem")
     .eq("projeto_id", params.id)
     .eq("investidor_id", investidorId)
     .maybeSingle()
@@ -138,20 +136,34 @@ export async function DELETE(
 
   if (error) return jsonError("Erro ao remover", 500)
 
-  // Restaurar capital disponivel se havia valor alocado
-  const valorAlocado = link ? Number((link as Record<string, unknown>).valor_alocado ?? 0) : 0
-  if (valorAlocado > 0) {
-    const { data: inv } = await raw
-      .from("investidores")
-      .select("capital_disponivel")
-      .eq("id", investidorId)
-      .maybeSingle()
+  // Restaurar capital: recalcular a partir do orçamento atual do projeto
+  if (link) {
+    const percentagem = Number((link as Record<string, unknown>).percentagem ?? 0)
+    if (percentagem > 0) {
+      const { data: proj } = await raw
+        .from("projects")
+        .select("budget")
+        .eq("id", params.id)
+        .eq("tenant_id", ctx.tenantId)
+        .maybeSingle()
 
-    if (inv) {
-      const novoCapital = Number((inv as Record<string, unknown>).capital_disponivel ?? 0) + valorAlocado
-      await raw.from("investidores")
-        .update({ capital_disponivel: novoCapital, updated_at: new Date().toISOString() })
-        .eq("id", investidorId)
+      const budget = proj ? Number((proj as Record<string, unknown>).budget ?? 0) : 0
+      const valorARestaurar = budget > 0 ? Math.round((budget * percentagem) / 100 * 100) / 100 : 0
+
+      if (valorARestaurar > 0) {
+        const { data: inv } = await raw
+          .from("investidores")
+          .select("capital_disponivel")
+          .eq("id", investidorId)
+          .maybeSingle()
+
+        if (inv) {
+          const novoCapital = Number((inv as Record<string, unknown>).capital_disponivel ?? 0) + valorARestaurar
+          await raw.from("investidores")
+            .update({ capital_disponivel: novoCapital, updated_at: new Date().toISOString() })
+            .eq("id", investidorId)
+        }
+      }
     }
   }
 
