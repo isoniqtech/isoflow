@@ -156,7 +156,8 @@ export default async function UtilizadoresPage() {
               const roleStyle = ROLE_STYLES[(u.role ?? "member") as UserRole]
               const isYou = u.id === session.user.id
               const isOwner = u.role === "owner"
-              const canEdit = canManage && !isYou && !isOwner
+              const isInvestidor = u.role === "investidor"
+              const canEdit = canManage && !isYou && !isOwner && !isInvestidor
               return (
                 <TableRow key={u.id}>
                   <TableCell>
