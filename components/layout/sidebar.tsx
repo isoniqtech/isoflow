@@ -167,7 +167,9 @@ export function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >
-          <Settings className="h-4 w-4" />
+          <span className="h-6 w-6 flex items-center justify-center shrink-0">
+            <Settings className="h-4 w-4" />
+          </span>
           Configuracoes
         </Link>
       )}
