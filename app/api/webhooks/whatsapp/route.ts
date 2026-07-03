@@ -169,6 +169,9 @@ export async function POST(req: Request) {
           .single()
 
         if (insertError) {
+          if (insertError.code === '23505') {
+            return getTwiMLResponse('⚠️ Esta fatura já foi registada anteriormente.')
+          }
           console.error('Insert error:', insertError)
           return getTwiMLResponse('❌ Erro ao criar fatura. Tenta novamente.')
         }
