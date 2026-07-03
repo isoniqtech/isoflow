@@ -1,7 +1,7 @@
 import { validateTwilioSignature } from '@/lib/twilio/validate'
 import { downloadTwilioMedia, sendWhatsAppReply, parseTwilioMediaType } from '@/lib/twilio/whatsapp'
 import { extractInvoiceData } from '@/lib/claude/extract-invoice'
-import { matchProjectFromText } from '@/lib/utils/projects'
+import { matchProjectFromTextWithAI } from '@/lib/utils/projects'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { log } from '@/lib/utils/audit'
 import { Invoice } from '@/types'
@@ -115,7 +115,9 @@ export async function POST(req: Request) {
 
         const extraction = await extractInvoiceData(base64, fileType)
 
-        const projectId = await matchProjectFromText(body, tenantId, supabase)
+        // Tentar encontrar projeto: primeiro pelo texto da mensagem, depois pela descricao da fatura
+        const matchText = [body, extraction.description, extraction.supplier_name].filter(Boolean).join(' ')
+        const projectId = await matchProjectFromTextWithAI(matchText, tenantId, supabase)
 
         const timestamp = Date.now()
         const filename = `whatsapp_${timestamp}.${fileType}`
@@ -196,15 +198,17 @@ export async function POST(req: Request) {
             .single()
 
           if (project) {
-            response += `\n✅ Adicionada ao projeto: ${project.name}`
+            response += `\n✅ Projeto: ${project.name}`
           }
+        } else if (body.trim()) {
+          response += `\n❓ Nao consegui identificar o projeto "${body.trim()}". Responde com o nome exato do projeto.`
         } else {
-          response += '\n📍 Qual é o projeto? Responde com o nome.'
+          response += '\n📍 A que projeto pertence? Responde com o nome.'
         }
 
         if (extraction.needs_review) {
-          response += '\n⚠️ Precisa de revisão manual (baixa confiança).'
-        } else {
+          response += '\n⚠️ Baixa confianca na leitura - verifica os dados na app.'
+        } else if (projectId) {
           response += '\n👇 Responde CONFIRMAR para validar.'
         }
 
@@ -257,7 +261,7 @@ export async function POST(req: Request) {
 
           return getTwiMLResponse('✅ Fatura confirmada e em processamento!')
         } else {
-          const projectId = await matchProjectFromText(body, tenantId, supabase)
+          const projectId = await matchProjectFromTextWithAI(body, tenantId, supabase)
 
           if (projectId) {
             const { error: updateError } = await supabase
