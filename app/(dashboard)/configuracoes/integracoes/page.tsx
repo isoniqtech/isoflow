@@ -1,13 +1,11 @@
 import { Suspense } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import {
-  ChevronLeft,
-  MessageCircle,
-} from "lucide-react"
+import { ChevronLeft } from "lucide-react"
 import { IntegrationCard } from "@/components/configuracoes/integration-card"
 import { EmailIntegrationCard } from "@/components/configuracoes/email-integration-card"
 import { ErpIntegrationCard } from "@/components/configuracoes/erp-integration-card"
+import { WhatsAppIntegrationCard } from "@/components/configuracoes/whatsapp-integration-card"
 import { BankAccountsCard } from "@/components/configuracoes/bank-accounts-card"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
 import { getCurrentSession } from "@/lib/queries/current-session"
@@ -85,7 +83,9 @@ export default async function IntegracoesPage() {
     }
   }
 
-  const whatsapp = getStatus("whatsapp")
+  const whatsappRow = byType.get("whatsapp")
+  const whatsappActive = whatsappRow?.is_active ?? false
+  const canEditWhatsapp = hasPermission(session.role, "integracoes", "edit")
 
   // ERP/n8n integration — load full record (config) to populate form.
   const erpRow = byType.get("erp")
@@ -201,17 +201,7 @@ export default async function IntegracoesPage() {
 
         <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
 
-        <IntegrationCard
-          icon={MessageCircle}
-          title="WhatsApp"
-          description="Recebe faturas via WhatsApp. A app processa com IA e associa ao projeto certo."
-          status={whatsapp.status}
-          provider={whatsapp.provider}
-          lastSyncAt={whatsapp.lastSyncAt}
-          onConnectLabel="Configurar WhatsApp"
-          onConnectTitle="Webhook Twilio será ativado depois do core"
-          onConnectDisabled
-        />
+        <WhatsAppIntegrationCard isActive={whatsappActive} canEdit={canEditWhatsapp} />
         <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
       </div>
 
