@@ -101,8 +101,10 @@ export function InvestorTable({
       <div className="rounded-lg border bg-background p-8 text-center">
         <p className="text-sm text-muted-foreground">Nenhum investidor registado.</p>
         {canEdit && (
-          <Link href="/investidores/novo">
-            <Button className="mt-4" size="sm">Adicionar investidor</Button>
+          <Link href="/configuracoes/utilizadores">
+            <Button className="mt-4" size="sm" variant="outline">
+              Convidar investidor em Configuracoes
+            </Button>
           </Link>
         )}
       </div>

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { Plus } from "lucide-react"
+import { Settings } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { InvestorStats } from "@/components/investidores/investor-stats"
 import { InvestorTable } from "@/components/investidores/investor-table"
@@ -33,10 +33,10 @@ export default async function InvestidoresPage() {
           </p>
         </div>
         {canEdit && (
-          <Link href="/investidores/novo">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Novo investidor
+          <Link href="/configuracoes/utilizadores">
+            <Button variant="outline">
+              <Settings className="h-4 w-4 mr-2" />
+              Convidar investidor
             </Button>
           </Link>
         )}
