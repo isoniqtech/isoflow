@@ -71,9 +71,14 @@ export function ProjectInvestorBlock({
 
     if (mode === "pct") {
       pct = raw
-      eurValue = budget !== null ? (budget * raw) / 100 : null
+      if (budget !== null) {
+        eurValue = (budget * raw) / 100
+      } else if (selectedInvestidor && selectedInvestidor.capital_disponivel > 0) {
+        // Sem orçamento não é possível converter % em € para validar contra capital
+        validationError = "Defina um orçamento no projeto para validar contra o capital do investidor."
+        return { pct, eurValue: null, validationError }
+      }
     } else {
-      // € mode: requires budget to calculate %
       eurValue = raw
       pct = budget !== null ? (raw / budget) * 100 : null
     }
@@ -84,6 +89,7 @@ export function ProjectInvestorBlock({
 
     if (
       selectedInvestidor &&
+      selectedInvestidor.capital_disponivel > 0 &&
       eurValue !== null &&
       eurValue > selectedInvestidor.capital_disponivel
     ) {
@@ -282,6 +288,13 @@ export function ProjectInvestorBlock({
             </Button>
           </div>
 
+          {/* Referência: capital disponível do investidor selecionado */}
+          {selectedInvestidor && selectedInvestidor.capital_disponivel > 0 && (
+            <p className="pl-1 text-xs text-muted-foreground">
+              Capital disponivel: <span className="font-medium tabular-nums">{formatCurrency(selectedInvestidor.capital_disponivel)}</span>
+            </p>
+          )}
+
           {/* Linha 2: preview do valor calculado / erro */}
           {selectedId && inputValue && (
             <div className="pl-1">
@@ -296,7 +309,6 @@ export function ProjectInvestorBlock({
                     <>
                       {pct.toFixed(2)}% do orçamento
                       {eurValue !== null && <> = {formatCurrency(eurValue)}</>}
-                      {budget === null && " (sem orçamento definido)"}
                     </>
                   )}
                   {mode === "eur" && eurValue !== null && pct !== null && (
