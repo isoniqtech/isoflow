@@ -12,8 +12,6 @@ name: Email IMAP sync
 # Para correr manualmente: Actions → Email IMAP sync → Run workflow.
 
 on:
-  schedule:
-    - cron: "*/5 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -30,7 +28,7 @@ jobs:
             --max-time 540 \
             --write-out "\nHTTP_STATUS:%{http_code}\n" \
             --header "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            https://isoflow-seven.vercel.app/api/cron/email)
+            https://flow.isoniqtech.com/api/cron/email)
           echo "$response"
           if echo "$response" | grep -q "HTTP_STATUS:2"; then
             echo "✓ Cron concluído"
