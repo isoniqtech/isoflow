@@ -14,20 +14,17 @@ export function ThemeRadioGroup() {
 
   return (
     <>
-      <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        FINMED x Isoniq
-      </DropdownMenuLabel>
       <DropdownMenuRadioGroup
         value={theme ?? "finmed-light"}
         onValueChange={(v) => setTheme(v)}
       >
         <DropdownMenuRadioItem value="finmed-light" className="cursor-pointer">
           <Leaf className="mr-2 h-4 w-4 text-emerald-600" />
-          Finmed (claro)
+          Bosque (claro)
         </DropdownMenuRadioItem>
         <DropdownMenuRadioItem value="finmed-dark" className="cursor-pointer">
           <Leaf className="mr-2 h-4 w-4 text-emerald-400" />
-          Finmed (escuro)
+          Bosque (escuro)
         </DropdownMenuRadioItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
