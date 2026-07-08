@@ -155,7 +155,7 @@ export function OnboardingWizard({ tenant }: { tenant: Tenant }) {
     <div className="min-h-screen bg-muted/40 py-12 px-4">
       <div className="mx-auto max-w-2xl space-y-8">
         <header className="text-center space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className="text-3xl font-display font-semibold tracking-tight">
             Vamos configurar a tua conta
           </h1>
           <p className="text-muted-foreground">
@@ -166,7 +166,7 @@ export function OnboardingWizard({ tenant }: { tenant: Tenant }) {
         <Stepper current={step} />
 
         {step === 1 && (
-          <Card>
+          <Card className="shadow-[var(--shadow-card,none)] border-border/60">
             <CardHeader>
               <CardTitle>Dados da empresa</CardTitle>
               <CardDescription>
@@ -249,7 +249,7 @@ export function OnboardingWizard({ tenant }: { tenant: Tenant }) {
         )}
 
         {step === 2 && (
-          <Card>
+          <Card className="shadow-[var(--shadow-card,none)] border-border/60">
             <CardHeader>
               <CardTitle>Integração ERP</CardTitle>
               <CardDescription>
@@ -279,7 +279,7 @@ export function OnboardingWizard({ tenant }: { tenant: Tenant }) {
         )}
 
         {step === 3 && (
-          <Card>
+          <Card className="shadow-[var(--shadow-card,none)] border-border/60">
             <CardHeader>
               <CardTitle>Ligar banco</CardTitle>
               <CardDescription>
@@ -332,10 +332,11 @@ function Stepper({ current }: { current: number }) {
             <div
               className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-medium",
-                isComplete && "bg-foreground text-background border-foreground",
+                isComplete && "border-primary text-white",
                 isCurrent && "border-foreground",
                 !isCurrent && !isComplete && "border-muted text-muted-foreground",
               )}
+              style={isComplete ? { background: "linear-gradient(135deg, #4E7217, #3DAEAF)" } : undefined}
             >
               {isComplete ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
             </div>

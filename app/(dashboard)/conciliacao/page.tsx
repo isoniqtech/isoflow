@@ -135,7 +135,7 @@ export default async function ConciliacaoPage() {
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Conciliação Bancária</h1>
+          <h1 className="text-2xl font-display font-semibold tracking-tight">Conciliação Bancária</h1>
           <p className="text-muted-foreground text-sm">
             {invoices.length} faturas por conciliar · {txs.length} movimentos por conciliar
             {invoices.length > 0 && (
@@ -166,7 +166,7 @@ export default async function ConciliacaoPage() {
       )}
 
       {invoices.length === 0 && txs.length === 0 ? (
-        <Card>
+        <Card className="shadow-[var(--shadow-card,none)] border-border/60">
           <CardContent className="p-12 flex flex-col items-center text-center">
             <Sparkles className="h-10 w-10 text-emerald-500 mb-3" />
             <h2 className="font-semibold mb-1">Tudo conciliado</h2>

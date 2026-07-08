@@ -73,7 +73,7 @@ export default async function SuportePage({
     <div className="p-4 md:p-6 lg:p-8 space-y-4 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Suporte</h1>
+          <h1 className="text-2xl font-display font-semibold tracking-tight">Suporte</h1>
           <p className="text-muted-foreground text-sm">
             {tickets.length} {tickets.length === 1 ? "ticket" : "tickets"}
           </p>

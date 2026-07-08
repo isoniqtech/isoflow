@@ -64,7 +64,7 @@ export default async function ConfiguracoesPage() {
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
+        <h1 className="text-2xl font-display font-semibold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground text-sm">
           Personaliza a tua empresa e gere o acesso da equipa.
         </p>
@@ -105,10 +105,10 @@ export default async function ConfiguracoesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {links.map((link) => (
               <Link key={link.href} href={link.href} className="group">
-                <Card className="transition-shadow group-hover:shadow-md">
+                <Card className="transition-shadow group-hover:shadow-md shadow-[var(--shadow-card,none)] border-border/60">
                   <CardContent className="p-4 flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center shrink-0">
-                      <link.icon className="h-5 w-5 text-muted-foreground" />
+                    <div className="h-10 w-10 rounded-md flex items-center justify-center shrink-0" style={{ background: "linear-gradient(135deg, #4E7217, #3DAEAF)" }}>
+                      <link.icon className="h-5 w-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium">{link.label}</p>

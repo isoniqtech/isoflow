@@ -42,7 +42,7 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
   const status = STATUS_STYLES[project.status]
   return (
     <Link href={`/projetos/${project.id}`} className="group">
-      <Card className="h-full transition-shadow group-hover:shadow-md">
+      <Card className="h-full transition-shadow group-hover:shadow-md shadow-[var(--shadow-card,none)] border-border/60">
         <CardContent className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1 min-w-0">
@@ -51,7 +51,7 @@ export function ProjectCard({ project }: { project: ProjectListItem }) {
                   className="h-2 w-2 rounded-full shrink-0"
                   style={{ backgroundColor: project.color }}
                 />
-                <h3 className="font-semibold truncate">{project.name}</h3>
+                <h3 className="font-display font-semibold truncate">{project.name}</h3>
               </div>
               {project.code && (
                 <p className="text-xs text-muted-foreground mt-0.5 font-mono">

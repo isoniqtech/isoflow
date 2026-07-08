@@ -69,7 +69,7 @@ function SidebarBrand() {
           {tenant.app_name.charAt(0).toUpperCase()}
         </div>
       )}
-      <span className="font-semibold tracking-tight truncate">
+      <span className="font-display font-semibold tracking-tight truncate">
         {tenant.app_name}
       </span>
     </Link>
@@ -125,7 +125,7 @@ function NavLink({
       className={cn(
         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         active
-          ? "bg-foreground text-background"
+          ? "bg-gradient-to-r from-primary/12 to-primary/5 text-primary font-medium border-l-2 border-primary pl-2.5"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
@@ -165,7 +165,7 @@ export function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
           className={cn(
             "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
             suporteActive
-              ? "bg-foreground text-background"
+              ? "bg-gradient-to-r from-primary/12 to-primary/5 text-primary font-medium border-l-2 border-primary pl-2.5"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >
@@ -182,7 +182,7 @@ export function SidebarFooter({ onNavigate }: { onNavigate?: () => void }) {
           className={cn(
             "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
             configActive
-              ? "bg-foreground text-background"
+              ? "bg-gradient-to-r from-primary/12 to-primary/5 text-primary font-medium border-l-2 border-primary pl-2.5"
               : "text-muted-foreground hover:bg-muted hover:text-foreground",
           )}
         >

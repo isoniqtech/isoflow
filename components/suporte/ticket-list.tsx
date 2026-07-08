@@ -62,7 +62,7 @@ const CATEGORY_LABELS: Record<SupportTicketCategory, string> = {
 export function TicketList({ tickets }: { tickets: TicketListItem[] }) {
   if (tickets.length === 0) {
     return (
-      <div className="border rounded-lg p-12 flex flex-col items-center text-center bg-background">
+      <div className="border-border/60 rounded-lg p-12 flex flex-col items-center text-center bg-card shadow-[var(--shadow-card,none)] border">
         <LifeBuoy className="h-10 w-10 text-muted-foreground mb-3" />
         <h2 className="font-semibold mb-1">Sem tickets de suporte</h2>
         <p className="text-sm text-muted-foreground max-w-md mb-4">
@@ -77,7 +77,7 @@ export function TicketList({ tickets }: { tickets: TicketListItem[] }) {
   }
 
   return (
-    <div className="rounded-lg border bg-background overflow-x-auto">
+    <div className="rounded-lg border-border/60 border bg-card shadow-[var(--shadow-card,none)] overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>

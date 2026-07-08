@@ -6,11 +6,11 @@ export default function AuthLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen bg-muted/40 flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: "linear-gradient(160deg, hsl(var(--background)) 0%, hsl(var(--muted)/0.5) 50%, hsl(var(--background)) 100%)" }}>
       <header className="py-8 flex justify-center">
         <Link
           href="/"
-          className="text-2xl font-semibold tracking-tight text-foreground"
+          className="text-2xl font-display font-semibold tracking-tight text-foreground"
         >
           ISOFlow
         </Link>
