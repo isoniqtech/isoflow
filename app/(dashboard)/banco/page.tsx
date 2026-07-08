@@ -1,10 +1,11 @@
 import Link from "next/link"
 import { Suspense } from "react"
 import { redirect } from "next/navigation"
-import { Landmark } from "lucide-react"
+import { Activity, CheckCheck, Clock, Landmark } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
+import { KpiCard } from "@/components/dashboard/kpi-card"
 import { TransactionTable } from "@/components/banco/transaction-table"
 import { BancoPeriodControls } from "@/components/banco/banco-period-controls"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
@@ -117,7 +118,7 @@ export default async function BancoPage({
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Banco</h1>
+            <h1 className="text-2xl font-display font-semibold tracking-tight">Banco</h1>
             <p className="text-muted-foreground text-sm">
               {periodTotal.toLocaleString("pt-PT")} movimentos · {periodMatched} conciliados · {label}
             </p>
@@ -130,7 +131,7 @@ export default async function BancoPage({
 
         {/* Empty state */}
         {!hasConfiguredAccounts && (
-          <Card>
+          <Card className="shadow-[var(--shadow-card,none)] border-border/60">
             <CardContent className="p-6 flex flex-col items-center text-center">
               <Landmark className="h-10 w-10 text-muted-foreground mb-3" />
               <h2 className="font-semibold mb-1">Nenhum banco configurado</h2>
@@ -158,31 +159,27 @@ export default async function BancoPage({
             </Suspense>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Movimentos</p>
-                  <p className="text-2xl font-semibold tabular-nums">{periodTotal}</p>
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Conciliados</p>
-                  <p className="text-2xl font-semibold tabular-nums">{periodMatched}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {periodTotal > 0 ? `${matchedPct}% do total` : "—"}
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">Por conciliar</p>
-                  <p className="text-2xl font-semibold tabular-nums">{periodUnmatched}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {periodTotal > 0 ? `${unmatchedPct}% do total` : "—"}
-                  </p>
-                </CardContent>
-              </Card>
+              <KpiCard
+                label="Movimentos"
+                value={String(periodTotal)}
+                icon={Activity}
+                hint={label}
+                variant="neutral"
+              />
+              <KpiCard
+                label="Conciliados"
+                value={String(periodMatched)}
+                icon={CheckCheck}
+                hint={periodTotal > 0 ? `${matchedPct}% do total` : "—"}
+                variant="revenue"
+              />
+              <KpiCard
+                label="Por conciliar"
+                value={String(periodUnmatched)}
+                icon={Clock}
+                hint={periodTotal > 0 ? `${unmatchedPct}% do total` : "—"}
+                variant={periodUnmatched > 0 ? "expense" : "neutral"}
+              />
             </div>
           </div>
         )}
