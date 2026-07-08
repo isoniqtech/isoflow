@@ -248,9 +248,9 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
         {filteredDocs.length === 0 ? (
           <EmptyState icon={FileText} title="Sem documentos pendentes" description="Todos os documentos AT já estão associados a faturas." />
         ) : (
-          <div className="rounded-lg border bg-background">
+          <div className="rounded-lg border border-border/60 bg-card overflow-auto shadow-[var(--shadow-card,none)]">
             <table className="w-full caption-bottom text-sm">
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
                   {HEADERS.map((h, i) => (
                     <TableHead
@@ -302,7 +302,7 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
 
 function EmptyState({ icon: Icon, title, description }: { icon: typeof FileText; title: string; description: string }) {
   return (
-    <div className="border rounded-lg p-8 flex flex-col items-center text-center bg-background">
+    <div className="rounded-lg border border-border/60 bg-card shadow-[var(--shadow-card,none)] p-8 flex flex-col items-center text-center">
       <Icon className="h-8 w-8 text-muted-foreground mb-2" />
       <h3 className="font-semibold text-sm mb-1">{title}</h3>
       <p className="text-xs text-muted-foreground max-w-xs">{description}</p>
