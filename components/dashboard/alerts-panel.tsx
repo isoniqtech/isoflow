@@ -6,10 +6,17 @@ import type { DashboardAlert } from "@/lib/queries/dashboard"
 
 export function AlertsPanel({ alerts }: { alerts: DashboardAlert[] }) {
   return (
-    <Card className="border-2 border-amber-400 dark:border-amber-500 h-full">
+    <Card
+      className="h-full border-amber-200/70 dark:border-amber-900/40 shadow-[var(--shadow-card,none)] overflow-hidden"
+      style={{ background: "linear-gradient(155deg, hsl(var(--card)) 30%, rgba(245,158,11,0.06) 100%)" }}
+    >
+      <div
+        className="h-0.5 w-full"
+        style={{ background: "linear-gradient(90deg, transparent 0%, #F59E0B 40%, #FBBF24 60%, transparent 100%)" }}
+      />
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <BellRing className="h-4 w-4" />
+          <BellRing className="h-4 w-4 text-amber-500" />
           Alertas
         </CardTitle>
         {alerts.length > 0 && (

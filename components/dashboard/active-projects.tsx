@@ -8,9 +8,9 @@ import type { RecentProject } from "@/lib/queries/dashboard"
 
 export function ActiveProjects({ projects }: { projects: RecentProject[] }) {
   return (
-    <Card>
+    <Card className="shadow-[var(--shadow-card,none)] border-border/60">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">Projetos ativos</CardTitle>
+        <CardTitle className="text-sm font-medium font-display">Projetos ativos</CardTitle>
         <Button variant="ghost" size="sm" asChild>
           <Link href="/projetos">Ver todos</Link>
         </Button>
@@ -56,11 +56,15 @@ function ProjectItem({ project }: { project: RecentProject }) {
             {/* Progress bar */}
             <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden mb-2">
               <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  isOver ? "bg-destructive" : isWarn ? "bg-amber-500" : "bg-primary",
-                )}
-                style={{ width: `${pct}%` }}
+                className="h-full rounded-full transition-all"
+                style={{
+                  width: `${pct}%`,
+                  background: isOver
+                    ? "linear-gradient(90deg, #F87171, #EF4444)"
+                    : isWarn
+                    ? "linear-gradient(90deg, #FBBF24, #F59E0B)"
+                    : "linear-gradient(90deg, #4E7217, #3DAEAF)",
+                }}
               />
             </div>
             <div className="grid grid-cols-3 gap-1 text-xs">
