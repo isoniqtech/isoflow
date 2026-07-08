@@ -1,11 +1,16 @@
 import type { Metadata, Viewport } from "next"
-import { Inter } from "next/font/google"
+import { Inter, Space_Grotesk } from "next/font/google"
 import { Toaster } from "@/components/ui/sonner"
 import { RegisterServiceWorker } from "@/components/pwa/register-sw"
 import { ThemeProvider } from "@/components/theme-provider"
 import "./globals.css"
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" })
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-display",
+  weight: ["400", "500", "600", "700"],
+})
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
 
@@ -54,8 +59,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#F5F8EF" },
+    { media: "(prefers-color-scheme: dark)", color: "#070C08" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -69,13 +74,13 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="finmed-light"
+          enableSystem={false}
           disableTransitionOnChange
-          themes={["light", "dark", "studio", "studio-dark"]}
+          themes={["light", "dark", "studio", "studio-dark", "finmed-light", "finmed-dark"]}
         >
           {children}
           <Toaster richColors position="top-right" />

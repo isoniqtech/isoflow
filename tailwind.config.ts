@@ -1,9 +1,7 @@
 import type { Config } from "tailwindcss"
 
 const config: Config = {
-  // dark: variants ativam-se quando html tem class "dark" OU "studio-dark"
-  // (next-themes só permite uma class por theme; usamos selector composto)
-  darkMode: ["selector", ":is(.dark, .studio-dark)"],
+  darkMode: ["selector", ":is(.dark, .studio-dark, .finmed-dark)"],
   content: [
     "./pages/**/*.{ts,tsx}",
     "./components/**/*.{ts,tsx}",
@@ -18,6 +16,10 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

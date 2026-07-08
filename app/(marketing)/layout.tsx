@@ -8,13 +8,13 @@ export default function MarketingLayout({
 }) {
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className="sticky top-0 z-50 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-50 border-b border-border/40 bg-background/75 backdrop-blur-[14px] saturate-[140%]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+            <div className="h-7 w-7 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
               I
             </div>
-            <span className="font-semibold tracking-tight text-lg">ISOFlow</span>
+            <span className="font-display font-semibold tracking-tight text-lg">ISOFlow</span>
           </Link>
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <a href="#funcionalidades" className="hover:text-foreground transition-colors">Funcionalidades</a>
@@ -39,7 +39,7 @@ export default function MarketingLayout({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
             <div>
               <div className="flex items-center gap-2 mb-3">
-                <div className="h-6 w-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                <div className="h-6 w-6 rounded bg-primary flex items-center justify-center text-primary-foreground text-xs font-bold">
                   I
                 </div>
                 <span className="font-semibold">ISOFlow</span>

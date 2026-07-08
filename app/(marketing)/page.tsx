@@ -79,47 +79,46 @@ const STEPS = [
 const PLANS = [
   {
     name: "Starter",
-    price: "79",
+    price: "49",
     description: "Para pequenas empresas a começar.",
     features: [
-      "50 faturas / mês",
       "5 projetos",
-      "1 conta bancária",
-      "2 utilizadores",
-      "500 créditos IA / mês",
-      "Suporte por email",
+      "3 contas bancárias",
+      "3 utilizadores",
+      "WhatsApp + Email",
+      "Conciliação bancária",
+      "Até 1 GB de espaço",
+      "Comunicação AT",
+      "Integração ERP",
+      "Suporte por ticket",
     ],
     highlighted: false,
     cta: "Pedir demonstração",
   },
   {
     name: "Business",
-    price: "179",
+    price: "89",
     description: "O mais escolhido por PMEs em crescimento.",
     features: [
-      "200 faturas / mês",
-      "20 projetos",
-      "3 contas bancárias",
-      "5 utilizadores",
-      "1.500 créditos IA / mês",
-      "Integração ERP incluída",
-      "Suporte prioritário",
+      "Tudo do Starter",
+      "Projetos ilimitados",
+      "Bancos ilimitados",
+      "Até 15 utilizadores",
+      "Até 5 GB de espaço",
+      "Suporte por ticket",
     ],
     highlighted: true,
     cta: "Pedir demonstração",
   },
   {
-    name: "Pro",
-    price: "349",
-    description: "Faturas e projetos sem limites.",
+    name: "Investor",
+    price: "129",
+    description: "Para empresas e grupos em crescimento.",
     features: [
-      "Faturas ilimitadas",
-      "Projetos ilimitados",
-      "Contas bancárias ilimitadas",
-      "15 utilizadores",
-      "5.000 créditos IA / mês",
-      "Integração ERP incluída",
-      "Suporte dedicado",
+      "Tudo do Business",
+      "Até 50 utilizadores",
+      "Até 15 GB de espaço",
+      "Suporte assistido",
     ],
     highlighted: false,
     cta: "Pedir demonstração",
@@ -132,36 +131,39 @@ export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/50 to-background dark:from-blue-950/20 dark:to-background pt-20 pb-24 px-4 sm:px-6">
+      <section className="relative overflow-hidden bg-gradient-to-b from-secondary/30 to-background pt-20 pb-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <Badge variant="outline" className="mb-6 text-blue-700 border-blue-200 bg-blue-50 dark:text-blue-300 dark:border-blue-800 dark:bg-blue-950/50 animate-in fade-in duration-500">
+          <Badge
+            variant="outline"
+            className="mb-6 border-border text-muted-foreground animate-in fade-in duration-500 motion-reduce:animate-none"
+          >
             Desenvolvido em Portugal, para empresas portuguesas
           </Badge>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6 leading-tight animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-[-0.03em] text-foreground mb-6 leading-tight animate-in fade-in slide-in-from-bottom-4 duration-700 motion-reduce:animate-none">
             Faturas e projetos{" "}
-            <span className="text-blue-600 dark:text-blue-400">sob controlo.</span>
+            <span className="spectrum-text">sob controlo.</span>
             <br />
             Automaticamente.
           </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 motion-reduce:animate-none">
             Recebe faturas por WhatsApp ou email. A IA extrai os dados, associa ao projeto certo e concilia com o banco.
             Tu só confirmas.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 motion-reduce:animate-none">
             <Button
               size="lg"
-              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
+              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 btn-glow active:scale-95"
               asChild
             >
               <a href="#contacto">
                 Pedir demonstração
-                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </Button>
             <Button
               size="lg"
               variant="outline"
-              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-950/30 dark:hover:border-blue-700 dark:hover:text-blue-300 active:scale-95"
+              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:bg-secondary active:scale-95"
               asChild
             >
               <a href="#precos">Ver preços</a>
@@ -170,14 +172,14 @@ export default function LandingPage() {
         </div>
 
         {/* Stats strip */}
-        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-4 sm:gap-8 text-center animate-in fade-in duration-1000 delay-500">
+        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-4 sm:gap-8 text-center animate-in fade-in duration-1000 delay-500 motion-reduce:animate-none">
           {[
             { value: "< 5s", label: "por fatura processada" },
             { value: "+95%", label: "de precisão na extração" },
             { value: "0", label: "digitação manual necessária" },
           ].map((stat) => (
             <div key={stat.label}>
-              <p className="text-2xl sm:text-3xl font-bold text-foreground">{stat.value}</p>
+              <p className="font-display text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-foreground">{stat.value}</p>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1">{stat.label}</p>
             </div>
           ))}
@@ -315,8 +317,8 @@ export default function LandingPage() {
               <div>
                 <p className="font-semibold">Enterprise</p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Utilizadores ilimitados, créditos personalizados, SLA dedicado e integração à medida.
-                  A partir de 599€/mês.
+                  Tudo do Investor, utilizadores e espaço personalizados, SLA dedicado e integração à medida.
+                  Preço personalizado.
                 </p>
               </div>
               <Button

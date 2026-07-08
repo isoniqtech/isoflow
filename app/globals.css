@@ -154,6 +154,103 @@
     --chart-4: 346 72% 62%;   /* rose */
     --chart-5: 188 70% 52%;   /* teal */
   }
+
+  /* =========================================================
+     FINMED x Isoniq — claro
+     Âncora: verde-floresta. Espetro apenas em pontos focais.
+     ========================================================= */
+  .finmed-light {
+    /* Tokens de marca */
+    --forest:      #344E0D;
+    --forest-deep: #223608;
+    --forest-lt:   #4E7217;
+    --lime:        #90C765;
+    --mint:        #62C099;
+    --teal:        #3DAEAF;
+    --petrol:      #1D8192;
+    --abyss:       #0D4961;
+    --spectrum:      linear-gradient(100deg,#90C765,#62C099 38%,#3DAEAF 70%,#1D8192);
+    --spectrum-text: linear-gradient(100deg,#4E7217,#2E9E8C 55%,#1D8192);
+    --shadow-card: 0 1px 2px rgba(20,40,10,.04),0 6px 16px rgba(20,40,10,.05),0 20px 48px rgba(20,40,10,.07);
+    --glow-cta:    0 10px 30px -8px rgba(61,174,175,.42),0 2px 8px rgba(29,129,146,.2);
+
+    /* Semânticos shadcn */
+    --background:          80 39% 96%;
+    --foreground:          91 51% 8%;
+    --card:                0 0% 100%;
+    --card-foreground:     91 51% 8%;
+    --popover:             0 0% 100%;
+    --popover-foreground:  91 51% 8%;
+    --primary:             84 71% 18%;
+    --primary-foreground:  0 0% 98%;
+    --secondary:           81 35% 92%;
+    --secondary-foreground:91 51% 8%;
+    --muted:               81 35% 92%;
+    --muted-foreground:    90 14% 33%;
+    --accent:              81 35% 92%;
+    --accent-foreground:   84 71% 18%;
+    --destructive:         0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border:              82 29% 87%;
+    --input:               82 29% 87%;
+    --ring:                181 48% 46%;
+    --radius:              0.5rem;
+
+    /* Chart - paleta de marca */
+    --chart-1: 84 71% 18%;
+    --chart-2: 94 47% 59%;
+    --chart-3: 155 43% 57%;
+    --chart-4: 181 48% 46%;
+    --chart-5: 189 67% 34%;
+  }
+
+  /* =========================================================
+     FINMED x Isoniq — escuro
+     ========================================================= */
+  .finmed-dark {
+    /* Tokens de marca (iguais) */
+    --forest:      #344E0D;
+    --forest-deep: #223608;
+    --forest-lt:   #4E7217;
+    --lime:        #90C765;
+    --mint:        #62C099;
+    --teal:        #3DAEAF;
+    --petrol:      #1D8192;
+    --abyss:       #0D4961;
+    --spectrum:      linear-gradient(100deg,#90C765,#62C099 38%,#3DAEAF 70%,#1D8192);
+    --spectrum-text: linear-gradient(100deg,#90C765,#62C099 38%,#3DAEAF 70%,#1D8192);
+    --shadow-card: 0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35),0 24px 60px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.04);
+    --glow-cta:    0 10px 40px -8px rgba(98,192,153,.5),0 2px 8px rgba(29,129,146,.3);
+
+    /* Semânticos shadcn */
+    --background:          130 24% 4%;
+    --foreground:          93 32% 93%;
+    --card:                147 26% 8%;
+    --card-foreground:     93 32% 93%;
+    --popover:             147 24% 7%;
+    --popover-foreground:  93 32% 93%;
+    --primary:             94 47% 59%;
+    --primary-foreground:  130 24% 4%;
+    --secondary:           145 24% 15%;
+    --secondary-foreground:93 32% 93%;
+    --muted:               147 24% 7%;
+    --muted-foreground:    123 11% 66%;
+    --accent:              145 24% 15%;
+    --accent-foreground:   93 32% 93%;
+    --destructive:         0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border:              145 24% 15%;
+    --input:               145 24% 15%;
+    --ring:                181 48% 46%;
+    --radius:              0.5rem;
+
+    /* Chart */
+    --chart-1: 94 47% 59%;
+    --chart-2: 155 43% 57%;
+    --chart-3: 181 48% 46%;
+    --chart-4: 189 67% 34%;
+    --chart-5: 84 71% 18%;
+  }
 }
 
 @layer base {
@@ -162,17 +259,37 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Sutil melhoria de tipografia em todos os temas */
     font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
-/* Apenas Studio: backdrop subtil em cards para mais profundidade */
 @layer components {
+  /* Apenas Studio: backdrop subtil em cards */
   .studio .ring-elegant,
   .studio-dark .ring-elegant {
     box-shadow:
       0 1px 2px 0 hsl(var(--foreground) / 0.04),
       0 1px 3px 1px hsl(var(--foreground) / 0.04);
+  }
+
+  /* Gradiente de espetro FINMED aplicado a texto */
+  .spectrum-text {
+    background: var(--spectrum-text, linear-gradient(100deg,#4E7217,#2E9E8C 55%,#1D8192));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* Glow no botao CTA primario (FINMED) */
+  .btn-glow:hover {
+    box-shadow: var(--glow-cta, 0 10px 30px -8px rgba(61,174,175,.3));
   }
 }
