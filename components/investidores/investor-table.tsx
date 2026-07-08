@@ -98,7 +98,7 @@ export function InvestorTable({
 
   if (!rows.length) {
     return (
-      <div className="rounded-lg border bg-background p-8 text-center">
+      <div className="rounded-lg border border-border/60 bg-card shadow-[var(--shadow-card,none)] p-8 text-center">
         <p className="text-sm text-muted-foreground">Nenhum investidor registado.</p>
         {canEdit && (
           <Link href="/configuracoes/utilizadores">
@@ -112,9 +112,9 @@ export function InvestorTable({
   }
 
   return (
-    <div className="rounded-lg border bg-background overflow-x-auto">
+    <div className="rounded-lg border border-border/60 bg-card overflow-x-auto shadow-[var(--shadow-card,none)]">
       <table className="w-full text-sm">
-        <thead className="border-b">
+        <thead className="border-b bg-muted">
           <tr className="text-left">
             <th className="px-4 py-3 font-medium text-muted-foreground">Nome</th>
             <th className="px-4 py-3 font-medium text-muted-foreground">Email</th>
