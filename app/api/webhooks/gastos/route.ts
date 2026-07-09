@@ -33,13 +33,31 @@ export async function POST(req: Request) {
 
   const { tenant_id, month, year, total } = parsed
   const supabase = createServiceClient()
+  const now = new Date().toISOString()
 
-  await supabase
+  // Tenta UPDATE primeiro (row já existe pela receita)
+  const { data: updated, error: updateError } = await supabase
     .from("monthly_snapshots")
-    .upsert(
-      { tenant_id, month, year, expenses: total, saved_at: new Date().toISOString() },
-      { onConflict: "tenant_id,month,year" },
-    )
+    .update({ expenses: total, saved_at: now })
+    .eq("tenant_id", tenant_id)
+    .eq("month", month)
+    .eq("year", year)
+    .select("id")
+
+  if (updateError) {
+    return Response.json({ error: updateError.message }, { status: 500 })
+  }
+
+  // Se não havia row, insere
+  if (!updated || updated.length === 0) {
+    const { error: insertError } = await supabase
+      .from("monthly_snapshots")
+      .insert({ tenant_id, month, year, expenses: total, saved_at: now })
+
+    if (insertError) {
+      return Response.json({ error: insertError.message }, { status: 500 })
+    }
+  }
 
   return Response.json({ ok: true, tenant_id, month, year, total })
 }
