@@ -95,7 +95,7 @@ export async function POST(req: Request) {
         dateTo: currentDateTo,
       })
       const currentTotal =
-        Math.round(currentDocs.reduce((sum, doc) => sum + Number(doc.total ?? 0), 0) * 100) / 100
+        Math.round(currentDocs.reduce((sum, doc) => sum + Number(doc.net_total ?? doc.subtotal ?? 0), 0) * 100) / 100
 
       await Promise.all([
         supabase
@@ -126,7 +126,7 @@ export async function POST(req: Request) {
           dateTo: prevDateTo,
         })
         prevTotal =
-          Math.round(prevDocs.reduce((sum, doc) => sum + Number(doc.total ?? 0), 0) * 100) / 100
+          Math.round(prevDocs.reduce((sum, doc) => sum + Number(doc.net_total ?? doc.subtotal ?? 0), 0) * 100) / 100
 
         await supabase
           .from("monthly_snapshots")
