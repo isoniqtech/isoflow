@@ -54,15 +54,23 @@ export async function POST(req: Request) {
       const total = docs.reduce((sum, doc) => sum + Number(doc.total ?? 0), 0)
       const rounded = Math.round(total * 100) / 100
 
-      await supabase
-        .from("tenants")
-        .update({
-          toconline_revenue_total: rounded,
-          toconline_revenue_month: month,
-          toconline_revenue_year: year,
-          toconline_revenue_cached_at: now.toISOString(),
-        })
-        .eq("id", integration.tenant_id)
+      await Promise.all([
+        supabase
+          .from("tenants")
+          .update({
+            toconline_revenue_total: rounded,
+            toconline_revenue_month: month,
+            toconline_revenue_year: year,
+            toconline_revenue_cached_at: now.toISOString(),
+          })
+          .eq("id", integration.tenant_id),
+        supabase
+          .from("monthly_snapshots")
+          .upsert(
+            { tenant_id: integration.tenant_id, month, year, revenue: rounded, saved_at: now.toISOString() },
+            { onConflict: "tenant_id,month,year" },
+          ),
+      ])
 
       results.push({ tenant_id: integration.tenant_id, total: rounded })
     } catch (e) {
