@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowRight, Check, FileText, Landmark, Loader2 } from "lucide-react"
+import { Check, FileText, Landmark, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -90,7 +90,7 @@ export function SplitView({
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-3 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">
         {/* Invoices */}
         <Card>
           <CardContent className="p-3 space-y-2">
@@ -152,8 +152,6 @@ export function SplitView({
             )}
           </CardContent>
         </Card>
-
-        <ArrowRight className="hidden lg:block h-5 w-5 text-muted-foreground self-start mt-32" />
 
         {/* Bank tx */}
         <Card>
