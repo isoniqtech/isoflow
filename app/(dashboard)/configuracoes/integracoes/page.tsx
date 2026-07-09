@@ -166,6 +166,9 @@ export default async function IntegracoesPage() {
         subdomain:
           ((tcDirectRow.config as Record<string, unknown> | null)?.subdomain as string | null) ??
           null,
+        historico_importado_at:
+          ((tcDirectRow.config as Record<string, unknown> | null)?.historico_importado_at as string | null) ??
+          null,
         is_active: tcDirectRow.is_active ?? false,
         last_sync_at: tcDirectRow.last_sync_at,
         sync_error: tcDirectRow.sync_error,

@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  History,
   Loader2,
   Settings2,
   Trash2,
@@ -35,6 +36,7 @@ type DirectConfig = {
   has_refresh_token: boolean
   token_expires_at: string | null
   subdomain: string | null
+  historico_importado_at: string | null
   is_active: boolean
   last_sync_at: string | null
   sync_error: string | null
@@ -58,12 +60,43 @@ export function ToconlineDirectCard({
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [importingHistory, setImportingHistory] = useState(false)
+  const [historicoImportadoAt, setHistoricoImportadoAt] = useState(
+    initial?.historico_importado_at ?? null,
+  )
 
   const [clientId, setClientId] = useState(initial?.client_id ?? "")
   const [clientSecret, setClientSecret] = useState("")
   const [accessToken, setAccessToken] = useState("")
   const [refreshToken, setRefreshToken] = useState("")
   const [subdomain, setSubdomain] = useState(initial?.subdomain ?? "")
+
+  async function handleImportHistory() {
+    if (
+      !confirm(
+        "Importar receita e gastos de Jan/2025 ao mes atual?\n\nIsso substitui os valores ja existentes. Pode demorar ate 2 minutos.",
+      )
+    )
+      return
+    setImportingHistory(true)
+    try {
+      const res = await fetch("/api/integracoes/toconline/import-historico", { method: "POST" })
+      const body = await res.json()
+      if (res.ok && body.ok) {
+        setHistoricoImportadoAt(body.imported_at)
+        toast.success("Historico importado", {
+          description: `${body.months_processed} meses processados${body.errors?.length ? ` - ${body.errors.length} erros` : ""}`,
+        })
+        router.refresh()
+      } else {
+        toast.error("Falha na importacao", { description: body.error ?? `HTTP ${res.status}` })
+      }
+    } catch (e) {
+      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setImportingHistory(false)
+    }
+  }
 
   async function handleModeChange(newMode: IntegrationMode) {
     if (newMode === mode) return
@@ -362,30 +395,55 @@ export function ToconlineDirectCard({
 
         {/* Acoes (modo direto configurado) */}
         {mode === "toconline_direct" && !showForm && canEdit && (
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t">
-            {initial?.configured && initial.is_active && (
-              <Button variant="ghost" size="sm" onClick={handleRemove} disabled={removing}>
-                {removing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                )}
-                Desligar
-              </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t">
+            {/* Info historico */}
+            {initial?.configured && initial.is_active && historicoImportadoAt && (
+              <p className="text-xs text-muted-foreground">
+                Historico importado em {formatDate(historicoImportadoAt)}
+              </p>
             )}
-            {initial?.configured && initial.is_active && (
-              <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-                {syncing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Settings2 className="mr-2 h-4 w-4" />
-                )}
-                Sincronizar agora
+            {!(initial?.configured && initial.is_active && historicoImportadoAt) && <span />}
+
+            <div className="flex flex-wrap items-center gap-2">
+              {initial?.configured && initial.is_active && (
+                <Button variant="ghost" size="sm" onClick={handleRemove} disabled={removing}>
+                  {removing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Desligar
+                </Button>
+              )}
+              {initial?.configured && initial.is_active && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImportHistory}
+                  disabled={importingHistory}
+                >
+                  {importingHistory ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <History className="mr-2 h-4 w-4" />
+                  )}
+                  {importingHistory ? "A importar..." : "Importar historico"}
+                </Button>
+              )}
+              {initial?.configured && initial.is_active && (
+                <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+                  {syncing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Settings2 className="mr-2 h-4 w-4" />
+                  )}
+                  Sincronizar agora
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
+                {initial?.configured ? "Atualizar credenciais" : "Configurar"}
               </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
-              {initial?.configured ? "Atualizar credenciais" : "Configurar"}
-            </Button>
+            </div>
           </div>
         )}
       </CardContent>
