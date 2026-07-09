@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
-import { ANTHROPIC_SUPPORTED_MODELS } from "@/lib/claude/extract-invoice"
+import { ANTHROPIC_SUPPORTED_MODELS } from "@/lib/claude/models"
 
 type AiConfig = {
   configured: boolean
