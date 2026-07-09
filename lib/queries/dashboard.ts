@@ -354,13 +354,20 @@ function buildAnnualChart(
     ebitda: 0,
   }))
 
-  // Fill revenue from snapshots where available (current year only)
+  // Fill revenue from snapshots where available
   if (displayYear === currentYear) {
     for (let m = 1; m <= 12; m++) {
       if (m < currentMonth && snapshotRevenue.has(m)) {
         result[m - 1].revenue = snapshotRevenue.get(m)!
       } else if (m === currentMonth && mode === "mensal") {
         result[m - 1].revenue = periodRevenue
+      }
+    }
+  } else {
+    // Anos anteriores: snapshots primeiro (receita TOConline/n8n), faturas outgoing como fallback
+    for (let m = 1; m <= 12; m++) {
+      if (snapshotRevenue.has(m)) {
+        result[m - 1].revenue = snapshotRevenue.get(m)!
       }
     }
   }
@@ -375,8 +382,10 @@ function buildAnnualChart(
       result[m - 1].expenses += amount
     } else if (row.type === "outgoing") {
       if (displayYear !== currentYear) {
-        // Anos anteriores: receita sempre das faturas
-        result[m - 1].revenue += amount
+        // Anos anteriores sem snapshot: fallback para faturas (evita dupla contagem com snapshots)
+        if (!snapshotRevenue.has(m)) {
+          result[m - 1].revenue += amount
+        }
       } else if (!snapshotRevenue.has(m) && !(m === currentMonth && mode === "mensal")) {
         // Ano atual sem snapshot: fallback para faturas (evita dupla contagem com periodRevenue)
         result[m - 1].revenue += amount
