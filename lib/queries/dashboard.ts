@@ -274,10 +274,10 @@ export async function getDashboardData(
     vat_estimate: vatEstimate,
   }
 
-  // Se a cache do tenant corresponde a um ano anterior ao corrente, injeta no snapshotMap
-  // para que o grafico possa mostrar a receita (a cache pode ter dados que monthly_snapshots nao tem)
+  // Injeta cache do tenant no snapshotMap quando monthly_snapshots nao tem o mes em questao.
+  // Aplica para anos anteriores E para o ano corrente (meses passados + mes atual).
+  // Garante que a receita do ERP aparece no grafico mesmo sem snapshot persistente.
   if (
-    year !== currentYear &&
     cachedRevenue?.toconline_revenue_year === year &&
     cachedRevenue?.toconline_revenue_month != null &&
     cachedRevenue?.toconline_revenue_total != null &&
@@ -372,9 +372,11 @@ function buildAnnualChart(
   // Fill revenue from snapshots where available
   if (displayYear === currentYear) {
     for (let m = 1; m <= 12; m++) {
-      if (m < currentMonth && snapshotRevenue.has(m)) {
+      if (snapshotRevenue.has(m) && m <= currentMonth) {
+        // Usa snapshot se disponivel (inclui cache injetado para meses passados e atual)
         result[m - 1].revenue = snapshotRevenue.get(m)!
-      } else if (m === currentMonth && mode === "mensal") {
+      } else if (m === currentMonth && mode === "mensal" && !snapshotRevenue.has(m)) {
+        // Fallback para periodRevenue no mes atual apenas se nao ha snapshot
         result[m - 1].revenue = periodRevenue
       }
     }
