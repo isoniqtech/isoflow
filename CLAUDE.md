@@ -65,7 +65,7 @@ GitHub: https://github.com/isoniqtech/isoflow (controlo de versões obrigatório
 | WhatsApp | Twilio WhatsApp Business API | Webhook inbound |
 | Email | Resend inbound + webhooks | Email inbound |
 | Open Banking | Salt Edge API | Movimentos bancários PT |
-| Pagamentos | Stripe subscriptions | Planos + créditos |
+| Pagamentos | Stripe subscriptions | Planos |
 | Deploy | Vercel | CI/CD automático |
 | Linguagem | TypeScript strict | Sem any, sem ts-ignore |
 | Estilos | Tailwind CSS | Utility-first |
@@ -113,7 +113,7 @@ isoflow/
 │   │       ├── page.tsx                  # Empresa + branding
 │   │       ├── integracoes/page.tsx      # ERP, banco, WhatsApp
 │   │       ├── utilizadores/page.tsx     # Equipa + roles
-│   │       └── plano/page.tsx            # Subscrição + créditos
+│   │       └── plano/page.tsx            # Subscrição
 │   │
 │   ├── (admin)/                          # Super-admin ISONIQ TECH
 │   │   ├── layout.tsx
@@ -755,6 +755,57 @@ await sendBudgetAlertEmail(project, percentage, totalSpent)
 
 ---
 
+## 🎨 Design System - FINMED x Isoniq
+
+### Temas registados (next-themes, attribute="class")
+- `finmed-light` - claro de marca, **default global** para quem nao tem preferencia guardada
+- `finmed-dark` - escuro de marca
+- `light`, `dark`, `studio`, `studio-dark` - temas genericos mantidos
+
+`defaultTheme="finmed-light"`, `enableSystem={false}`. Utilizadores com tema explicitamente guardado mantem o que escolheram.
+
+### Tokens de marca (definidos em `.finmed-light` e `.finmed-dark`)
+```
+--forest:#344E0D  --forest-deep:#223608  --forest-lt:#4E7217
+--lime:#90C765    --mint:#62C099         --teal:#3DAEAF
+--petrol:#1D8192  --abyss:#0D4961
+--spectrum: linear-gradient(100deg,#90C765,#62C099 38%,#3DAEAF 70%,#1D8192)
+--spectrum-text: (claro) linear-gradient(100deg,#4E7217,#2E9E8C 55%,#1D8192)
+--spectrum-text: (escuro) = --spectrum
+```
+
+**Regra absoluta:** componentes consomem SEMPRE tokens semanticos (`--background`, `--foreground`, `--primary`, etc.), NUNCA hex direto. Os tokens de marca so existem nos blocos `.finmed-*` em `globals.css`.
+
+### Tokens semanticos - mapeamento finmed-light
+`--background` = bg (#F5F8EF) | `--foreground` = text (#141F0A) | `--card` = surface (#FFF)
+`--primary` = forest (#344E0D) | `--primary-foreground` = branco | `--muted` = surface-2 (#EDF2E4)
+`--border` = line (#E1E8D5) | `--ring` = teal (#3DAEAF)
+
+### Parcimonia do gradiente espetro
+Usar `--spectrum` / `--spectrum-text` / classe `.spectrum-text` APENAS em:
+- 1 palavra-chave do h1 (`.spectrum-text` em `<span>`)
+- Botao CTA primario (via `.btn-glow` no hover)
+- Linha divisoria decorativa
+- Glow do product shot
+
+Tudo o resto em neutros. Verde-floresta (`--primary`) ancora superficies serias.
+Nunca usar gradiente em paragrafo, label, icone ou card inteiro.
+
+### Tipografia
+- **Display:** Space Grotesk via `--font-display` → classe Tailwind `font-display`
+  - Titulos h1/h2: `font-display font-semibold tracking-[-0.03em]`
+  - Numeros/stats: `font-display font-semibold tracking-[-0.02em]`
+- **Body:** Inter via `--font-inter` → `font-sans` (default do body)
+- Sentence case. Pesos: 400/500/600.
+
+### Movimento
+- Entrar em vista: `animate-in fade-in slide-in-from-bottom-4` (tailwindcss-animate)
+- Hover cards: `hover:-translate-y-0.5` ou `hover:-translate-y-1`
+- Sempre com `motion-reduce:animate-none` para respeitar preferencia do SO
+- Regra global `@media (prefers-reduced-motion: reduce)` em `globals.css`
+
+---
+
 ## 🎨 Branding por Tenant
 
 ```typescript// Supabase Storage bucket: tenant-assets (público)
@@ -779,23 +830,20 @@ return (
 
 ---
 
-## 💳 Planos e CréditosPLANOS:
-starter    → 79€/mês  → 500 créditos  → 50 fat/mês  → 5 proj  → 1 banco  → 2 users
-business   → 179€/mês → 1500 créditos → 200 fat/mês → 20 proj → 3 bancos → 5 users
-pro        → 349€/mês → 5000 créditos → ilimitado   → ilimit  → ilimit   → 15 users
-enterprise → 599€+/mês → custom       → ilimitado   → ilimit  → ilimit   → ilimitadoCUSTO POR AÇÃO (créditos):
-processar fatura com IA    → 1
-sincronizar banco          → 1
-enviar para ERP            → 1
-comunicar AT               → 1
-abrir ticket normal        → 5
-abrir ticket urgente       → 10PACKS AVULSO:
-500 créditos   → 29€
-1500 créditos  → 79€
-5000 créditos  → 199€ALERTAS:
-30% créditos restantes → email aviso
-10% créditos restantes → email urgente + notificação in-app
-0 créditos             → bloquear ações + email + notificação in-app
+## 💳 Planos
+
+PLANOS:
+starter    → 49€/mês  → 5 proj  → 3 bancos  → 3 users  → 1 GB
+business   → 89€/mês  → ilimit  → ilimit    → 15 users → 5 GB
+investor   → 129€/mês → ilimit  → ilimit    → 50 users → 15 GB
+enterprise → custom   → ilimit  → ilimit    → custom   → custom
+
+Todos os planos incluem: WhatsApp + Email, conciliação bancária, comunicação AT, integração ERP, suporte por ticket.
+O plano investor adiciona suporte assistido.
+O plano enterprise inclui SLA dedicado e integração à medida.
+
+Nota: o campo plan na tabela tenants aceita 'starter'|'business'|'pro'|'enterprise'.
+O id 'pro' corresponde ao plano "Investor" na UI.
 
 ---
 

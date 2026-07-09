@@ -1,7 +1,7 @@
 "use client"
 
 import { useTheme } from "next-themes"
-import { Monitor, Moon, Sparkles, Sun } from "lucide-react"
+import { Leaf, Monitor, Moon, Sparkles, Sun } from "lucide-react"
 import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -14,13 +14,22 @@ export function ThemeRadioGroup() {
 
   return (
     <>
-      <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        Padrão
-      </DropdownMenuLabel>
       <DropdownMenuRadioGroup
-        value={theme ?? "system"}
+        value={theme ?? "finmed-light"}
         onValueChange={(v) => setTheme(v)}
       >
+        <DropdownMenuRadioItem value="finmed-light" className="cursor-pointer">
+          <Leaf className="mr-2 h-4 w-4 text-emerald-600" />
+          Bosque (claro)
+        </DropdownMenuRadioItem>
+        <DropdownMenuRadioItem value="finmed-dark" className="cursor-pointer">
+          <Leaf className="mr-2 h-4 w-4 text-emerald-400" />
+          Bosque (escuro)
+        </DropdownMenuRadioItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          Padrão
+        </DropdownMenuLabel>
         <DropdownMenuRadioItem value="light" className="cursor-pointer">
           <Sun className="mr-2 h-4 w-4" />
           Claro
@@ -40,11 +49,6 @@ export function ThemeRadioGroup() {
         <DropdownMenuRadioItem value="studio-dark" className="cursor-pointer">
           <Sparkles className="mr-2 h-4 w-4" />
           Studio (escuro)
-        </DropdownMenuRadioItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuRadioItem value="system" className="cursor-pointer">
-          <Monitor className="mr-2 h-4 w-4" />
-          Sistema
         </DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
     </>

@@ -4,9 +4,9 @@ import { RegisterForm } from "./register-form"
 
 export default function RegisterPage() {
   return (
-    <Card>
+    <Card className="shadow-[var(--shadow-card,none)] border-border/60">
       <CardHeader>
-        <CardTitle>Criar conta</CardTitle>
+        <CardTitle className="font-display">Criar conta</CardTitle>
         <CardDescription>
           Começa o teu trial gratuito de 14 dias
         </CardDescription>

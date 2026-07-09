@@ -90,7 +90,7 @@ export default async function FaturasPage({
       <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8 space-y-4 max-w-7xl mx-auto w-full">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Faturas</h1>
+            <h1 className="text-2xl font-display font-semibold tracking-tight">Faturas</h1>
             <p className="text-muted-foreground text-sm">
               {total.toLocaleString("pt-PT")} {total === 1 ? "fatura" : "faturas"}
             </p>

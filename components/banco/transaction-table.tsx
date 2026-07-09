@@ -150,7 +150,7 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
 
   if (rows.length === 0) {
     return (
-      <div className="border rounded-lg p-12 flex flex-col items-center text-center bg-background">
+      <div className="border border-border/60 rounded-lg p-12 flex flex-col items-center text-center bg-card shadow-[var(--shadow-card,none)]">
         <Landmark className="h-10 w-10 text-muted-foreground mb-3" />
         <h2 className="font-semibold mb-1">Sem movimentos para mostrar</h2>
         <p className="text-sm text-muted-foreground max-w-md">
@@ -166,7 +166,7 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
       <div className="flex-shrink-0 flex flex-wrap items-center gap-2 pb-3">
         {/* Year */}
         <Select value={filterYear} onValueChange={setFilterYear} disabled={hasDateRangeFilter}>
-          <SelectTrigger className="h-8 w-24 text-xs">
+          <SelectTrigger className="h-8 w-24 text-xs bg-card shadow-sm">
             <SelectValue placeholder="Ano" />
           </SelectTrigger>
           <SelectContent>
@@ -178,7 +178,7 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
 
         {/* Month */}
         <Select value={filterMonth} onValueChange={setFilterMonth} disabled={hasDateRangeFilter}>
-          <SelectTrigger className="h-8 w-32 text-xs">
+          <SelectTrigger className="h-8 w-32 text-xs bg-card shadow-sm">
             <SelectValue placeholder="Mês" />
           </SelectTrigger>
           <SelectContent>
@@ -194,7 +194,7 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
           type="date"
           value={filterFrom}
           onChange={(e) => setFilterFrom(e.target.value)}
-          className="h-8 w-36 text-xs"
+          className="h-8 w-36 text-xs bg-card shadow-sm"
           aria-label="De"
           placeholder="De"
         />
@@ -202,14 +202,14 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
           type="date"
           value={filterTo}
           onChange={(e) => setFilterTo(e.target.value)}
-          className="h-8 w-36 text-xs"
+          className="h-8 w-36 text-xs bg-card shadow-sm"
           aria-label="Até"
           placeholder="Até"
         />
 
         {/* Status */}
         <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger className="h-8 w-36 text-xs bg-card shadow-sm">
             <SelectValue placeholder="Estado" />
           </SelectTrigger>
           <SelectContent>
@@ -233,13 +233,13 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
 
       {/* ── Table — só o tbody faz scroll ── */}
       {filtered.length === 0 ? (
-        <div className="flex-1 border rounded-lg p-8 flex flex-col items-center text-center bg-background">
+        <div className="flex-1 border border-border/60 rounded-lg p-8 flex flex-col items-center text-center bg-card shadow-[var(--shadow-card,none)]">
           <p className="text-sm text-muted-foreground">Sem movimentos para os filtros selecionados.</p>
         </div>
       ) : (
-        <div className="flex-1 min-h-0 rounded-lg border bg-background overflow-auto">
+        <div className="flex-1 min-h-0 rounded-lg border border-border/60 bg-card overflow-auto shadow-[var(--shadow-card,none)]">
           <table className="w-full caption-bottom text-sm">
-            <TableHeader className="sticky top-0 z-10 bg-background">
+            <TableHeader className="sticky top-0 z-10 bg-muted">
               <TableRow>
                 <TableHead className="w-10" />
                 <TableHead

@@ -57,7 +57,7 @@ export default async function ProjetosPage({
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Projetos</h1>
+          <h1 className="text-2xl font-display font-semibold tracking-tight">Projetos</h1>
           <p className="text-muted-foreground text-sm">
             {projects.length}{" "}
             {projects.length === 1 ? "projeto" : "projetos"}
@@ -107,7 +107,7 @@ export default async function ProjetosPage({
 
 function EmptyState({ canCreate }: { canCreate: boolean }) {
   return (
-    <div className="border rounded-lg p-12 flex flex-col items-center text-center bg-background">
+    <div className="border border-border/60 rounded-lg p-12 flex flex-col items-center text-center bg-card shadow-[var(--shadow-card,none)]">
       <FolderPlus className="h-10 w-10 text-muted-foreground mb-3" />
       <h2 className="font-semibold mb-1">Sem projetos por aqui</h2>
       <p className="text-sm text-muted-foreground mb-4 max-w-md">

@@ -42,13 +42,15 @@ export function BudgetProgress({
       )}
       <div className="h-1.5 rounded-full bg-muted overflow-hidden">
         <div
-          className={cn(
-            "h-full transition-all",
-            overBudget && "bg-destructive",
-            warning && "bg-amber-500",
-            !overBudget && !warning && "bg-foreground",
-          )}
-          style={{ width: `${pct}%` }}
+          className="h-full rounded-full transition-all"
+          style={{
+            width: `${pct}%`,
+            background: overBudget
+              ? "linear-gradient(90deg, #F87171, #EF4444)"
+              : warning
+                ? "linear-gradient(90deg, #FBBF24, #F59E0B)"
+                : "linear-gradient(90deg, #4E7217, #3DAEAF)",
+          }}
         />
       </div>
       {compact && (

@@ -5,9 +5,9 @@ import { LoginForm } from "./login-form"
 
 export default function LoginPage() {
   return (
-    <Card>
+    <Card className="shadow-[var(--shadow-card,none)] border-border/60">
       <CardHeader>
-        <CardTitle>Entrar</CardTitle>
+        <CardTitle className="font-display">Entrar</CardTitle>
         <CardDescription>Acede à tua conta ISOFlow</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

@@ -69,7 +69,7 @@ export function InvoiceFilters({
       data-pending={isPending || undefined}
     >
       <Select value={value.status} onValueChange={(v) => setParam("status", v)}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-[140px] bg-card shadow-sm">
           <SelectValue placeholder="Estado" />
         </SelectTrigger>
         <SelectContent>
@@ -86,7 +86,7 @@ export function InvoiceFilters({
         value={value.project_id}
         onValueChange={(v) => setParam("project", v)}
       >
-        <SelectTrigger className="w-[180px]">
+        <SelectTrigger className="w-[180px] bg-card shadow-sm">
           <SelectValue placeholder="Projeto" />
         </SelectTrigger>
         <SelectContent>
@@ -101,7 +101,7 @@ export function InvoiceFilters({
       </Select>
 
       <Select value={value.source} onValueChange={(v) => setParam("source", v)}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-[140px] bg-card shadow-sm">
           <SelectValue placeholder="Origem" />
         </SelectTrigger>
         <SelectContent>
@@ -118,14 +118,14 @@ export function InvoiceFilters({
         type="date"
         value={value.date_from}
         onChange={(e) => setParam("from", e.target.value)}
-        className="w-[150px]"
+        className="w-[150px] bg-card shadow-sm"
         aria-label="Data início"
       />
       <Input
         type="date"
         value={value.date_to}
         onChange={(e) => setParam("to", e.target.value)}
-        className="w-[150px]"
+        className="w-[150px] bg-card shadow-sm"
         aria-label="Data fim"
       />
 

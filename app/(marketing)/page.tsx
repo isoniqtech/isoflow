@@ -79,47 +79,46 @@ const STEPS = [
 const PLANS = [
   {
     name: "Starter",
-    price: "79",
+    price: "49",
     description: "Para pequenas empresas a começar.",
     features: [
-      "50 faturas / mês",
       "5 projetos",
-      "1 conta bancária",
-      "2 utilizadores",
-      "500 créditos IA / mês",
-      "Suporte por email",
+      "3 contas bancárias",
+      "3 utilizadores",
+      "WhatsApp + Email",
+      "Conciliação bancária",
+      "Até 1 GB de espaço",
+      "Comunicação AT",
+      "Integração ERP",
+      "Suporte por ticket",
     ],
     highlighted: false,
     cta: "Pedir demonstração",
   },
   {
     name: "Business",
-    price: "179",
+    price: "89",
     description: "O mais escolhido por PMEs em crescimento.",
     features: [
-      "200 faturas / mês",
-      "20 projetos",
-      "3 contas bancárias",
-      "5 utilizadores",
-      "1.500 créditos IA / mês",
-      "Integração ERP incluída",
-      "Suporte prioritário",
+      "Tudo do Starter",
+      "Projetos ilimitados",
+      "Bancos ilimitados",
+      "Até 15 utilizadores",
+      "Até 5 GB de espaço",
+      "Suporte por ticket",
     ],
     highlighted: true,
     cta: "Pedir demonstração",
   },
   {
-    name: "Pro",
-    price: "349",
-    description: "Faturas e projetos sem limites.",
+    name: "Investor",
+    price: "129",
+    description: "Para empresas e grupos em crescimento.",
     features: [
-      "Faturas ilimitadas",
-      "Projetos ilimitados",
-      "Contas bancárias ilimitadas",
-      "15 utilizadores",
-      "5.000 créditos IA / mês",
-      "Integração ERP incluída",
-      "Suporte dedicado",
+      "Tudo do Business",
+      "Até 50 utilizadores",
+      "Até 15 GB de espaço",
+      "Suporte assistido",
     ],
     highlighted: false,
     cta: "Pedir demonstração",
@@ -132,36 +131,39 @@ export default function LandingPage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/50 to-background dark:from-blue-950/20 dark:to-background pt-20 pb-24 px-4 sm:px-6">
+      <section className="relative overflow-hidden bg-gradient-to-b from-secondary/30 to-background pt-20 pb-24 px-4 sm:px-6">
         <div className="max-w-4xl mx-auto text-center">
-          <Badge variant="outline" className="mb-6 text-blue-700 border-blue-200 bg-blue-50 dark:text-blue-300 dark:border-blue-800 dark:bg-blue-950/50 animate-in fade-in duration-500">
+          <Badge
+            variant="outline"
+            className="mb-6 border-border text-muted-foreground animate-in fade-in duration-500 motion-reduce:animate-none"
+          >
             Desenvolvido em Portugal, para empresas portuguesas
           </Badge>
-          <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground mb-6 leading-tight animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-semibold tracking-[-0.03em] text-foreground mb-6 leading-tight animate-in fade-in slide-in-from-bottom-4 duration-700 motion-reduce:animate-none">
             Faturas e projetos{" "}
-            <span className="text-blue-600 dark:text-blue-400">sob controlo.</span>
+            <span className="spectrum-text">sob controlo.</span>
             <br />
             Automaticamente.
           </h1>
-          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150">
+          <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 motion-reduce:animate-none">
             Recebe faturas por WhatsApp ou email. A IA extrai os dados, associa ao projeto certo e concilia com o banco.
             Tu só confirmas.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300 motion-reduce:animate-none">
             <Button
               size="lg"
-              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:shadow-lg active:scale-95"
+              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 btn-glow active:scale-95"
               asChild
             >
               <a href="#contacto">
                 Pedir demonstração
-                <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </Button>
             <Button
               size="lg"
               variant="outline"
-              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-950/30 dark:hover:border-blue-700 dark:hover:text-blue-300 active:scale-95"
+              className="text-base px-8 transition-all duration-200 hover:scale-105 hover:-translate-y-0.5 hover:bg-secondary active:scale-95"
               asChild
             >
               <a href="#precos">Ver preços</a>
@@ -170,14 +172,14 @@ export default function LandingPage() {
         </div>
 
         {/* Stats strip */}
-        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-4 sm:gap-8 text-center animate-in fade-in duration-1000 delay-500">
+        <div className="max-w-3xl mx-auto mt-20 grid grid-cols-3 gap-4 sm:gap-8 text-center animate-in fade-in duration-1000 delay-500 motion-reduce:animate-none">
           {[
             { value: "< 5s", label: "por fatura processada" },
             { value: "+95%", label: "de precisão na extração" },
             { value: "0", label: "digitação manual necessária" },
           ].map((stat) => (
             <div key={stat.label}>
-              <p className="text-2xl sm:text-3xl font-bold text-foreground">{stat.value}</p>
+              <p className="font-display text-2xl sm:text-3xl font-semibold tracking-[-0.02em] text-foreground">{stat.value}</p>
               <p className="text-xs sm:text-sm text-muted-foreground mt-1">{stat.label}</p>
             </div>
           ))}
@@ -188,7 +190,7 @@ export default function LandingPage() {
       <section id="funcionalidades" className="py-20 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mb-4">
               Tudo o que precisas numa só plataforma
             </h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -202,13 +204,16 @@ export default function LandingPage() {
               return (
                 <Card
                   key={feature.title}
-                  className="border bg-card transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-800 cursor-default"
+                  className="border-border/60 bg-card shadow-[var(--shadow-card,none)] transition-all duration-200 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30 cursor-default"
                 >
                   <CardHeader className="pb-3">
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center mb-3 transition-colors duration-200 group-hover:bg-blue-200">
-                      <Icon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <div
+                      className="h-10 w-10 rounded-lg flex items-center justify-center mb-3"
+                      style={{ background: "linear-gradient(135deg, #4E7217, #3DAEAF)" }}
+                    >
+                      <Icon className="h-5 w-5 text-white" />
                     </div>
-                    <CardTitle className="text-base">{feature.title}</CardTitle>
+                    <CardTitle className="font-display text-base">{feature.title}</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm text-muted-foreground leading-relaxed">{feature.description}</p>
@@ -224,7 +229,7 @@ export default function LandingPage() {
       <section id="como-funciona" className="py-20 px-4 sm:px-6 bg-muted/30">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mb-4">
               Como funciona
             </h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -236,14 +241,14 @@ export default function LandingPage() {
             {STEPS.map((step, i) => (
               <div key={step.number} className="relative flex flex-col items-center text-center md:items-start md:text-left group">
                 <div className="flex items-center gap-4 mb-4">
-                  <span className="text-4xl font-black text-blue-600/20 dark:text-blue-400/20 leading-none transition-colors duration-200 group-hover:text-blue-600/40 dark:group-hover:text-blue-400/40">
+                  <span className="text-4xl font-black text-primary/15 leading-none transition-colors duration-200 group-hover:text-primary/30">
                     {step.number}
                   </span>
                   {i < STEPS.length - 1 && (
                     <div className="hidden md:block absolute left-1/2 top-5 w-full h-px bg-border" />
                   )}
                 </div>
-                <h3 className="text-lg font-semibold mb-2">{step.title}</h3>
+                <h3 className="font-display text-lg font-semibold mb-2">{step.title}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">{step.description}</p>
               </div>
             ))}
@@ -255,7 +260,7 @@ export default function LandingPage() {
       <section id="precos" className="py-20 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
-            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+            <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mb-4">
               Preços simples e transparentes
             </h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
@@ -269,22 +274,26 @@ export default function LandingPage() {
                 key={plan.name}
                 className={
                   plan.highlighted
-                    ? "border-2 border-blue-600 dark:border-blue-400 shadow-lg relative transition-all duration-200 hover:shadow-xl hover:-translate-y-1"
-                    : "border transition-all duration-200 hover:shadow-md hover:-translate-y-1 hover:border-blue-200 dark:hover:border-blue-800"
+                    ? "border-2 border-primary shadow-[var(--shadow-card,none)] relative transition-all duration-200 hover:shadow-xl hover:-translate-y-1"
+                    : "border-border/60 shadow-[var(--shadow-card,none)] transition-all duration-200 hover:shadow-md hover:-translate-y-1 hover:border-primary/30"
+                }
+                style={plan.highlighted
+                  ? { background: "linear-gradient(160deg, hsl(var(--card)) 0%, rgba(61,174,175,0.06) 100%)" }
+                  : undefined
                 }
               >
                 {plan.highlighted && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="bg-blue-600 text-white hover:bg-blue-600 text-xs px-3">
+                    <Badge className="bg-primary text-primary-foreground hover:bg-primary text-xs px-3">
                       Mais popular
                     </Badge>
                   </div>
                 )}
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg">{plan.name}</CardTitle>
+                  <CardTitle className="font-display text-lg">{plan.name}</CardTitle>
                   <p className="text-sm text-muted-foreground">{plan.description}</p>
                   <div className="flex items-baseline gap-1 mt-2">
-                    <span className="text-4xl font-bold">{plan.price}€</span>
+                    <span className="font-display text-4xl font-semibold">{plan.price}€</span>
                     <span className="text-muted-foreground text-sm">/mês</span>
                   </div>
                 </CardHeader>
@@ -310,18 +319,18 @@ export default function LandingPage() {
           </div>
 
           {/* Enterprise */}
-          <Card className="border bg-muted/30 transition-all duration-200 hover:shadow-md">
+          <Card className="border-border/60 bg-muted/30 shadow-[var(--shadow-card,none)] transition-all duration-200 hover:shadow-md">
             <CardContent className="py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div>
-                <p className="font-semibold">Enterprise</p>
+                <p className="font-display font-semibold">Enterprise</p>
                 <p className="text-sm text-muted-foreground mt-0.5">
-                  Utilizadores ilimitados, créditos personalizados, SLA dedicado e integração à medida.
-                  A partir de 599€/mês.
+                  Tudo do Investor, utilizadores e espaço personalizados, SLA dedicado e integração à medida.
+                  Preço personalizado.
                 </p>
               </div>
               <Button
                 variant="outline"
-                className="shrink-0 transition-all duration-200 hover:scale-105 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-950/30 active:scale-95"
+                className="shrink-0 transition-all duration-200 hover:scale-105 hover:bg-primary/10 hover:border-primary/40 hover:text-primary active:scale-95"
                 asChild
               >
                 <a href={`mailto:${CONTACT_EMAIL}`}>Falar com vendas</a>
@@ -341,7 +350,7 @@ export default function LandingPage() {
               { icon: Landmark, text: "Preparado para e-Fatura e AT" },
             ].map(({ icon: Icon, text }) => (
               <div key={text} className="flex items-center gap-2 transition-colors duration-200 hover:text-foreground">
-                <Icon className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                <Icon className="h-4 w-4 shrink-0 text-[#3DAEAF]" />
                 <span>{text}</span>
               </div>
             ))}
@@ -352,7 +361,7 @@ export default function LandingPage() {
       {/* Contact / CTA */}
       <section id="contacto" className="py-24 px-4 sm:px-6">
         <div className="max-w-xl mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold tracking-tight mb-4">
+          <h2 className="font-display text-3xl sm:text-4xl font-semibold tracking-tight mb-4">
             Pronto para começar?
           </h2>
           <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
@@ -360,17 +369,20 @@ export default function LandingPage() {
             configuração, integração e formação incluídas na implementação.
           </p>
 
-          <Card className="border bg-card text-left">
+          <Card className="border-border/60 bg-card shadow-[var(--shadow-card,none)] text-left">
             <CardContent className="pt-6 space-y-4">
               <div className="flex items-start gap-4">
-                <div className="h-9 w-9 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
-                  <MessageCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <div
+                  className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: "linear-gradient(135deg, #4E7217, #3DAEAF)" }}
+                >
+                  <MessageCircle className="h-4 w-4 text-white" />
                 </div>
                 <div>
                   <p className="text-sm font-medium">Email</p>
                   <a
                     href={`mailto:${CONTACT_EMAIL}`}
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                    className="text-sm text-[#3DAEAF] hover:underline"
                   >
                     {CONTACT_EMAIL}
                   </a>
@@ -385,7 +397,7 @@ export default function LandingPage() {
               </p>
 
               <Button
-                className="w-full transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-95"
+                className="w-full transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-95 btn-glow"
                 size="lg"
                 asChild
               >
@@ -396,7 +408,7 @@ export default function LandingPage() {
               </Button>
 
               <Button
-                className="w-full transition-all duration-200 hover:scale-[1.02] hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 dark:hover:bg-blue-950/30 active:scale-95"
+                className="w-full transition-all duration-200 hover:scale-[1.02] hover:bg-primary/10 hover:border-primary/40 hover:text-primary active:scale-95"
                 variant="outline"
                 size="lg"
                 asChild

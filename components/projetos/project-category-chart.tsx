@@ -11,15 +11,28 @@ import {
 import { formatCurrency } from "@/lib/utils/portugal"
 import type { CategorySlice } from "@/lib/queries/project-detail"
 
+// Paleta alinhada com o espetro de marca: forest-lt, teal, lime, mint, petrol, abyss, ambar, forest
 const PALETTE = [
-  "hsl(217 91% 60%)",
-  "hsl(160 84% 39%)",
-  "hsl(38 92% 50%)",
-  "hsl(0 84% 60%)",
-  "hsl(280 90% 55%)",
-  "hsl(190 80% 45%)",
-  "hsl(20 90% 55%)",
-  "hsl(110 60% 45%)",
+  "#3DAEAF", // teal
+  "#90C765", // lime
+  "#1D8192", // petrol
+  "#62C099", // mint
+  "#4E7217", // forest-lt
+  "#FBBF24", // ambar (contraste quente)
+  "#0D4961", // abyss
+  "#344E0D", // forest
+]
+
+// Gradientes SVG por indice de slice (máximo 8 categorias)
+const GRADIENTS = [
+  { from: "#3DAEAF", to: "#1D8192" }, // teal -> petrol
+  { from: "#90C765", to: "#62C099" }, // lime -> mint
+  { from: "#1D8192", to: "#0D4961" }, // petrol -> abyss
+  { from: "#62C099", to: "#3DAEAF" }, // mint -> teal
+  { from: "#4E7217", to: "#3DAEAF" }, // forest-lt -> teal
+  { from: "#FBBF24", to: "#F59E0B" }, // ambar
+  { from: "#0D4961", to: "#1D8192" }, // abyss -> petrol
+  { from: "#344E0D", to: "#4E7217" }, // forest -> forest-lt
 ]
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -47,9 +60,9 @@ export function ProjectCategoryChart({ data }: { data: CategorySlice[] }) {
   }, {})
 
   return (
-    <Card>
+    <Card className="shadow-[var(--shadow-card,none)] border-border/60">
       <CardHeader>
-        <CardTitle className="text-sm font-medium">Distribuição por categoria</CardTitle>
+        <CardTitle className="font-display text-sm font-medium">Distribuição por categoria</CardTitle>
         <CardDescription>{formatCurrency(total)} no total</CardDescription>
       </CardHeader>
       <CardContent>
@@ -61,6 +74,14 @@ export function ProjectCategoryChart({ data }: { data: CategorySlice[] }) {
           <>
             <ChartContainer config={config} className="h-56 w-full">
               <PieChart>
+                <defs>
+                  {GRADIENTS.map((g, i) => (
+                    <radialGradient key={i} id={`gradSlice${i}`} cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor={g.from} stopOpacity={1} />
+                      <stop offset="100%" stopColor={g.to} stopOpacity={0.85} />
+                    </radialGradient>
+                  ))}
+                </defs>
                 <ChartTooltip
                   content={
                     <ChartTooltipContent
@@ -85,7 +106,12 @@ export function ProjectCategoryChart({ data }: { data: CategorySlice[] }) {
                   paddingAngle={2}
                 >
                   {data.map((slice, i) => (
-                    <Cell key={slice.category} fill={PALETTE[i % PALETTE.length]} />
+                    <Cell
+                      key={slice.category}
+                      fill={`url(#gradSlice${i % GRADIENTS.length})`}
+                      stroke="hsl(var(--card))"
+                      strokeWidth={1.5}
+                    />
                   ))}
                 </Pie>
               </PieChart>
@@ -95,7 +121,7 @@ export function ProjectCategoryChart({ data }: { data: CategorySlice[] }) {
                 <li key={slice.category} className="flex items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 rounded-sm shrink-0"
-                    style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
+                    style={{ background: `linear-gradient(135deg, ${GRADIENTS[i % GRADIENTS.length].from}, ${GRADIENTS[i % GRADIENTS.length].to})` }}
                   />
                   <span className="flex-1 truncate">
                     {CATEGORY_LABELS[slice.category] ?? slice.category}

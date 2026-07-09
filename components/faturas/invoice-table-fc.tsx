@@ -141,7 +141,7 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
         </div>
       )}
       {invoices.length === 0 ? (
-        <div className="flex-1 border rounded-lg p-12 flex flex-col items-center text-center bg-background">
+        <div className="flex-1 border border-border/60 rounded-lg p-12 flex flex-col items-center text-center bg-card shadow-[var(--shadow-card,none)]">
           <FileText className="h-10 w-10 text-muted-foreground mb-3" />
           <h2 className="font-semibold mb-1">Sem faturas para mostrar</h2>
           <p className="text-sm text-muted-foreground max-w-md">
@@ -162,9 +162,9 @@ export function InvoiceTableFC({ invoices }: { invoices: InvoiceListItem[] }) {
           </div>
 
           {/* Tabela — thead sticky, tbody scrollável */}
-          <div className="flex-1 min-h-0 rounded-lg border bg-background overflow-auto">
+          <div className="flex-1 min-h-0 rounded-lg border border-border/60 bg-card overflow-auto shadow-[var(--shadow-card,none)]">
             <table className="w-full caption-bottom text-sm">
-              <TableHeader className="sticky top-0 z-10 bg-background">
+              <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
               <TableHead className="w-10">
                 {eligible.length > 0 && (

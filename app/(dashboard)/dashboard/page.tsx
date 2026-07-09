@@ -74,7 +74,7 @@ export default async function DashboardPage({
     <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-display font-semibold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground text-sm">
             Olá, {session.user.name.split(" ")[0]}. Resumo do {periodLabel}.
           </p>
@@ -90,18 +90,21 @@ export default async function DashboardPage({
               value={formatCurrency(data.kpis.revenue)}
               icon={TrendingUp}
               hint={data.kpis.revenue_source === "toconline" ? "Fonte: ERP · sem IVA" : "Faturas emitidas · sem IVA"}
+              variant="revenue"
             />
             <KpiCard
               label="Gastos"
               value={formatCurrency(data.kpis.expenses)}
               icon={TrendingDown}
               hint="Faturas recebidas · sem IVA"
+              variant="expense"
             />
             <KpiCard
               label="EBITDA"
               value={ebitdaLabel}
               icon={Activity}
               hint={`${data.kpis.ebitda_pct >= 0 ? "+" : ""}${data.kpis.ebitda_pct}% da receita`}
+              variant={data.kpis.ebitda >= 0 ? "ebitda-pos" : "ebitda-neg"}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -110,18 +113,21 @@ export default async function DashboardPage({
               value={`${data.kpis.bank_pending_pct}%`}
               icon={Banknote}
               hint={`${data.kpis.bank_pending_count} de ${data.kpis.bank_total_count} mov. no período`}
+              variant="neutral"
             />
             <KpiCard
               label="e-Fatura pendentes"
               value={`${data.kpis.efatura_pending_pct}%`}
               icon={Receipt}
               hint={`${data.kpis.efatura_pending_count} de ${data.kpis.efatura_total_count} docs AT`}
+              variant="neutral"
             />
             <KpiCard
               label={`Estimativa IVA (${vatDirection})`}
               value={formatCurrency(Math.abs(data.kpis.vat_estimate))}
               icon={Calculator}
               hint={`Prazo: ${vatDeadlineLabel}`}
+              variant="neutral"
             />
           </div>
         </div>

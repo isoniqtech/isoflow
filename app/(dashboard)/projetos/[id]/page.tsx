@@ -135,7 +135,7 @@ export default async function ProjetoDetailPage({
                 className="h-3 w-3 rounded-full shrink-0"
                 style={{ backgroundColor: project.color }}
               />
-              <h1 className="text-2xl font-semibold tracking-tight truncate">
+              <h1 className="text-2xl font-display font-semibold tracking-tight truncate">
                 {project.name}
               </h1>
               <Badge variant="outline" className={status.className}>
@@ -222,7 +222,7 @@ export default async function ProjetoDetailPage({
       </div>
 
       {project.budget !== null && (
-        <div className="rounded-lg border bg-background p-4">
+        <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Progresso do orçamento</span>
             {overBudget && (
