@@ -169,8 +169,8 @@ export async function getDashboardData(
   const periodList = periodInvoices ?? []
   const invoicesThisPeriod = periodList.length
 
-  // Expenses without VAT: use subtotal for incoming
-  const expensesRaw = periodList
+  // Expenses without VAT: use subtotal for incoming (fallback quando nao ha snapshot)
+  const expensesFromInvoices = periodList
     .filter((i) => i.type === "incoming")
     .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
 
@@ -186,7 +186,37 @@ export async function getDashboardData(
   )
 
   let revenueRaw = 0
+  let expensesRaw = 0
   let useToconlineCache = false
+
+  // Calcular gastos por período - snapshots primeiro, faturas incoming como fallback
+  if (mode === "mensal") {
+    expensesRaw = snapshotExpenses.get(month) ?? expensesFromInvoices
+  } else if (mode === "trimestral") {
+    const startM = (quarter - 1) * 3 + 1
+    for (let m = startM; m <= startM + 2; m++) {
+      if (snapshotExpenses.has(m)) {
+        expensesRaw += snapshotExpenses.get(m) ?? 0
+      } else {
+        const ms = `${year}-${String(m).padStart(2, "0")}`
+        expensesRaw += periodList
+          .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
+          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+      }
+    }
+  } else {
+    // Acumulado
+    for (let m = 1; m <= 12; m++) {
+      if (snapshotExpenses.has(m)) {
+        expensesRaw += snapshotExpenses.get(m) ?? 0
+      } else {
+        const ms = `${year}-${String(m).padStart(2, "0")}`
+        expensesRaw += periodList
+          .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
+          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+      }
+    }
+  }
 
   if (mode === "mensal") {
     // Mensal: cache TOConline se for o mês corrente, senão snapshot, senão faturas
