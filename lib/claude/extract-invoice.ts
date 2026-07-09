@@ -1,7 +1,64 @@
 import Anthropic from "@anthropic-ai/sdk"
 import sharp from "sharp"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { decryptOptional } from "@/lib/utils/encryption"
 
-const CLAUDE_MODEL = "claude-sonnet-4-6"
+const CLAUDE_DEFAULT_MODEL = "claude-sonnet-4-6"
+
+// Allow-list de modelos disponiveis por tenant (nao texto livre)
+export const ANTHROPIC_SUPPORTED_MODELS = [
+  { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (plataforma)" },
+  { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5 (rapido)" },
+  { id: "claude-opus-4-8", label: "Claude Opus 4.8 (avancado)" },
+  { id: "claude-sonnet-5", label: "Claude Sonnet 5 (mais recente)" },
+] as const
+
+export type AnthropicModelId = (typeof ANTHROPIC_SUPPORTED_MODELS)[number]["id"]
+
+export interface AnthropicConfig {
+  apiKey: string
+  model: string
+}
+
+/**
+ * Resolve a config Anthropic para um tenant.
+ * Se o tenant tiver chave propria configurada em tenant_integrations
+ * (type='ai', provider='anthropic'), usa essa chave e o modelo configurado.
+ * Caso contrario, usa a chave da plataforma e o modelo default.
+ * A chave nunca e devolvida ao browser - este metodo e server-only.
+ */
+export async function resolveAnthropicConfig(
+  tenantId: string,
+  supabase: SupabaseClient,
+): Promise<AnthropicConfig> {
+  const platformKey = process.env.ANTHROPIC_API_KEY ?? ""
+  const platformModel = CLAUDE_DEFAULT_MODEL
+
+  try {
+    const { data } = await supabase
+      .from("tenant_integrations")
+      .select("api_key_encrypted, config")
+      .eq("tenant_id", tenantId)
+      .eq("type", "ai")
+      .eq("provider", "anthropic")
+      .eq("is_active", true)
+      .maybeSingle()
+
+    if (!data) return { apiKey: platformKey, model: platformModel }
+
+    const keyDecrypted = decryptOptional(data.api_key_encrypted)
+    const config = (data.config ?? {}) as { model?: string }
+    const model =
+      ANTHROPIC_SUPPORTED_MODELS.find((m) => m.id === config.model)?.id ?? platformModel
+
+    return {
+      apiKey: keyDecrypted ?? platformKey,
+      model,
+    }
+  } catch {
+    return { apiKey: platformKey, model: platformModel }
+  }
+}
 
 /**
  * Claude API rejeita imagens > 5MB base64. Damos uma margem de segurança.
@@ -88,12 +145,19 @@ Regras estritas:
 - invoice_date e due_date no formato YYYY-MM-DD.
 - currency sempre "EUR".`
 
-function getClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+function getClient(config?: AnthropicConfig): Anthropic {
+  const apiKey = config?.apiKey ?? process.env.ANTHROPIC_API_KEY
   if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY não configurada no servidor")
+    throw new Error("ANTHROPIC_API_KEY nao configurada no servidor")
   }
   return new Anthropic({ apiKey })
+}
+
+function resolveModel(config?: AnthropicConfig): string {
+  if (config?.model) {
+    return ANTHROPIC_SUPPORTED_MODELS.find((m) => m.id === config.model)?.id ?? CLAUDE_DEFAULT_MODEL
+  }
+  return CLAUDE_DEFAULT_MODEL
 }
 
 function normaliseMediaType(fileType: InvoiceFileType): {
@@ -193,8 +257,9 @@ async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
 export async function extractInvoiceData(
   fileBase64: string,
   fileType: InvoiceFileType,
+  config?: AnthropicConfig,
 ): Promise<InvoiceExtraction> {
-  const client = getClient()
+  const client = getClient(config)
   const { isImage, mediaType } = normaliseMediaType(fileType)
 
   type ContentBlock =
@@ -234,7 +299,7 @@ export async function extractInvoiceData(
 
   const response = await withRetry(() =>
     client.messages.create({
-      model: CLAUDE_MODEL,
+      model: resolveModel(config),
       max_tokens: 2000,
       messages: [{ role: "user", content }],
     }),
@@ -254,11 +319,12 @@ export async function extractInvoiceData(
  */
 export async function extractInvoiceFromText(
   text: string,
+  config?: AnthropicConfig,
 ): Promise<InvoiceExtraction> {
-  const client = getClient()
+  const client = getClient(config)
   const response = await withRetry(() =>
     client.messages.create({
-      model: CLAUDE_MODEL,
+      model: resolveModel(config),
       max_tokens: 2000,
       messages: [
         {

@@ -41,7 +41,9 @@ export interface ProjetoInvestidor {
   created_at: string
 }
 
-export type IntegrationType = "erp" | "banking" | "whatsapp" | "email"
+export type IntegrationType = "erp" | "banking" | "whatsapp" | "email" | "ai"
+
+export type IntegrationMode = "n8n" | "toconline_direct"
 
 export type ProjectType =
   | "obra"
@@ -128,6 +130,12 @@ export interface Tenant {
   billing_cycle: BillingCycle
   internal_notes: string | null
   next_billing_date: string | null
+  integration_mode: IntegrationMode
+  toconline_revenue_total: number | null
+  toconline_revenue_month: number | null
+  toconline_revenue_year: number | null
+  toconline_revenue_cached_at: string | null
+  auto_erp_send: boolean
   created_at: string
   updated_at: string
 }
@@ -156,6 +164,10 @@ export interface TenantIntegration {
   is_active: boolean
   last_sync_at: string | null
   sync_error: string | null
+  sync_locked_until: string | null
+  toconline_client_id: string | null
+  toconline_client_secret_encrypted: string | null
+  toconline_token_expires_at: string | null
   created_at: string
   updated_at: string
 }

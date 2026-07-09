@@ -6,6 +6,7 @@ export interface TOCOnlineDocument {
   date: string
   document_number: string
   total: number
+  net_total?: number
   subtotal: number
   vat_total: number
   communication_status?: string
@@ -16,6 +17,41 @@ export interface TOCOnlineDocument {
 }
 
 type DateFilters = { dateFrom?: string; dateTo?: string }
+
+// ---------------------------------------------------------------------------
+// URL builders - subdominio dinamico por tenant
+// app{N} = UI/auth/alguns endpoints de listagem
+// api{N} = endpoints REST principais
+// ---------------------------------------------------------------------------
+
+export function buildAppUrl(subdomain: string | number, path: string): string {
+  return `https://app${subdomain}.toconline.pt${path}`
+}
+
+export function buildApiUrl(subdomain: string | number, path: string): string {
+  return `https://api${subdomain}.toconline.pt${path}`
+}
+
+// Retorna a base URL da app a partir da config do tenant.
+// Aceita subdomain (novo) ou base_url (legado). Preferencia ao subdomain.
+export function resolveBaseUrl(config: Record<string, unknown>): {
+  appBase: string
+  apiBase: string
+} {
+  const subdomain = config.subdomain as string | number | undefined
+  if (subdomain) {
+    return {
+      appBase: `https://app${subdomain}.toconline.pt`,
+      apiBase: `https://api${subdomain}.toconline.pt`,
+    }
+  }
+  const base = (config.base_url as string | undefined) ?? "https://app.toconline.pt"
+  return { appBase: base, apiBase: base }
+}
+
+// ---------------------------------------------------------------------------
+// Fetch interno
+// ---------------------------------------------------------------------------
 
 async function fetchDocuments(
   accessToken: string,
@@ -68,6 +104,85 @@ export async function fetchSalesDocuments(
   )
 }
 
+// ---------------------------------------------------------------------------
+// e-Fatura list - endpoint especifico com filtros encodeados em duplas aspas.
+// Resposta vem como string JSON aninhada em .data que precisa de JSON.parse.
+// ---------------------------------------------------------------------------
+
+export interface EFaturaItem {
+  id: number
+  document_type: string
+  document_number: string
+  date: string
+  total: number
+  net_total?: number
+  communication_status?: string
+  supplier_tax_registration_number?: string
+  supplier_business_name?: string
+  toconline_fc_id?: string
+  external_reference?: string
+}
+
+export async function fetchEFaturaList(
+  accessToken: string,
+  appBase: string,
+  filter?: string,
+): Promise<EFaturaItem[]> {
+  const url = new URL(
+    `${appBase.replace(/\/$/, "")}/api/commercial_purchases_documents_list_for_invoices`,
+  )
+  if (filter) {
+    url.searchParams.set("filter", filter)
+  }
+
+  const res = await fetch(url.toString(), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`TOConline e-fatura list error ${res.status}: ${await res.text()}`)
+  }
+
+  const body = await res.json()
+
+  // Resposta pode vir como string JSON aninhada conforme observado nos workflows n8n
+  let items: unknown = body
+  if (typeof body?.data === "string") {
+    try {
+      const parsed = JSON.parse(body.data)
+      items = parsed?.data ?? parsed
+    } catch {
+      items = []
+    }
+  } else if (body?.data !== undefined) {
+    items = body.data
+  }
+
+  const arr = Array.isArray(items) ? items : []
+  return arr.map((item: Record<string, unknown>) => {
+    const attrs = (item.attributes ?? item) as Record<string, unknown>
+    return {
+      id: Number(attrs.id ?? item.id ?? 0),
+      document_type: String(attrs.document_type ?? ""),
+      document_number: String(attrs.document_number ?? attrs.searchable_document_no ?? ""),
+      date: String(attrs.date ?? ""),
+      total: Number(attrs.total ?? 0),
+      net_total: attrs.net_total !== undefined ? Number(attrs.net_total) : undefined,
+      communication_status: attrs.communication_status as string | undefined,
+      supplier_tax_registration_number: attrs.supplier_tax_registration_number as string | undefined,
+      supplier_business_name: attrs.supplier_business_name as string | undefined,
+      external_reference: attrs.external_reference as string | undefined,
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// AT communication
+// ---------------------------------------------------------------------------
+
 export async function sendDocumentToAT(
   accessToken: string,
   baseUrl: string,
@@ -90,6 +205,10 @@ export async function sendDocumentToAT(
     throw new Error(`TOConline AT error ${res.status}: ${await res.text()}`)
   }
 }
+
+// ---------------------------------------------------------------------------
+// Mapping
+// ---------------------------------------------------------------------------
 
 export function mapTOCDocumentToInvoice(
   doc: TOCOnlineDocument,

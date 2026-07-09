@@ -12,6 +12,8 @@ import {
 import {
   extractInvoiceData,
   extractInvoiceFromText,
+  resolveAnthropicConfig,
+  type AnthropicConfig,
   type InvoiceExtraction,
   type InvoiceFileType,
 } from "@/lib/claude/extract-invoice"
@@ -132,7 +134,7 @@ export async function processEmailInvoice(
     return { ...result, skipped: true, reason: "already_processed" }
   }
 
-  // 2. Carregar tenant
+  // 2. Carregar tenant + config AI (resolve antes do loop para nao fazer N queries)
   const { data: tenant } = await supabase
     .from("tenants")
     .select("app_name, name, auto_erp_send")
@@ -140,6 +142,14 @@ export async function processEmailInvoice(
     .maybeSingle()
   if (!tenant) {
     return { ...result, skipped: true, reason: "tenant_not_found" }
+  }
+
+  // Config AI do tenant (1 query, reutilizada por todos os anexos do email)
+  let aiConfig: AnthropicConfig | undefined
+  try {
+    aiConfig = await resolveAnthropicConfig(tenantId, supabase)
+  } catch {
+    aiConfig = undefined
   }
 
   // 3. Extrair anexos
@@ -261,9 +271,9 @@ export async function processEmailInvoice(
             })
             continue
           }
-          extraction = await extractInvoiceData(item.base64, ft)
+          extraction = await extractInvoiceData(item.base64, ft, aiConfig)
         } else {
-          extraction = await extractInvoiceFromText(item.html)
+          extraction = await extractInvoiceFromText(item.html, aiConfig)
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)

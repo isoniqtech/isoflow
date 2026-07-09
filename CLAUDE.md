@@ -1124,3 +1124,71 @@ types/index.ts + status-badge.tsx + invoice-filters.tsx - em simultâneo
 TASK 2 completa
 TASK 1
 TASK 3
+---
+
+## Implementação: TOConline Direto + IA por Tenant (Jul 2026)
+
+### Contexto
+App em PRODUÇÃO com tenant FINMED a usar n8n. Todas as alterações são ADITIVAS.
+O caminho n8n fica byte-a-byte idêntico ao original. Nunca tocado, nunca refatorado.
+
+### Critério de pronto
+Um tenant sem a nova config continua a ir por n8n, com a chave da plataforma,
+sem qualquer ação. O DEFAULT 'n8n' na coluna integration_mode garante isto.
+
+### Migração adicionada
+**supabase/migrations/037_direct_mode_config.sql** - ADITIVA:
+- `tenants.integration_mode text DEFAULT 'n8n' CHECK (IN ('n8n','toconline_direct'))`
+- `tenant_integrations.toconline_client_id text` (nullable)
+- `tenant_integrations.toconline_client_secret_encrypted text` (nullable)
+- `tenant_integrations.toconline_token_expires_at timestamptz` (nullable)
+- Index em token_expires_at para crons de refresh
+
+Correr PRIMEIRO em dev (Supabase dashboard org "isoflow DEV"), depois em prod.
+
+### Ficheiros criados / modificados
+
+| Ficheiro | Estado | Notas |
+|---|---|---|
+| `supabase/migrations/037_direct_mode_config.sql` | NOVO | Ver secção migração |
+| `types/index.ts` | MODIFICADO | IntegrationMode, IntegrationType inclui 'ai', campos novos em Tenant/TenantIntegration |
+| `types/supabase.ts` | MODIFICADO | Colunas novas em tenant_integrations + integration_mode em tenants (Row/Insert/Update) |
+| `lib/integrations/toconline.ts` | MODIFICADO | buildAppUrl/buildApiUrl, fetchEFaturaList, EFaturaItem, net_total |
+| `lib/toconline/token.ts` | NOVO | getValidToken, saveInitialCredentials - EXCLUSIVO modo direto |
+| `lib/toconline/fc.ts` | NOVO | createDirectFC com dedup idêntico ao n8n |
+| `lib/claude/extract-invoice.ts` | MODIFICADO | resolveAnthropicConfig, ANTHROPIC_SUPPORTED_MODELS, config opcional |
+| `app/api/faturas/process/route.ts` | MODIFICADO | Passa aiConfig a extractInvoiceData |
+| `lib/email/process-email.ts` | MODIFICADO | Resolve aiConfig por tenant (fallback silencioso) |
+| `app/api/faturas/create-fc/route.ts` | MODIFICADO | Ramifica n8n vs toconline_direct; n8n intocado |
+| `app/api/integracoes/ai/route.ts` | NOVO | GET/POST/DELETE chave Anthropic por tenant |
+| `app/api/integracoes/erp/mode/route.ts` | NOVO | POST muda integration_mode do tenant |
+| `app/api/integracoes/toconline/direct/route.ts` | NOVO | GET/POST/DELETE credenciais TOConline Direct |
+| `components/configuracoes/toconline-direct-card.tsx` | NOVO | Seletor de modo + form credenciais OAuth |
+| `components/configuracoes/ai-integration-card.tsx` | NOVO | Chave Anthropic por tenant com validação |
+| `app/(dashboard)/configuracoes/integracoes/page.tsx` | MODIFICADO | Carrega integration_mode, rende novos cards |
+
+### Arquitetura do token OAuth TOConline (modo direto)
+- Token guardado em `api_key_encrypted` (access) e `api_secret_encrypted` (refresh)
+- `toconline_token_expires_at` - timestamp absoluto; renova 60s antes de expirar
+- Refresh: `POST {appBase}/oauth/token` com `Authorization: Basic base64(id:secret)`
+- TOConline pode rodar o refresh_token: o retornado é sempre persistido
+- Falha de refresh: grava `sync_error` na row + insere em `audit_logs` com action `toconline_token_refresh_failed`
+
+### Dedup FC (modo direto, replicado de n8n)
+`lib/toconline/fc.ts` replica o filtro exato do n8n:
+- `external_reference ILIKE '%<NUMBER>%' OR searchable_document_no ILIKE '%<NUMBER>%'`
+- `document_type IN ('FC','DSP','NCF','NDF','NLDF','NLCF','SIF','FCA')`
+- Idempotente: se já existe, devolve o fc_number sem criar
+
+### IA por tenant
+- Linha em `tenant_integrations` com `type='ai', provider='anthropic'`
+- `api_key_encrypted` = chave Anthropic; `config.model` = modelo escolhido
+- `resolveAnthropicConfig(tenantId, supabase)` - fallback para chave da plataforma se não configurado
+- Validação antes de guardar: `client.models.list({limit:1})` - distingue 401 (inválida) de 429 (rate limit)
+- Segurança: chave nunca devolvida ao browser
+
+### Regras absolutas para futuras alterações
+- Nunca modificar a lógica do bloco n8n em `app/api/faturas/create-fc/route.ts`
+- `lib/toconline/token.ts` é EXCLUSIVO do modo direto - nunca chamar no caminho n8n
+- Colunas novas em `tenant_integrations` são nullable - nunca adicionar NOT NULL sem DEFAULT
+- O bloco `.finmed-*` em `globals.css` é a única fonte dos tokens de marca
