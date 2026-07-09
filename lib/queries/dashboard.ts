@@ -147,7 +147,7 @@ export async function getDashboardData(
     // Monthly snapshots for past months
     supabase
       .from("monthly_snapshots")
-      .select("month, revenue")
+      .select("month, revenue, expenses")
       .eq("tenant_id", tenantId)
       .eq("year", year),
     // Bank transactions do período: total e pendentes de conciliação
@@ -178,6 +178,11 @@ export async function getDashboardData(
   const cachedRevenue = tenantCache
   const snapshotMap = new Map<number, number>(
     (snapshotRows ?? []).map((s) => [s.month, Number(s.revenue)]),
+  )
+  const snapshotExpenses = new Map<number, number>(
+    (snapshotRows ?? [])
+      .filter((s) => s.expenses != null && Number(s.expenses) > 0)
+      .map((s) => [s.month, Number(s.expenses)]),
   )
 
   let revenueRaw = 0
@@ -298,6 +303,7 @@ export async function getDashboardData(
     month,
     annualRows ?? [],
     snapshotMap,
+    snapshotExpenses,
     revenueRaw,
   )
 
@@ -358,6 +364,7 @@ function buildAnnualChart(
   selectedMonth: number,
   invoiceRows: Array<{ invoice_date: string | null; total: number | null; subtotal: number | null; type: string | null }>,
   snapshotRevenue: Map<number, number>,
+  snapshotExpensesMap: Map<number, number>,
   periodRevenue: number,
 ): ChartPoint[] {
   const result: ChartPoint[] = Array.from({ length: 12 }, (_, i) => ({
@@ -389,14 +396,24 @@ function buildAnnualChart(
     }
   }
 
-  // Fill expenses and outgoing revenue from invoice rows (without VAT = subtotal)
+  // Fill snapshot expenses first (dados TOConline via n8n - mais fiáveis que faturas)
+  for (let m = 1; m <= 12; m++) {
+    if (snapshotExpensesMap.has(m)) {
+      result[m - 1].expenses = snapshotExpensesMap.get(m)!
+    }
+  }
+
+  // Fill remaining revenue/expenses from invoice rows (without VAT = subtotal)
   for (const row of invoiceRows) {
     if (!row.invoice_date) continue
     const m = parseInt(row.invoice_date.slice(5, 7), 10)
     if (m < 1 || m > 12) continue
     const amount = Number(row.subtotal ?? row.total ?? 0)
     if (row.type === "incoming") {
-      result[m - 1].expenses += amount
+      // Só usa faturas se não há snapshot de gastos para este mês
+      if (!snapshotExpensesMap.has(m)) {
+        result[m - 1].expenses += amount
+      }
     } else if (row.type === "outgoing") {
       if (displayYear !== currentYear) {
         // Anos anteriores sem snapshot: fallback para faturas (evita dupla contagem com snapshots)
