@@ -274,6 +274,21 @@ export async function getDashboardData(
     vat_estimate: vatEstimate,
   }
 
+  // Se a cache do tenant corresponde a um ano anterior ao corrente, injeta no snapshotMap
+  // para que o grafico possa mostrar a receita (a cache pode ter dados que monthly_snapshots nao tem)
+  if (
+    year !== currentYear &&
+    cachedRevenue?.toconline_revenue_year === year &&
+    cachedRevenue?.toconline_revenue_month != null &&
+    cachedRevenue?.toconline_revenue_total != null &&
+    !snapshotMap.has(Number(cachedRevenue.toconline_revenue_month))
+  ) {
+    snapshotMap.set(
+      Number(cachedRevenue.toconline_revenue_month),
+      Number(cachedRevenue.toconline_revenue_total),
+    )
+  }
+
   // Chart: always annual, always without VAT
   const chart = buildAnnualChart(
     currentMonth,
