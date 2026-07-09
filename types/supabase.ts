@@ -893,6 +893,9 @@ export type Database = {
           sync_error: string | null
           sync_locked_until: string | null
           tenant_id: string
+          toconline_client_id: string | null
+          toconline_client_secret_encrypted: string | null
+          toconline_token_expires_at: string | null
           type: string
           updated_at: string | null
         }
@@ -908,6 +911,9 @@ export type Database = {
           sync_error?: string | null
           sync_locked_until?: string | null
           tenant_id: string
+          toconline_client_id?: string | null
+          toconline_client_secret_encrypted?: string | null
+          toconline_token_expires_at?: string | null
           type: string
           updated_at?: string | null
         }
@@ -923,6 +929,9 @@ export type Database = {
           sync_error?: string | null
           sync_locked_until?: string | null
           tenant_id?: string
+          toconline_client_id?: string | null
+          toconline_client_secret_encrypted?: string | null
+          toconline_token_expires_at?: string | null
           type?: string
           updated_at?: string | null
         }
@@ -948,6 +957,7 @@ export type Database = {
           email: string | null
           favicon_path: string | null
           id: string
+          integration_mode: string
           internal_notes: string | null
           logo_path: string | null
           logo_url: string | null
@@ -976,6 +986,7 @@ export type Database = {
           email?: string | null
           favicon_path?: string | null
           id?: string
+          integration_mode?: string
           internal_notes?: string | null
           logo_path?: string | null
           logo_url?: string | null
@@ -1004,6 +1015,7 @@ export type Database = {
           email?: string | null
           favicon_path?: string | null
           id?: string
+          integration_mode?: string
           internal_notes?: string | null
           logo_path?: string | null
           logo_url?: string | null

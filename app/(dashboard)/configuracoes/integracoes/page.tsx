@@ -7,11 +7,13 @@ import { EmailIntegrationCard } from "@/components/configuracoes/email-integrati
 import { ErpIntegrationCard } from "@/components/configuracoes/erp-integration-card"
 import { WhatsAppIntegrationCard } from "@/components/configuracoes/whatsapp-integration-card"
 import { BankAccountsCard } from "@/components/configuracoes/bank-accounts-card"
+import { ToconlineDirectCard } from "@/components/configuracoes/toconline-direct-card"
+import { AiIntegrationCard } from "@/components/configuracoes/ai-integration-card"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { createClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
-import type { IntegrationType } from "@/types"
+import type { IntegrationType, IntegrationMode } from "@/types"
 import type { BankAccountConfig } from "@/app/api/integracoes/banco/route"
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -85,7 +87,7 @@ export default async function IntegracoesPage() {
 
   const canEditWhatsapp = hasPermission(session.role, "integracoes", "edit")
 
-  // WhatsApp - load full row to get encrypted credentials flag and phone number
+  // WhatsApp
   const { data: waFullRow } = await supabase
     .from("tenant_integrations")
     .select("is_active, api_key_encrypted, config")
@@ -99,7 +101,7 @@ export default async function IntegracoesPage() {
   const whatsappPhoneNumber =
     ((waFullRow?.config as Record<string, unknown> | null)?.phone_number as string | null) ?? null
 
-  // ERP/n8n integration — load full record (config) to populate form.
+  // ERP n8n
   const erpRow = byType.get("erp")
   type ErpConfigType = { url?: string }
   let erpInitial: {
@@ -114,6 +116,7 @@ export default async function IntegracoesPage() {
     const { data: row } = await supabase
       .from("tenant_integrations")
       .select("id, config, is_active, last_sync_at, sync_error, api_key_encrypted")
+      .eq("tenant_id", session.tenant.id)
       .eq("type", "erp")
       .eq("provider", "n8n")
       .maybeSingle()
@@ -131,7 +134,65 @@ export default async function IntegracoesPage() {
   }
   const canEditErp = hasPermission(session.role, "integracoes", "edit")
 
-  // Email IMAP integration — load full record (config) to populate form.
+  // Modo de integracao ERP do tenant
+  const { data: tenantRow } = await supabase
+    .from("tenants")
+    .select("integration_mode")
+    .eq("id", session.tenant.id)
+    .maybeSingle()
+  const integrationMode: IntegrationMode =
+    ((tenantRow as { integration_mode?: string } | null)?.integration_mode as IntegrationMode) ??
+    "n8n"
+
+  // TOConline Direct
+  const { data: tcDirectRow } = await supabase
+    .from("tenant_integrations")
+    .select(
+      "toconline_client_id, toconline_client_secret_encrypted, api_key_encrypted, api_secret_encrypted, toconline_token_expires_at, config, is_active, last_sync_at, sync_error",
+    )
+    .eq("tenant_id", session.tenant.id)
+    .eq("type", "erp")
+    .eq("provider", "toconline")
+    .maybeSingle()
+
+  const tcDirectConfig = tcDirectRow
+    ? {
+        configured: true,
+        client_id: tcDirectRow.toconline_client_id ?? null,
+        has_client_secret: Boolean(tcDirectRow.toconline_client_secret_encrypted),
+        has_access_token: Boolean(tcDirectRow.api_key_encrypted),
+        has_refresh_token: Boolean(tcDirectRow.api_secret_encrypted),
+        token_expires_at: tcDirectRow.toconline_token_expires_at ?? null,
+        subdomain:
+          ((tcDirectRow.config as Record<string, unknown> | null)?.subdomain as string | null) ??
+          null,
+        is_active: tcDirectRow.is_active ?? false,
+        last_sync_at: tcDirectRow.last_sync_at,
+        sync_error: tcDirectRow.sync_error,
+      }
+    : null
+
+  // AI Anthropic por tenant
+  const { data: aiRow } = await supabase
+    .from("tenant_integrations")
+    .select("api_key_encrypted, config, is_active, last_sync_at, sync_error")
+    .eq("tenant_id", session.tenant.id)
+    .eq("type", "ai")
+    .eq("provider", "anthropic")
+    .maybeSingle()
+
+  const aiConfig = aiRow
+    ? {
+        configured: true,
+        has_key: Boolean(aiRow.api_key_encrypted),
+        model: ((aiRow.config as Record<string, unknown> | null)?.model as string | null) ?? null,
+        is_active: aiRow.is_active ?? false,
+        last_sync_at: aiRow.last_sync_at,
+        sync_error: aiRow.sync_error,
+      }
+    : null
+
+  // Email IMAP
   const emailRow = byType.get("email")
   type EmailConfig = {
     provider: "gmail" | "outlook" | "imap"
@@ -177,12 +238,12 @@ export default async function IntegracoesPage() {
   }
   const canEditEmail = hasPermission(session.role, "integracoes", "edit")
 
-  // Contas bancárias manuais
+  // Contas bancarias manuais
   const bankingRow = byType.get("banking")
   const bankAccounts: BankAccountConfig[] = Array.isArray(
     (bankingRow?.config as Record<string, unknown> | null | undefined)?.accounts,
   )
-    ? ((bankingRow!.config as { accounts: BankAccountConfig[] }).accounts)
+    ? (bankingRow!.config as { accounts: BankAccountConfig[] }).accounts
     : []
   const canEditBanking = hasPermission(session.role, "integracoes", "edit")
 
@@ -198,18 +259,26 @@ export default async function IntegracoesPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Configurações
+          Configuracoes
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Integracoes</h1>
         <p className="text-muted-foreground text-sm">
-          Liga ERPs, banco e canais de receção de faturas. Configurações
-          completas vão sendo ativadas à medida que adicionas as chaves no
+          Liga ERPs, banco e canais de rececao de faturas. Configuracoes
+          completas vao sendo ativadas a medida que adicionas as chaves no
           servidor.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="space-y-3">
+        {/* ERP - modo n8n (card original intocado quando modo = n8n) */}
         <ErpIntegrationCard initial={erpInitial} canEdit={canEditErp} />
+
+        {/* ERP - modo direto TOConline (seletor de modo + credenciais) */}
+        <ToconlineDirectCard
+          initial={tcDirectConfig}
+          integrationMode={integrationMode}
+          canEdit={canEditErp}
+        />
 
         <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
 
@@ -219,15 +288,12 @@ export default async function IntegracoesPage() {
           phoneNumber={whatsappPhoneNumber}
           canEdit={canEditWhatsapp}
         />
-        <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
-      </div>
 
-      <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-        Estes cards mostram o estado guardado em <code className="text-xs">tenant_integrations</code>.
-        À medida que ativarmos cada integração, o botão fica funcional e o
-        estado passa a refletir a ligação real.
+        <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
+
+        {/* IA - chave Anthropic por tenant */}
+        <AiIntegrationCard initial={aiConfig} canEdit={canEditErp} />
       </div>
     </div>
   )
 }
-

@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server"
 import { getApiContext } from "@/lib/api/auth"
-import { extractInvoiceData, type InvoiceFileType } from "@/lib/claude/extract-invoice"
+import {
+  extractInvoiceData,
+  resolveAnthropicConfig,
+  type InvoiceFileType,
+} from "@/lib/claude/extract-invoice"
 
 const ALLOWED_TYPES: Record<string, InvoiceFileType> = {
   "application/pdf": "pdf",
@@ -49,7 +53,8 @@ export async function POST(req: Request) {
 
   const fileBase64 = buffer.toString("base64")
   try {
-    const extraction = await extractInvoiceData(fileBase64, fileType)
+    const aiConfig = await resolveAnthropicConfig(ctx.tenantId, supabase)
+    const extraction = await extractInvoiceData(fileBase64, fileType, aiConfig)
 
     return NextResponse.json({ extraction, file_path: filePath, file_name: file.name, file_type: fileType })
   } catch (err) {
