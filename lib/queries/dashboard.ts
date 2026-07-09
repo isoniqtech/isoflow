@@ -189,32 +189,26 @@ export async function getDashboardData(
   let expensesRaw = 0
   let useToconlineCache = false
 
-  // Calcular gastos por período - snapshots primeiro, faturas incoming como fallback
+  // Gastos = snapshot TOConline + faturas incoming na app (soma das duas fontes)
   if (mode === "mensal") {
-    expensesRaw = snapshotExpenses.get(month) ?? expensesFromInvoices
+    expensesRaw = (snapshotExpenses.get(month) ?? 0) + expensesFromInvoices
   } else if (mode === "trimestral") {
     const startM = (quarter - 1) * 3 + 1
     for (let m = startM; m <= startM + 2; m++) {
-      if (snapshotExpenses.has(m)) {
-        expensesRaw += snapshotExpenses.get(m) ?? 0
-      } else {
-        const ms = `${year}-${String(m).padStart(2, "0")}`
-        expensesRaw += periodList
-          .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
-      }
+      const ms = `${year}-${String(m).padStart(2, "0")}`
+      expensesRaw += (snapshotExpenses.get(m) ?? 0)
+      expensesRaw += periodList
+        .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
+        .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
     }
   } else {
     // Acumulado
     for (let m = 1; m <= 12; m++) {
-      if (snapshotExpenses.has(m)) {
-        expensesRaw += snapshotExpenses.get(m) ?? 0
-      } else {
-        const ms = `${year}-${String(m).padStart(2, "0")}`
-        expensesRaw += periodList
-          .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
-      }
+      const ms = `${year}-${String(m).padStart(2, "0")}`
+      expensesRaw += (snapshotExpenses.get(m) ?? 0)
+      expensesRaw += periodList
+        .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
+        .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
     }
   }
 
@@ -426,24 +420,22 @@ function buildAnnualChart(
     }
   }
 
-  // Fill snapshot expenses first (dados TOConline via n8n - mais fiáveis que faturas)
+  // Fill snapshot expenses (TOConline) - somado com faturas incoming da app
   for (let m = 1; m <= 12; m++) {
     if (snapshotExpensesMap.has(m)) {
-      result[m - 1].expenses = snapshotExpensesMap.get(m)!
+      result[m - 1].expenses += snapshotExpensesMap.get(m)!
     }
   }
 
-  // Fill remaining revenue/expenses from invoice rows (without VAT = subtotal)
+  // Fill revenue/expenses from invoice rows (without VAT = subtotal)
+  // Expenses: soma com snapshot (fontes complementares)
   for (const row of invoiceRows) {
     if (!row.invoice_date) continue
     const m = parseInt(row.invoice_date.slice(5, 7), 10)
     if (m < 1 || m > 12) continue
     const amount = Number(row.subtotal ?? row.total ?? 0)
     if (row.type === "incoming") {
-      // Só usa faturas se não há snapshot de gastos para este mês
-      if (!snapshotExpensesMap.has(m)) {
-        result[m - 1].expenses += amount
-      }
+      result[m - 1].expenses += amount
     } else if (row.type === "outgoing") {
       if (displayYear !== currentYear) {
         // Anos anteriores sem snapshot: fallback para faturas (evita dupla contagem com snapshots)

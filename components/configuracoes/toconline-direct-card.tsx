@@ -1,12 +1,13 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import {
   Building2,
   ChevronDown,
   ChevronUp,
   ExternalLink,
+  History,
   Loader2,
   Settings2,
   Trash2,
@@ -35,6 +36,7 @@ type DirectConfig = {
   has_refresh_token: boolean
   token_expires_at: string | null
   subdomain: string | null
+  historico_importado_at: string | null
   is_active: boolean
   last_sync_at: string | null
   sync_error: string | null
@@ -52,18 +54,62 @@ export function ToconlineDirectCard({
   canEdit: boolean
 }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [mode, setMode] = useState<IntegrationMode>(integrationMode)
   const [showForm, setShowForm] = useState(false)
   const [savingMode, setSavingMode] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const [connecting, setConnecting] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [importingHistory, setImportingHistory] = useState(false)
+  const [historicoImportadoAt, setHistoricoImportadoAt] = useState(
+    initial?.historico_importado_at ?? null,
+  )
 
   const [clientId, setClientId] = useState(initial?.client_id ?? "")
   const [clientSecret, setClientSecret] = useState("")
-  const [accessToken, setAccessToken] = useState("")
-  const [refreshToken, setRefreshToken] = useState("")
   const [subdomain, setSubdomain] = useState(initial?.subdomain ?? "")
+
+  useEffect(() => {
+    const result = searchParams.get("toconline")
+    if (result === "connected") {
+      toast.success("TOConline ligado com sucesso")
+      router.replace("/configuracoes/integracoes")
+    } else if (result === "error") {
+      const reason = searchParams.get("reason")
+      toast.error("Falha ao ligar ao TOConline", {
+        description: reason ?? "Tenta novamente",
+      })
+      router.replace("/configuracoes/integracoes")
+    }
+  }, [searchParams, router])
+
+  async function handleImportHistory() {
+    if (
+      !confirm(
+        "Importar receita e gastos de Jan/2025 ao mes atual?\n\nIsso substitui os valores ja existentes. Pode demorar ate 2 minutos.",
+      )
+    )
+      return
+    setImportingHistory(true)
+    try {
+      const res = await fetch("/api/integracoes/toconline/import-historico", { method: "POST" })
+      const body = await res.json()
+      if (res.ok && body.ok) {
+        setHistoricoImportadoAt(body.imported_at)
+        toast.success("Historico importado", {
+          description: `${body.months_processed} meses processados${body.errors?.length ? ` - ${body.errors.length} erros` : ""}`,
+        })
+        router.refresh()
+      } else {
+        toast.error("Falha na importacao", { description: body.error ?? `HTTP ${res.status}` })
+      }
+    } catch (e) {
+      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setImportingHistory(false)
+    }
+  }
 
   async function handleModeChange(newMode: IntegrationMode) {
     if (newMode === mode) return
@@ -97,40 +143,37 @@ export function ToconlineDirectCard({
     }
   }
 
-  async function handleSave() {
-    if (!clientId || !clientSecret || !accessToken || !refreshToken || !subdomain) {
-      toast.error("Todos os campos sao obrigatorios")
+  async function handleOAuthStart() {
+    const secretRequired = !initial?.has_client_secret
+    if (!clientId || !subdomain || (secretRequired && !clientSecret)) {
+      toast.error("Preenche subdominio, Client ID e Client Secret")
       return
     }
-    setSaving(true)
+    if (clientSecret && !initial?.has_client_secret && !secretRequired && !clientSecret) {
+      toast.error("Client Secret obrigatorio na primeira configuracao")
+      return
+    }
+    setConnecting(true)
     try {
-      const res = await fetch("/api/integracoes/toconline/direct", {
+      const res = await fetch("/api/integracoes/toconline/oauth/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
-          access_token: accessToken,
-          refresh_token: refreshToken,
           subdomain,
-          expires_in: 3600,
+          client_id: clientId,
+          client_secret: clientSecret || undefined,
         }),
       })
       const body = await res.json()
-      if (res.ok && body.ok) {
-        toast.success("Credenciais TOConline guardadas")
-        setClientSecret("")
-        setAccessToken("")
-        setRefreshToken("")
-        setShowForm(false)
-        router.refresh()
+      if (res.ok && body.redirect_url) {
+        window.location.href = body.redirect_url
       } else {
-        toast.error("Falha ao guardar", { description: body.error ?? `HTTP ${res.status}` })
+        toast.error("Falha ao iniciar autorizacao", { description: body.error ?? `HTTP ${res.status}` })
+        setConnecting(false)
       }
     } catch (e) {
       toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
-    } finally {
-      setSaving(false)
+      setConnecting(false)
     }
   }
 
@@ -288,6 +331,11 @@ export function ToconlineDirectCard({
               </a>{" "}
               em Definicoes - API OAuth. O subdominio e o numero da tua app (ex: 13 para app13.toconline.pt).
             </p>
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Apos guardar seras redirecionado para o TOConline para autorizar o acesso.
+              Certifica-te que o URI de redirect esta registado nas definicoes OAuth:{" "}
+              <span className="font-mono">{process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/integracoes/toconline/oauth/callback</span>
+            </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="tc-subdomain">Subdominio</Label>
@@ -326,35 +374,13 @@ export function ToconlineDirectCard({
                 autoComplete="new-password"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tc-access-token">Access Token inicial</Label>
-              <Input
-                id="tc-access-token"
-                type="password"
-                placeholder={initial?.has_access_token ? "•••••••• (atual)" : "access_token OAuth"}
-                value={accessToken}
-                onChange={(e) => setAccessToken(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="tc-refresh-token">Refresh Token</Label>
-              <Input
-                id="tc-refresh-token"
-                type="password"
-                placeholder={initial?.has_refresh_token ? "•••••••• (atual)" : "refresh_token OAuth"}
-                value={refreshToken}
-                onChange={(e) => setRefreshToken(e.target.value)}
-                autoComplete="new-password"
-              />
-            </div>
             <div className="flex flex-wrap justify-end gap-2 pt-1">
-              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)}>
+              <Button variant="ghost" size="sm" onClick={() => setShowForm(false)} disabled={connecting}>
                 Cancelar
               </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving}>
-                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Guardar credenciais
+              <Button size="sm" onClick={handleOAuthStart} disabled={connecting}>
+                {connecting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {connecting ? "A redirecionar..." : "Ligar ao TOConline"}
               </Button>
             </div>
           </div>
@@ -362,30 +388,55 @@ export function ToconlineDirectCard({
 
         {/* Acoes (modo direto configurado) */}
         {mode === "toconline_direct" && !showForm && canEdit && (
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-1 border-t">
-            {initial?.configured && initial.is_active && (
-              <Button variant="ghost" size="sm" onClick={handleRemove} disabled={removing}>
-                {removing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
-                )}
-                Desligar
-              </Button>
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t">
+            {/* Info historico */}
+            {initial?.configured && initial.is_active && historicoImportadoAt && (
+              <p className="text-xs text-muted-foreground">
+                Historico importado em {formatDate(historicoImportadoAt)}
+              </p>
             )}
-            {initial?.configured && initial.is_active && (
-              <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
-                {syncing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Settings2 className="mr-2 h-4 w-4" />
-                )}
-                Sincronizar agora
+            {!(initial?.configured && initial.is_active && historicoImportadoAt) && <span />}
+
+            <div className="flex flex-wrap items-center gap-2">
+              {initial?.configured && initial.is_active && (
+                <Button variant="ghost" size="sm" onClick={handleRemove} disabled={removing}>
+                  {removing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Desligar
+                </Button>
+              )}
+              {initial?.configured && initial.is_active && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImportHistory}
+                  disabled={importingHistory}
+                >
+                  {importingHistory ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <History className="mr-2 h-4 w-4" />
+                  )}
+                  {importingHistory ? "A importar..." : "Importar historico"}
+                </Button>
+              )}
+              {initial?.configured && initial.is_active && (
+                <Button variant="outline" size="sm" onClick={handleSync} disabled={syncing}>
+                  {syncing ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Settings2 className="mr-2 h-4 w-4" />
+                  )}
+                  Sincronizar agora
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
+                {initial?.configured ? "Atualizar credenciais" : "Configurar"}
               </Button>
-            )}
-            <Button size="sm" variant="outline" onClick={() => setShowForm(true)}>
-              {initial?.configured ? "Atualizar credenciais" : "Configurar"}
-            </Button>
+            </div>
           </div>
         )}
       </CardContent>
