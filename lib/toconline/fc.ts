@@ -111,11 +111,11 @@ async function findSupplier(
 
 async function createSupplier(
   accessToken: string,
-  appBase: string,
+  apiBase: string,
   nif: string,
   name: string,
 ): Promise<number> {
-  const url = `${appBase.replace(/\/$/, "")}/api/v1/suppliers`
+  const url = `${apiBase.replace(/\/$/, "")}/api/v1/suppliers`
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -145,6 +145,7 @@ async function createSupplier(
 async function lookupOrCreateSupplier(
   accessToken: string,
   appBase: string,
+  apiBase: string,
   nif: string | null,
   name: string | null,
 ): Promise<number | null> {
@@ -154,7 +155,7 @@ async function lookupOrCreateSupplier(
   if (existing !== null) return existing
 
   if (!name) return null
-  return createSupplier(accessToken, appBase, nif, name)
+  return createSupplier(accessToken, apiBase, nif, name)
 }
 
 // ---------------------------------------------------------------------------
@@ -163,11 +164,11 @@ async function lookupOrCreateSupplier(
 
 async function doCreateFC(
   accessToken: string,
-  appBase: string,
+  apiBase: string,
   payload: FCPayload,
   supplierId: number | null,
 ): Promise<string> {
-  const url = `${appBase.replace(/\/$/, "")}/api/v1/commercial_purchases_documents`
+  const url = `${apiBase.replace(/\/$/, "")}/api/v1/commercial_purchases_documents`
   const invoiceDate = payload.invoiceDate ?? new Date().toISOString().slice(0, 10)
   const description = payload.description ?? payload.supplierName ?? "Fatura importada ISOFlow"
 
@@ -237,15 +238,17 @@ async function doCreateFC(
  * Idempotente: se a FC ja existir, devolve o numero sem criar de novo.
  *
  * @param accessToken token de acesso valido (usar getValidToken() antes)
- * @param appBase URL base da app (ex: https://app13.toconline.pt)
+ * @param appBase URL base da app (ex: https://app13.toconline.pt) - endpoints custom
+ * @param apiBase URL base da API REST (ex: https://api13.toconline.pt) - endpoints /api/v1/
  * @param payload dados da fatura ISOFlow
  */
 export async function createDirectFC(
   accessToken: string,
   appBase: string,
+  apiBase: string,
   payload: FCPayload,
 ): Promise<FCResult> {
-  // 1. Dedup - verificar se FC ja existe
+  // 1. Dedup - verificar se FC ja existe (endpoint custom em appBase)
   if (payload.invoiceNumber) {
     const existing = await findExistingFC(accessToken, appBase, payload.invoiceNumber)
     if (existing) {
@@ -253,17 +256,18 @@ export async function createDirectFC(
     }
   }
 
-  // 2. Fornecedor - procurar ou criar
+  // 2. Fornecedor - procurar (appBase) ou criar (apiBase)
   const supplierId = await lookupOrCreateSupplier(
     accessToken,
     appBase,
+    apiBase,
     payload.supplierNif,
     payload.supplierName,
   )
 
-  // 3. Criar FC
+  // 3. Criar FC (endpoint REST em apiBase)
   try {
-    const fcNumber = await doCreateFC(accessToken, appBase, payload, supplierId)
+    const fcNumber = await doCreateFC(accessToken, apiBase, payload, supplierId)
     return { fcNumber, alreadyExisted: false }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)

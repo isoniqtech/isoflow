@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     await Promise.all(
       pending.map(async (inv) => {
         try {
-          const result = await createDirectFC(tokenConfig.accessToken, tokenConfig.appBase, {
+          const result = await createDirectFC(tokenConfig.accessToken, tokenConfig.appBase, tokenConfig.apiBase, {
             invoiceId: inv.id,
             invoiceNumber: inv.invoice_number,
             invoiceDate: inv.invoice_date,
