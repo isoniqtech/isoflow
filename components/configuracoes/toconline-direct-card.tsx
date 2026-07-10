@@ -101,9 +101,16 @@ export function ToconlineDirectCard({
       const body = await res.json()
       if (res.ok && body.ok) {
         setHistoricoImportadoAt(body.imported_at)
-        toast.success("Historico importado", {
-          description: `${body.months_processed} meses processados${body.errors?.length ? ` - ${body.errors.length} erros` : ""}`,
-        })
+        if (body.errors?.length) {
+          toast.warning("Historico importado com erros", {
+            description: `${body.months_processed} meses ok, ${body.errors.length} erros: ${body.errors.slice(0, 2).join(" | ")}`,
+            duration: 15000,
+          })
+        } else {
+          toast.success("Historico importado", {
+            description: `${body.months_processed} meses processados`,
+          })
+        }
         router.refresh()
       } else {
         toast.error("Falha na importacao", { description: body.error ?? `HTTP ${res.status}` })
