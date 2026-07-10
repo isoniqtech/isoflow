@@ -1,5 +1,7 @@
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
+import { getValidToken } from "@/lib/toconline/token"
+import { fetchDocumentAssociations } from "@/lib/integrations/toconline"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -14,23 +16,83 @@ export async function POST() {
   const { createServiceClient } = await import("@/lib/supabase/server")
   const supabase = createServiceClient()
 
-  // ── A) Disparar n8n para ir buscar dados frescos ─────────────────────────
-  const n8nUrl = process.env.EFATURA_SYNC_WEBHOOK_URL
+  // Verificar modo de integração do tenant
+  const { data: tenantRow } = await supabase
+    .from("tenants")
+    .select("integration_mode")
+    .eq("id", ctx.tenantId)
+    .maybeSingle()
+  const isDirectMode = (tenantRow as { integration_mode?: string } | null)?.integration_mode === "toconline_direct"
+
+  // ── A) Buscar dados frescos do TOConline ─────────────────────────────────
   let n8nTriggered = false
   let n8nError: string | null = null
+  let directFetched = 0
 
-  if (n8nUrl) {
+  if (isDirectMode) {
+    // Modo directo: buscar de document_associations (appBase = app13)
     try {
-      const n8nRes = await fetch(n8nUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenant_id: ctx.tenantId }),
-        signal: AbortSignal.timeout(15000),
-      })
-      n8nTriggered = n8nRes.ok
-      if (!n8nRes.ok) n8nError = `n8n HTTP ${n8nRes.status}`
+      const tokenConfig = await getValidToken(ctx.tenantId)
+      const now = new Date()
+      // Buscar mes actual + mes anterior
+      const ranges: Array<{ from: string; to: string }> = []
+      for (let i = 0; i <= 1; i++) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+        const firstDay = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`
+        const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0)
+        const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, "0")}-${String(lastDay.getDate()).padStart(2, "0")}`
+        ranges.push({ from: firstDay, to: lastDayStr })
+      }
+
+      for (const range of ranges) {
+        const docs = await fetchDocumentAssociations(
+          tokenConfig.accessToken,
+          tokenConfig.appBase,
+          range.from,
+          range.to,
+        )
+
+        for (const doc of docs) {
+          if (!doc.document_number) continue
+          const toconlineId = String(doc.id)
+          await supabase.from("efatura_documents").upsert(
+            {
+              tenant_id: ctx.tenantId,
+              toconline_id: toconlineId,
+              document_number: doc.document_number,
+              document_date: doc.date,
+              supplier_name: doc.supplier_name,
+              supplier_nif: doc.supplier_nif,
+              total: doc.total,
+              currency: "EUR",
+              at_status: doc.at_status,
+              raw_data: doc as unknown as Record<string, unknown>,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "tenant_id,toconline_id", ignoreDuplicates: false },
+          )
+          directFetched++
+        }
+      }
     } catch (e) {
-      n8nError = e instanceof Error ? e.message : "n8n timeout"
+      n8nError = `Direct fetch: ${e instanceof Error ? e.message : String(e)}`
+    }
+  } else {
+    // Modo n8n: disparar webhook para o n8n ir buscar e fazer POST a /api/efatura/sync
+    const n8nUrl = process.env.EFATURA_SYNC_WEBHOOK_URL
+    if (n8nUrl) {
+      try {
+        const n8nRes = await fetch(n8nUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tenant_id: ctx.tenantId }),
+          signal: AbortSignal.timeout(15000),
+        })
+        n8nTriggered = n8nRes.ok
+        if (!n8nRes.ok) n8nError = `n8n HTTP ${n8nRes.status}`
+      } catch (e) {
+        n8nError = e instanceof Error ? e.message : "n8n timeout"
+      }
     }
   }
 
@@ -139,6 +201,7 @@ export async function POST() {
   return Response.json({
     n8n_triggered: n8nTriggered,
     n8n_error: n8nError,
+    direct_fetched: directFetched,
     matched,
     at_communicated_updated: atUpdated,
   })

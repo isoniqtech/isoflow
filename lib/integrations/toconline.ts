@@ -180,6 +180,60 @@ export async function fetchEFaturaList(
 }
 
 // ---------------------------------------------------------------------------
+// Document associations (e-Fatura AT status)
+// app13.toconline.pt/api/document_associations?filter="date BETWEEN 'X' AND 'Y'"
+// ---------------------------------------------------------------------------
+
+export interface DocumentAssociation {
+  id: number
+  document_number: string | null
+  date: string | null
+  supplier_name: string | null
+  supplier_nif: string | null
+  total: number
+  at_status: string | null
+}
+
+export async function fetchDocumentAssociations(
+  accessToken: string,
+  appBase: string,
+  dateFrom: string,
+  dateTo: string,
+): Promise<DocumentAssociation[]> {
+  const url = new URL(`${appBase.replace(/\/$/, "")}/api/document_associations`)
+  url.searchParams.set("filter", `"date BETWEEN '${dateFrom}' AND '${dateTo}'"`)
+
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+  })
+
+  if (!res.ok) {
+    throw new Error(`TOConline document_associations ${res.status}: ${await res.text()}`)
+  }
+
+  const body = await res.json()
+  let items: unknown[] = []
+  if (Array.isArray(body)) items = body
+  else if (Array.isArray(body?.data)) items = body.data
+
+  return items.map((item: unknown) => {
+    const r = item as Record<string, unknown>
+    const attrs = (r.attributes ?? r) as Record<string, unknown>
+    return {
+      id: Number(r.id ?? attrs.id ?? 0),
+      document_number: attrs.document_number ? String(attrs.document_number) : null,
+      date: attrs.date ? String(attrs.date) : null,
+      supplier_name: attrs.supplier_name ? String(attrs.supplier_name) : null,
+      supplier_nif: attrs.supplier_tax_registration_number
+        ? String(attrs.supplier_tax_registration_number)
+        : null,
+      total: Number(attrs.total ?? 0),
+      at_status: attrs.at_status ? String(attrs.at_status) : null,
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
 // AT communication
 // ---------------------------------------------------------------------------
 
