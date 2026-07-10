@@ -40,10 +40,43 @@ export async function POST() {
 
   const { accessToken, appBase } = tokenConfig
   const now = new Date()
-  const currentMonth = now.getMonth() + 1
-  const currentYear = now.getFullYear()
+
+  // Buscar todos os documentos de uma vez (sem filtro de data - API nao suporta date_from/date_to)
+  // Depois agrupar por mes no codigo
+  let allSales: Awaited<ReturnType<typeof fetchSalesDocuments>> = []
+  let allPurchases: Awaited<ReturnType<typeof fetchPurchaseDocuments>> = []
+
+  try {
+    ;[allSales, allPurchases] = await Promise.all([
+      fetchSalesDocuments(accessToken, appBase),
+      fetchPurchaseDocuments(accessToken, appBase),
+    ])
+  } catch (e) {
+    return NextResponse.json(
+      { error: `Erro ao buscar documentos TOConline: ${e instanceof Error ? e.message : String(e)}` },
+      { status: 502 },
+    )
+  }
+
+  // Agrupar por ano-mes
+  type MonthKey = string // "YYYY-MM"
+  const salesByMonth = new Map<MonthKey, number>()
+  const purchasesByMonth = new Map<MonthKey, number>()
+
+  for (const doc of allSales) {
+    const key = doc.date?.slice(0, 7) // "YYYY-MM"
+    if (!key || key.length !== 7) continue
+    salesByMonth.set(key, (salesByMonth.get(key) ?? 0) + Number(doc.net_total ?? doc.subtotal ?? 0))
+  }
+  for (const doc of allPurchases) {
+    const key = doc.date?.slice(0, 7)
+    if (!key || key.length !== 7) continue
+    purchasesByMonth.set(key, (purchasesByMonth.get(key) ?? 0) + Number(doc.net_total ?? doc.subtotal ?? 0))
+  }
 
   // Todos os meses desde Jan/2025 ate ao mes atual
+  const currentMonth = now.getMonth() + 1
+  const currentYear = now.getFullYear()
   const months: Array<{ month: number; year: number }> = []
   for (let y = 2025; y <= currentYear; y++) {
     const endMonth = y === currentYear ? currentMonth : 12
@@ -54,31 +87,14 @@ export async function POST() {
 
   let processed = 0
   const errors: string[] = []
+  const savedAt = now.toISOString()
 
   for (const { month, year } of months) {
-    const lastDay = new Date(year, month, 0).getDate()
-    const dateFrom = `${year}-${String(month).padStart(2, "0")}-01`
-    const dateTo = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`
+    const key = `${year}-${String(month).padStart(2, "0")}`
+    const revenue = Math.round((salesByMonth.get(key) ?? 0) * 100) / 100
+    const expenses = Math.round((purchasesByMonth.get(key) ?? 0) * 100) / 100
 
     try {
-      const [salesDocs, purchaseDocs] = await Promise.all([
-        fetchSalesDocuments(accessToken, appBase, { dateFrom, dateTo }),
-        fetchPurchaseDocuments(accessToken, appBase, { dateFrom, dateTo }),
-      ])
-
-      const revenue =
-        Math.round(
-          salesDocs.reduce((s, d) => s + Number(d.net_total ?? d.subtotal ?? 0), 0) * 100,
-        ) / 100
-
-      const expenses =
-        Math.round(
-          purchaseDocs.reduce((s, d) => s + Number(d.net_total ?? d.subtotal ?? 0), 0) * 100,
-        ) / 100
-
-      const savedAt = now.toISOString()
-
-      // Update se ja existe, insert se nao existe
       const { data: existing } = await svc
         .from("monthly_snapshots")
         .select("id")
