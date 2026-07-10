@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import Link from "next/link"
-import { AlertTriangle, FileText, Mail, MessageCircle, Upload } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { AlertTriangle, ChevronDown, FileText, Mail, MessageCircle, Upload } from "lucide-react"
 import {
   Table,
   TableBody,
@@ -12,11 +13,21 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { StatusBadge } from "@/components/faturas/status-badge"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import type { InvoiceListItem } from "@/lib/queries/invoices"
 import type { InvoiceSource } from "@/types"
+
+type ProjectOption = { id: string; name: string; color: string }
 
 const SOURCE_ICONS: Record<InvoiceSource, typeof FileText> = {
   whatsapp: MessageCircle,
@@ -80,7 +91,39 @@ const HEADERS: Array<{ key: string; label: string; tip: string; className?: stri
   { key: "source",     label: "Origem",     tip: "Canal por onde a fatura foi recebida - email, WhatsApp ou upload manual", className: "hidden sm:table-cell" },
 ]
 
-export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
+export function InvoiceTable({
+  invoices,
+  canEdit = false,
+}: {
+  invoices: InvoiceListItem[]
+  canEdit?: boolean
+}) {
+  const router = useRouter()
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+
+  useEffect(() => {
+    if (!canEdit) return
+    fetch("/api/projetos")
+      .then((r) => r.json())
+      .then((body) => {
+        const list = (body.data ?? []) as Array<{ id: string; name: string; color: string }>
+        setProjects(list.map((p) => ({ id: p.id, name: p.name, color: p.color ?? "#2563EB" })))
+      })
+      .catch(() => {})
+  }, [canEdit])
+
+  async function handleProjectChange(invoiceId: string, projectId: string | null) {
+    const res = await fetch(`/api/faturas/${invoiceId}`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ project_id: projectId }),
+    })
+    if (!res.ok) {
+      toast.error("Erro ao atualizar projeto")
+      return
+    }
+    router.refresh()
+  }
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null)
 
   const show = useCallback((e: React.MouseEvent<HTMLTableCellElement>, text: string) => {
@@ -188,16 +231,56 @@ export function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
                       )}
                     </Link>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <Link href={`/faturas/${inv.id}`} className="block">
-                      {inv.project ? (
-                        <Badge variant="outline" className="font-normal" style={{ borderColor: inv.project.color, color: inv.project.color }}>
-                          {inv.project.name}
-                        </Badge>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
-                      )}
-                    </Link>
+                  <TableCell className="hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                    {canEdit ? (
+                      <Select
+                        value={inv.project?.id ?? "none"}
+                        onValueChange={(v) =>
+                          handleProjectChange(inv.id, v === "none" ? null : v)
+                        }
+                      >
+                        <SelectTrigger className="h-7 text-xs border-0 bg-transparent shadow-none px-1 gap-1 w-auto max-w-[160px] focus:ring-0 hover:bg-muted/50 rounded">
+                          {inv.project ? (
+                            <span className="flex items-center gap-1.5 truncate">
+                              <span
+                                className="h-2 w-2 rounded-full shrink-0"
+                                style={{ backgroundColor: inv.project.color }}
+                              />
+                              <span className="truncate">{inv.project.name}</span>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Sem projeto</span>
+                          )}
+                          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">
+                            <span className="text-muted-foreground text-xs">Sem projeto</span>
+                          </SelectItem>
+                          {projects.map((p) => (
+                            <SelectItem key={p.id} value={p.id}>
+                              <span className="flex items-center gap-2">
+                                <span
+                                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: p.color }}
+                                />
+                                {p.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Link href={`/faturas/${inv.id}`} className="block">
+                        {inv.project ? (
+                          <Badge variant="outline" className="font-normal" style={{ borderColor: inv.project.color, color: inv.project.color }}>
+                            {inv.project.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </Link>
+                    )}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
                     <Link href={`/faturas/${inv.id}`} className="block">

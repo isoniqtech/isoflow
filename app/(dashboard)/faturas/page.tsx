@@ -155,7 +155,12 @@ export default async function FaturasPage({
       {/* Tabela — flex-1, só as linhas fazem scroll */}
       <div className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 md:px-6 lg:px-8 py-4">
         <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full">
-          {activeTab === "todas" && <InvoiceTableFC invoices={invoices} />}
+          {activeTab === "todas" && (
+            <InvoiceTableFC
+              invoices={invoices}
+              canEdit={hasPermission(session.role, "faturas", "edit")}
+            />
+          )}
           {activeTab === "efatura" && <EFaturaTab data={eFaturaPageData} />}
         </div>
       </div>
