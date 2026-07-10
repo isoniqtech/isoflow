@@ -61,33 +61,36 @@ function SidebarBrand() {
 
   return (
     <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">
-      <Link href="/dashboard" className="flex items-center gap-2 flex-1 min-w-0">
+      <Link href="/dashboard" className="flex items-center gap-2 shrink-0">
         {tenant.logo_url ? (
           <Image
             src={tenant.logo_url}
             alt={tenant.app_name}
             width={28}
             height={28}
-            className="h-7 w-7 rounded object-contain shrink-0"
+            className="h-7 w-7 rounded object-contain"
             unoptimized
           />
         ) : (
           <div
-            className="h-7 w-7 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
+            className="h-7 w-7 rounded flex items-center justify-center text-white text-xs font-bold"
             style={{ backgroundColor: tenant.primary_color }}
           >
             {tenant.app_name.charAt(0).toUpperCase()}
           </div>
         )}
-        <div className="flex flex-col min-w-0">
-          <span className="font-display font-semibold tracking-tight truncate text-sm leading-tight">
-            {tenant.app_name}
-          </span>
-          {availableTenants.length > 1 && (
-            <TenantSwitcher current={currentSummary} available={availableTenants} />
-          )}
-        </div>
       </Link>
+      <div className="flex flex-col min-w-0 flex-1">
+        <Link
+          href="/dashboard"
+          className="font-display font-semibold tracking-tight truncate text-sm leading-tight hover:opacity-80 transition-opacity"
+        >
+          {tenant.app_name}
+        </Link>
+        {availableTenants.length > 1 && (
+          <TenantSwitcher current={currentSummary} available={availableTenants} />
+        )}
+      </div>
     </div>
   )
 }
