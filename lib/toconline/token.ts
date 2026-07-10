@@ -204,7 +204,9 @@ export async function getValidToken(tenantId: string): Promise<TOCTokenConfig> {
     )
   }
 
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integracoes/toconline/oauth/callback`
+  const redirectUri =
+    (config.redirect_uri as string | undefined) ??
+    `${process.env.NEXT_PUBLIC_APP_URL}/api/integracoes/toconline/oauth/callback`
 
   let refreshResult: OAuthResponse | null = null
 

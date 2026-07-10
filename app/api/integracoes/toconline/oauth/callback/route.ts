@@ -101,7 +101,7 @@ export async function GET(req: Request) {
       api_key_encrypted: encrypt(tokens.access_token),
       api_secret_encrypted: encrypt(tokens.refresh_token),
       toconline_token_expires_at: expiresAt,
-      config: { ...config, oauth_pending: false },
+      config: { ...config, oauth_pending: false, redirect_uri: redirectUri },
       sync_error: null,
       last_sync_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
