@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ThemeRadioGroup } from "@/components/theme-toggle"
+import { TenantSwitcher } from "@/components/layout/tenant-switcher"
 import { createClient } from "@/lib/supabase/client"
 
 export function Sidebar({ className }: { className?: string }) {
@@ -46,33 +47,48 @@ export function Sidebar({ className }: { className?: string }) {
 }
 
 function SidebarBrand() {
-  const { tenant } = useTenant()
+  const { tenant, availableTenants } = useTenant()
+
+  const currentSummary = availableTenants.find((t) => t.id === tenant.id) ?? {
+    id: tenant.id,
+    name: tenant.name,
+    logo_url: tenant.logo_url,
+    primary_color: tenant.primary_color,
+    app_name: tenant.app_name,
+    role: "owner" as const,
+    is_primary: true,
+  }
+
   return (
-    <Link
-      href="/dashboard"
-      className="flex items-center gap-2 px-4 h-14 border-b shrink-0"
-    >
-      {tenant.logo_url ? (
-        <Image
-          src={tenant.logo_url}
-          alt={tenant.app_name}
-          width={28}
-          height={28}
-          className="h-7 w-7 rounded object-contain"
-          unoptimized
-        />
-      ) : (
-        <div
-          className="h-7 w-7 rounded flex items-center justify-center text-white text-xs font-bold"
-          style={{ backgroundColor: tenant.primary_color }}
-        >
-          {tenant.app_name.charAt(0).toUpperCase()}
+    <div className="flex items-center gap-2 px-4 h-14 border-b shrink-0">
+      <Link href="/dashboard" className="flex items-center gap-2 flex-1 min-w-0">
+        {tenant.logo_url ? (
+          <Image
+            src={tenant.logo_url}
+            alt={tenant.app_name}
+            width={28}
+            height={28}
+            className="h-7 w-7 rounded object-contain shrink-0"
+            unoptimized
+          />
+        ) : (
+          <div
+            className="h-7 w-7 rounded flex items-center justify-center text-white text-xs font-bold shrink-0"
+            style={{ backgroundColor: tenant.primary_color }}
+          >
+            {tenant.app_name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="flex flex-col min-w-0">
+          <span className="font-display font-semibold tracking-tight truncate text-sm leading-tight">
+            {tenant.app_name}
+          </span>
+          {availableTenants.length > 1 && (
+            <TenantSwitcher current={currentSummary} available={availableTenants} />
+          )}
         </div>
-      )}
-      <span className="font-display font-semibold tracking-tight truncate">
-        {tenant.app_name}
-      </span>
-    </Link>
+      </Link>
+    </div>
   )
 }
 

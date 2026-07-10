@@ -29,6 +29,35 @@ export async function POST(req: Request) {
   const proto = host.includes("localhost") ? "http" : "https"
   const redirectTo = `${proto}://${host}/reset-password`
 
+  // Verificar se o utilizador ja existe no Supabase Auth
+  const { data: existingList } = await admin.auth.admin.listUsers()
+  const existingAuthUser = existingList?.users?.find((u) => u.email === email)
+
+  if (existingAuthUser) {
+    // Utilizador ja existe - adicionar como membro do tenant actual
+    const { error: memberErr } = await admin
+      .from("tenant_memberships")
+      .upsert({
+        user_id: existingAuthUser.id,
+        tenant_id: ctx.tenantId,
+        role,
+        invited_by: ctx.userId,
+        joined_at: new Date().toISOString(),
+        status: "active",
+      }, { onConflict: "user_id,tenant_id" })
+
+    if (memberErr) {
+      console.error("[invite] membership upsert error:", memberErr.message)
+      return jsonError("Erro ao adicionar membro: " + memberErr.message, 500)
+    }
+
+    return Response.json(
+      { id: existingAuthUser.id, email, name, role, existing_user: true },
+      { status: 201 },
+    )
+  }
+
+  // Utilizador novo - criar via convite
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
     redirectTo,
     data: { name, tenant_id: ctx.tenantId, role },

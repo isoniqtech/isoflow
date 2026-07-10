@@ -880,6 +880,47 @@ export type Database = {
           },
         ]
       }
+      tenant_memberships: {
+        Row: {
+          id: string
+          user_id: string
+          tenant_id: string
+          role: string
+          invited_by: string | null
+          invited_at: string | null
+          joined_at: string | null
+          status: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          tenant_id: string
+          role?: string
+          invited_by?: string | null
+          invited_at?: string | null
+          joined_at?: string | null
+          status?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          tenant_id?: string
+          role?: string
+          invited_by?: string | null
+          invited_at?: string | null
+          joined_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_memberships_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_integrations: {
         Row: {
           api_key_encrypted: string | null
