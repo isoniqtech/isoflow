@@ -1,14 +1,14 @@
 import { z } from "zod"
-import { createClient } from "@/lib/supabase/server"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
-import { decryptOptional } from "@/lib/utils/encryption"
+import { getValidToken } from "@/lib/toconline/token"
 import {
   fetchPurchaseDocuments,
   fetchSalesDocuments,
   mapTOCDocumentToInvoice,
   type TOCOnlineDocument,
 } from "@/lib/integrations/toconline"
+import { createClient } from "@/lib/supabase/server"
 
 const bodySchema = z.object({
   month: z.number().int().min(1).max(12),
@@ -37,46 +37,30 @@ export async function POST(req: Request) {
 
   const { month, year, type } = parsed.data
   const tenantId = ctx.tenantId
-  const supabase = createClient()
 
-  const { data: integration, error: intErr } = await supabase
-    .from("tenant_integrations")
-    .select("api_key_encrypted, config, is_active")
-    .eq("tenant_id", tenantId)
-    .eq("type", "erp")
-    .eq("provider", "toconline")
-    .maybeSingle()
-
-  if (intErr) return jsonError("Database error", 500, intErr.message)
-  if (!integration) return jsonError("Toconline integration not configured", 404)
-  if (!integration.is_active) return jsonError("Toconline integration is disabled", 400)
-
-  let accessToken: string
+  let tokenConfig: Awaited<ReturnType<typeof getValidToken>>
   try {
-    accessToken = decryptOptional(integration.api_key_encrypted) ?? ""
-    if (!accessToken) throw new Error("Missing access token")
+    tokenConfig = await getValidToken(tenantId)
   } catch (e) {
-    return jsonError("Failed to decrypt credentials", 500, String(e))
+    return jsonError("TOConline nao disponivel", 503, String(e))
   }
 
-  const config = (integration.config ?? {}) as Record<string, string>
-  const baseUrl = config.base_url ?? "https://app.toconline.pt"
+  const { accessToken, apiBase } = tokenConfig
 
-  const startDate = new Date(year, month - 1, 1)
-  const endDate = new Date(year, month, 0)
-  const dateFrom = startDate.toISOString().slice(0, 10)
-  const dateTo = endDate.toISOString().slice(0, 10)
-  const filters = { dateFrom, dateTo }
+  // Buscar todos os documentos sem filtro de data (API nao suporta date_from/to)
+  // Filtrar por mes/ano no codigo
+  const monthKey = `${year}-${String(month).padStart(2, "0")}`
 
+  const supabase = createClient()
   const errors: string[] = []
   let created = 0
   let updated = 0
 
-  async function processDocs(
-    docs: TOCOnlineDocument[],
-    invoiceType: "incoming" | "outgoing",
-  ) {
-    for (const doc of docs) {
+  async function processDocs(docs: TOCOnlineDocument[], invoiceType: "incoming" | "outgoing") {
+    // Filtrar apenas documentos do mes/ano pedido
+    const filtered = docs.filter((d) => d.date?.startsWith(monthKey))
+
+    for (const doc of filtered) {
       try {
         const erpDocId = doc.id.toString()
 
@@ -95,9 +79,7 @@ export async function POST(req: Request) {
               erp_synced_at: new Date().toISOString(),
               at_communicated: doc.communication_status === "sent",
               at_communicated_at:
-                doc.communication_status === "sent"
-                  ? new Date().toISOString()
-                  : null,
+                doc.communication_status === "sent" ? new Date().toISOString() : null,
               updated_at: new Date().toISOString(),
             })
             .eq("id", existing.id)
@@ -106,7 +88,10 @@ export async function POST(req: Request) {
           continue
         }
 
-        if (doc.document_number && (doc.supplier_tax_registration_number || doc.client_tax_registration_number)) {
+        if (
+          doc.document_number &&
+          (doc.supplier_tax_registration_number || doc.client_tax_registration_number)
+        ) {
           const nif =
             invoiceType === "incoming"
               ? doc.supplier_tax_registration_number
@@ -129,9 +114,7 @@ export async function POST(req: Request) {
                 erp_synced_at: new Date().toISOString(),
                 at_communicated: doc.communication_status === "sent",
                 at_communicated_at:
-                  doc.communication_status === "sent"
-                    ? new Date().toISOString()
-                    : null,
+                  doc.communication_status === "sent" ? new Date().toISOString() : null,
                 updated_at: new Date().toISOString(),
               })
               .eq("id", byNifAndNum.id)
@@ -142,9 +125,7 @@ export async function POST(req: Request) {
         }
 
         const invoiceData = mapTOCDocumentToInvoice(doc, tenantId, invoiceType)
-        const { error: insertErr } = await supabase
-          .from("invoices")
-          .insert(invoiceData)
+        const { error: insertErr } = await supabase.from("invoices").insert(invoiceData)
 
         if (insertErr) {
           errors.push(`Doc ${doc.id}: ${insertErr.message}`)
@@ -159,11 +140,11 @@ export async function POST(req: Request) {
 
   try {
     if (type === "purchases" || type === "both") {
-      const docs = await fetchPurchaseDocuments(accessToken, baseUrl, filters)
+      const docs = await fetchPurchaseDocuments(accessToken, apiBase)
       await processDocs(docs, "incoming")
     }
     if (type === "sales" || type === "both") {
-      const docs = await fetchSalesDocuments(accessToken, baseUrl, filters)
+      const docs = await fetchSalesDocuments(accessToken, apiBase)
       await processDocs(docs, "outgoing")
     }
   } catch (e) {
