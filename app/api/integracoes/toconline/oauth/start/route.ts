@@ -9,7 +9,7 @@ import { encrypt } from "@/lib/utils/encryption"
 const bodySchema = z.object({
   subdomain: z.string().min(1),
   client_id: z.string().min(1),
-  client_secret: z.string().min(1),
+  client_secret: z.string().min(1).optional(),
 })
 
 function makeState(tenantId: string): string {
@@ -33,7 +33,26 @@ export async function POST(req: Request) {
   const tenantId = session.tenant.id
   const admin = createAdminClient()
 
-  // Guardar credenciais temporariamente (is_active false ate callback)
+  // Verificar se ja existe uma row para preservar o secret se nao for enviado
+  const { data: existing } = await admin
+    .from("tenant_integrations")
+    .select("toconline_client_secret_encrypted, config")
+    .eq("tenant_id", tenantId)
+    .eq("type", "erp")
+    .eq("provider", "toconline")
+    .maybeSingle()
+
+  const secretToSave =
+    client_secret
+      ? encrypt(client_secret)
+      : existing?.toconline_client_secret_encrypted ?? null
+
+  if (!secretToSave) {
+    return NextResponse.json({ error: "Client Secret obrigatorio na primeira configuracao" }, { status: 400 })
+  }
+
+  const existingConfig = (existing?.config ?? {}) as Record<string, unknown>
+
   await admin.from("tenant_integrations").upsert(
     {
       tenant_id: tenantId,
@@ -41,8 +60,8 @@ export async function POST(req: Request) {
       provider: "toconline",
       is_active: false,
       toconline_client_id: client_id,
-      toconline_client_secret_encrypted: encrypt(client_secret),
-      config: { subdomain: String(subdomain), oauth_pending: true },
+      toconline_client_secret_encrypted: secretToSave,
+      config: { ...existingConfig, subdomain: String(subdomain), oauth_pending: true },
       sync_error: null,
       updated_at: new Date().toISOString(),
     },

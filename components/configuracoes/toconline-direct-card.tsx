@@ -69,6 +69,10 @@ export function ToconlineDirectCard({
   const [clientId, setClientId] = useState(initial?.client_id ?? "")
   const [clientSecret, setClientSecret] = useState("")
   const [subdomain, setSubdomain] = useState(initial?.subdomain ?? "")
+  const [showManual, setShowManual] = useState(false)
+  const [manualAccessToken, setManualAccessToken] = useState("")
+  const [manualRefreshToken, setManualRefreshToken] = useState("")
+  const [savingManual, setSavingManual] = useState(false)
 
   useEffect(() => {
     const result = searchParams.get("toconline")
@@ -140,6 +144,44 @@ export function ToconlineDirectCard({
       })
     } finally {
       setSavingMode(false)
+    }
+  }
+
+  async function handleManualSave() {
+    if (!clientId || !clientSecret || !manualAccessToken || !manualRefreshToken || !subdomain) {
+      toast.error("Todos os campos sao obrigatorios no modo manual")
+      return
+    }
+    setSavingManual(true)
+    try {
+      const res = await fetch("/api/integracoes/toconline/direct", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: clientSecret,
+          access_token: manualAccessToken,
+          refresh_token: manualRefreshToken,
+          subdomain,
+          expires_in: 14400,
+        }),
+      })
+      const body = await res.json()
+      if (res.ok && body.ok) {
+        toast.success("Credenciais guardadas (modo manual)")
+        setManualAccessToken("")
+        setManualRefreshToken("")
+        setClientSecret("")
+        setShowManual(false)
+        setShowForm(false)
+        router.refresh()
+      } else {
+        toast.error("Falha ao guardar", { description: body.error ?? `HTTP ${res.status}` })
+      }
+    } catch (e) {
+      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setSavingManual(false)
     }
   }
 
@@ -374,6 +416,52 @@ export function ToconlineDirectCard({
                 autoComplete="new-password"
               />
             </div>
+            {/* Fallback manual */}
+            <div className="border-t pt-3">
+              <button
+                type="button"
+                className="text-xs text-muted-foreground underline underline-offset-2"
+                onClick={() => setShowManual((v) => !v)}
+              >
+                {showManual ? "Ocultar entrada manual" : "Nao consigo autorizar - entrar tokens manualmente"}
+              </button>
+              {showManual && (
+                <div className="space-y-3 mt-3">
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    Usa isto se o redirect OAuth nao funcionar. Obtem os tokens do n8n ou Postman.
+                  </p>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tc-access-token-manual">Access Token</Label>
+                    <Input
+                      id="tc-access-token-manual"
+                      type="password"
+                      placeholder="access_token obtido do n8n ou Postman"
+                      value={manualAccessToken}
+                      onChange={(e) => setManualAccessToken(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tc-refresh-token-manual">Refresh Token</Label>
+                    <Input
+                      id="tc-refresh-token-manual"
+                      type="password"
+                      placeholder="refresh_token obtido do n8n ou Postman"
+                      value={manualRefreshToken}
+                      onChange={(e) => setManualRefreshToken(e.target.value)}
+                      autoComplete="new-password"
+                    />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button size="sm" variant="outline" onClick={handleManualSave} disabled={savingManual}>
+                      {savingManual && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Guardar tokens manualmente
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex flex-wrap justify-end gap-2 pt-1">
               <Button variant="ghost" size="sm" onClick={() => setShowForm(false)} disabled={connecting}>
                 Cancelar
