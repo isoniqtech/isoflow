@@ -38,18 +38,18 @@ export async function POST() {
     )
   }
 
-  const { accessToken, appBase } = tokenConfig
+  const { accessToken, apiBase } = tokenConfig
   const now = new Date()
 
   // Buscar todos os documentos de uma vez (sem filtro de data - API nao suporta date_from/date_to)
-  // Depois agrupar por mes no codigo
+  // apiBase = https://api13.toconline.pt (confirmar com workflow n8n)
   let allSales: Awaited<ReturnType<typeof fetchSalesDocuments>> = []
   let allPurchases: Awaited<ReturnType<typeof fetchPurchaseDocuments>> = []
 
   try {
     ;[allSales, allPurchases] = await Promise.all([
-      fetchSalesDocuments(accessToken, appBase),
-      fetchPurchaseDocuments(accessToken, appBase),
+      fetchSalesDocuments(accessToken, apiBase),
+      fetchPurchaseDocuments(accessToken, apiBase),
     ])
   } catch (e) {
     return NextResponse.json(
