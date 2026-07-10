@@ -32,6 +32,8 @@ import { PdfViewer } from "@/components/faturas/pdf-viewer"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import type { InvoiceDetail as InvoiceDetailType } from "@/lib/queries/invoice-detail"
 
+type ProjectOption = { id: string; name: string; color: string }
+
 // Form uses strings for number inputs — converted to numbers on submit
 const editSchema = z.object({
   supplier_name: z.string().max(200),
@@ -60,6 +62,7 @@ const editSchema = z.object({
     .or(z.literal(""))
     .nullable(),
   notes: z.string().max(2000),
+  project_id: z.string().uuid().nullable().or(z.literal("")).nullable(),
 })
 
 type EditForm = z.infer<typeof editSchema>
@@ -97,6 +100,8 @@ export function InvoiceDetail({
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [fileType, setFileType] = useState<string | null>(null)
   const [fileLoading, setFileLoading] = useState(false)
+  const [projects, setProjects] = useState<ProjectOption[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
 
   const aiFailedNoData =
     invoice.file_path &&
@@ -126,6 +131,21 @@ export function InvoiceDetail({
     resolver: zodResolver(editSchema),
     defaultValues: toFormValues(invoice),
   })
+
+  function startEditing() {
+    if (projects.length === 0 && !projectsLoading) {
+      setProjectsLoading(true)
+      fetch("/api/projetos")
+        .then((r) => r.json())
+        .then((body) => {
+          const list = (body.data ?? []) as Array<{ id: string; name: string; color: string }>
+          setProjects(list.map((p) => ({ id: p.id, name: p.name, color: p.color ?? "#2563EB" })))
+        })
+        .catch(() => {})
+        .finally(() => setProjectsLoading(false))
+    }
+    setEditing(true)
+  }
 
   useEffect(() => {
     if (!invoice.file_path) return
@@ -158,6 +178,7 @@ export function InvoiceDetail({
         description: values.description || null,
         category: values.category || null,
         notes: values.notes || null,
+        project_id: values.project_id || null,
       }
 
       const res = await fetch(`/api/faturas/${invoice.id}`, {
@@ -241,7 +262,7 @@ export function InvoiceDetail({
                   Reprocessar com AI
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+              <Button variant="outline" size="sm" onClick={startEditing}>
                 <Pencil className="h-3.5 w-3.5 mr-1.5" />
                 Editar
               </Button>
@@ -295,7 +316,7 @@ export function InvoiceDetail({
         </div>
 
         {editing ? (
-          <InvoiceEditForm control={control} errors={errors} />
+          <InvoiceEditForm control={control} errors={errors} projects={projects} projectsLoading={projectsLoading} />
         ) : (
           <InvoiceViewMode invoice={invoice} />
         )}
@@ -318,12 +339,23 @@ function toFormValues(invoice: InvoiceDetailType): EditForm {
     description: invoice.description ?? "",
     category: (invoice.category as EditForm["category"]) ?? null,
     notes: invoice.notes ?? "",
+    project_id: invoice.project?.id ?? null,
   }
 }
 
 function InvoiceViewMode({ invoice }: { invoice: InvoiceDetailType }) {
   return (
     <div className="space-y-4">
+      {invoice.project && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 border text-sm">
+          <div
+            className="h-3 w-3 rounded-full shrink-0"
+            style={{ backgroundColor: invoice.project.color }}
+          />
+          <span className="font-medium truncate">{invoice.project.name}</span>
+        </div>
+      )}
+
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Fornecedor</CardTitle>
@@ -401,12 +433,51 @@ function InvoiceViewMode({ invoice }: { invoice: InvoiceDetailType }) {
 function InvoiceEditForm({
   control,
   errors,
+  projects,
+  projectsLoading,
 }: {
   control: ReturnType<typeof useForm<EditForm>>["control"]
   errors: ReturnType<typeof useForm<EditForm>>["formState"]["errors"]
+  projects: ProjectOption[]
+  projectsLoading: boolean
 }) {
   return (
     <div className="space-y-3">
+      <div className="space-y-1">
+        <Label htmlFor="project_id">Projeto</Label>
+        <Controller
+          control={control}
+          name="project_id"
+          render={({ field }) => (
+            <Select
+              value={field.value ?? "none"}
+              onValueChange={(v) => field.onChange(v === "none" ? null : v)}
+              disabled={projectsLoading}
+            >
+              <SelectTrigger id="project_id">
+                <SelectValue placeholder={projectsLoading ? "A carregar…" : "Sem projeto"} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">Sem projeto</span>
+                </SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-2.5 w-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: p.color }}
+                      />
+                      {p.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label htmlFor="supplier_name">Fornecedor</Label>
