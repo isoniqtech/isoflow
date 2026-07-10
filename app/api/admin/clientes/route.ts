@@ -73,25 +73,7 @@ export async function POST(req: Request) {
     return jsonError("Este email ja esta registado na plataforma. Usa outro email para o owner.", 400)
   }
 
-  // 2. Criar utilizador no Supabase Auth
-  const tempPassword = generateTempPassword()
-  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-    email: d.owner_email,
-    password: tempPassword,
-    email_confirm: true,
-    user_metadata: { name: d.owner_name },
-  })
-
-  if (authError || !authData.user) {
-    return jsonError(
-      "Falha ao criar utilizador: " + (authError?.message ?? "desconhecido"),
-      500,
-    )
-  }
-
-  const userId = authData.user.id
-
-  // 2. Criar tenant
+  // 2. Criar tenant primeiro
   const baseCredits = CREDITS_BY_PLAN[d.plan] ?? 500
   const initialCredits =
     d.initial_credits !== undefined
@@ -136,27 +118,31 @@ export async function POST(req: Request) {
     .single()
 
   if (tenantError || !tenant) {
-    await supabase.auth.admin.deleteUser(userId)
     return jsonError(
       "Falha ao criar empresa: " + (tenantError?.message ?? "desconhecido"),
       500,
     )
   }
 
-  // 3. Criar perfil do utilizador
-  const { error: profileError } = await supabase.from("users").insert({
-    id: userId,
-    tenant_id: tenant.id,
-    name: d.owner_name,
+  // 3. Criar utilizador no Supabase Auth
+  // O trigger handle_new_user() cria o perfil automaticamente usando o tenant_id do metadata
+  const tempPassword = generateTempPassword()
+  const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email: d.owner_email,
-    role: "owner",
+    password: tempPassword,
+    email_confirm: true,
+    user_metadata: { name: d.owner_name, tenant_id: tenant.id, role: "owner" },
   })
 
-  if (profileError) {
-    await supabase.auth.admin.deleteUser(userId)
+  if (authError || !authData.user) {
     await supabase.from("tenants").delete().eq("id", tenant.id)
-    return jsonError("Falha ao criar perfil: " + profileError.message, 500)
+    return jsonError(
+      "Falha ao criar utilizador: " + (authError?.message ?? "desconhecido"),
+      500,
+    )
   }
+
+  const userId = authData.user.id
 
   // 4. Audit log
   await log(supabase, {
