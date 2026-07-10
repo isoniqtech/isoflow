@@ -62,7 +62,18 @@ export async function POST(req: Request) {
   const d = parsed.data
   const supabase = createAdminClient()
 
-  // 1. Criar utilizador no Supabase Auth
+  // 1. Verificar se email ja existe na tabela users
+  const { data: existingUser } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", d.owner_email)
+    .maybeSingle()
+
+  if (existingUser) {
+    return jsonError("Este email ja esta registado na plataforma. Usa outro email para o owner.", 400)
+  }
+
+  // 2. Criar utilizador no Supabase Auth
   const tempPassword = generateTempPassword()
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email: d.owner_email,
