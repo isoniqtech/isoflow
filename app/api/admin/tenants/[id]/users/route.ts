@@ -51,28 +51,16 @@ export async function POST(
     .maybeSingle()
   if (!tenant) return jsonError("Tenant not found", 404)
 
+  // O trigger handle_new_user() cria o perfil automaticamente usando tenant_id do metadata
   const { data: authUser, error: authErr } = await admin.auth.admin.createUser({
     email,
     password,
     email_confirm: true,
+    user_metadata: { name, tenant_id: params.id, role },
   })
 
   if (authErr || !authUser.user) {
     return jsonError("Failed to create auth user", 500, authErr?.message)
-  }
-
-  const { error: profileErr } = await admin.from("users").insert({
-    id: authUser.user.id,
-    tenant_id: params.id,
-    name,
-    email,
-    role,
-    is_active: true,
-  })
-
-  if (profileErr) {
-    await admin.auth.admin.deleteUser(authUser.user.id)
-    return jsonError("Failed to create user profile", 500, profileErr.message)
   }
 
   return Response.json({ id: authUser.user.id, email, name, role }, { status: 201 })
