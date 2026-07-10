@@ -103,7 +103,9 @@ export async function POST() {
       processed++
     } catch (e) {
       const label = `${String(month).padStart(2, "0")}/${year}`
-      errors.push(`${label}: ${e instanceof Error ? e.message : String(e)}`)
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`[import-historico] ${label}:`, msg)
+      errors.push(`${label}: ${msg}`)
     }
   }
 
