@@ -69,7 +69,9 @@ export async function POST(req: Request) {
   )
 
   const state = makeState(tenantId)
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integracoes/toconline/oauth/callback`
+  const reqUrl = new URL(req.url)
+  const origin = `${reqUrl.protocol}//${reqUrl.host}`
+  const redirectUri = `${origin}/api/integracoes/toconline/oauth/callback`
   const appBase = `https://app${subdomain}.toconline.pt`
   const authUrl =
     `${appBase}/oauth/auth` +

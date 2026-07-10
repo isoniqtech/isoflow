@@ -54,7 +54,8 @@ export async function GET(req: Request) {
   const config = (row!.config ?? {}) as Record<string, unknown>
   const subdomain = config.subdomain as string
   const appBase = `https://app${subdomain}.toconline.pt`
-  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integracoes/toconline/oauth/callback`
+  const reqUrl = new URL(req.url)
+  const redirectUri = `${reqUrl.protocol}//${reqUrl.host}/api/integracoes/toconline/oauth/callback`
 
   let clientSecret: string
   try {
