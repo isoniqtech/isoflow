@@ -32,30 +32,91 @@ async function refreshOAuthToken(
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
   const url = `${appBase.replace(/\/$/, "")}/oauth/token`
 
-  const body = new URLSearchParams({
-    grant_type: "refresh_token",
-    refresh_token: refreshToken,
-    scope: "commercial",
-  })
-
   const res = await fetch(url, {
     method: "POST",
     headers: {
       Authorization: `Basic ${credentials}`,
       "Content-Type": "application/x-www-form-urlencoded",
     },
-    body: body.toString(),
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      refresh_token: refreshToken,
+      scope: "commercial",
+    }).toString(),
   })
 
   if (!res.ok) {
     const text = await res.text().catch(() => "")
-    throw new Error(`TOConline token refresh falhou ${res.status}: ${text.slice(0, 300)}`)
+    throw new Error(`refresh_token falhou ${res.status}: ${text.slice(0, 200)}`)
   }
 
   const data = await res.json()
   if (!data.access_token) {
-    throw new Error("TOConline token refresh: resposta sem access_token")
+    throw new Error("refresh_token: resposta sem access_token")
   }
+  return data as OAuthResponse
+}
+
+/**
+ * Fallback de re-autorizacao server-side (replica o mecanismo do n8n):
+ * chama /oauth/auth com o Bearer token atual - o TOConline devolve um code
+ * sem interacao do utilizador se o token ainda for valido.
+ * So e chamado quando grant_type=refresh_token falha.
+ */
+async function reauthorizeWithToken(
+  appBase: string,
+  clientId: string,
+  clientSecret: string,
+  currentAccessToken: string,
+  redirectUri: string,
+): Promise<OAuthResponse> {
+  const base = appBase.replace(/\/$/, "")
+  const authUrl =
+    `${base}/oauth/auth` +
+    `?client_id=${encodeURIComponent(clientId)}` +
+    `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+    `&response_type=code` +
+    `&scope=commercial`
+
+  const authRes = await fetch(authUrl, {
+    headers: { Authorization: `Bearer ${currentAccessToken}`, Accept: "*/*" },
+    redirect: "follow",
+  })
+
+  const html = await authRes.text().catch(() => "")
+
+  // TOConline devolve {"code":"..."} dentro de um <pre> ou na URL
+  let code: string | null = null
+  let m = html.match(/&quot;code&quot;\s*:\s*&quot;([^&]+?)&quot;/)
+  if (!m) m = html.match(/"code"\s*:\s*"([^"]+?)"/)
+  if (!m) m = html.match(/[?&]code=([^&\s<"]+)/)
+  if (m) code = decodeURIComponent(m[1])
+
+  if (!code) throw new Error("Nao foi possivel extrair OAuth code da pagina de auth")
+
+  const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
+  const tokenRes = await fetch(`${base}/oauth/token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Basic ${credentials}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      Accept: "application/json",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      scope: "commercial",
+      redirect_uri: redirectUri,
+    }).toString(),
+  })
+
+  if (!tokenRes.ok) {
+    const text = await tokenRes.text().catch(() => "")
+    throw new Error(`re-auth token exchange falhou ${tokenRes.status}: ${text.slice(0, 200)}`)
+  }
+
+  const data = await tokenRes.json()
+  if (!data.access_token) throw new Error("re-auth: resposta sem access_token")
   return data as OAuthResponse
 }
 
@@ -143,23 +204,44 @@ export async function getValidToken(tenantId: string): Promise<TOCTokenConfig> {
     )
   }
 
-  let refreshResult: OAuthResponse
+  const redirectUri = `${process.env.NEXT_PUBLIC_APP_URL}/api/integracoes/toconline/oauth/callback`
+
+  let refreshResult: OAuthResponse | null = null
+
+  // 1a tentativa: grant_type=refresh_token (standard OAuth)
   try {
     refreshResult = await refreshOAuthToken(appBase, clientId, clientSecret, refreshToken)
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e)
-    // Persistir erro na tabela para ser visto na UI
+  } catch {
+    // Falhou - tentar fallback server-side (mecanismo n8n)
+  }
+
+  // 2a tentativa: re-autorizacao server-side com token atual (fallback n8n)
+  if (!refreshResult && accessToken) {
+    try {
+      refreshResult = await reauthorizeWithToken(
+        appBase,
+        clientId,
+        clientSecret,
+        accessToken,
+        redirectUri,
+      )
+    } catch {
+      // Ambas falharam - registar erro abaixo
+    }
+  }
+
+  if (!refreshResult) {
+    const msg = "Nao foi possivel renovar o token (refresh_token e re-auth falharam). Volta a ligar o TOConline nas definicoes."
     await admin
       .from("tenant_integrations")
       .update({
-        sync_error: `Refresh token falhou: ${msg}`.slice(0, 500),
+        sync_error: msg.slice(0, 500),
         updated_at: new Date().toISOString(),
       })
       .eq("tenant_id", tenantId)
       .eq("type", "erp")
       .eq("provider", "toconline")
 
-    // Audit log para rastreabilidade
     await admin.from("audit_logs").insert({
       tenant_id: tenantId,
       user_id: null,
