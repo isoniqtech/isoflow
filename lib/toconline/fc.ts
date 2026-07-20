@@ -15,6 +15,8 @@ export interface FCPayload {
   supplierName: string | null
   subtotal: number | null
   description: string | null
+  /** Nota do movimento bancario conciliado, anexada ao campo notes do FC. */
+  movementNote?: string | null
 }
 
 export interface FCResult {
@@ -172,12 +174,19 @@ async function doCreateFC(
   const invoiceDate = payload.invoiceDate ?? new Date().toISOString().slice(0, 10)
   const description = payload.description ?? payload.supplierName ?? "Fatura importada ISOFlow"
 
+  // Nota do movimento bancario (se conciliado) anexada ao campo notes do FC,
+  // para ficar visivel ao contabilista no TOConline.
+  const movementNote = payload.movementNote?.trim()
+  const notes = movementNote
+    ? `${description}\nNota mov. banco: ${movementNote}`
+    : description
+
   const body: Record<string, unknown> = {
     document_type: "FC",
     date: invoiceDate,
     due_date: invoiceDate,
     external_reference: payload.invoiceNumber ?? "",
-    notes: description,
+    notes,
     vat_included_prices: false,
     retention_total: 0,
     lines: [

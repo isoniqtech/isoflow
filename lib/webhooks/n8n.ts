@@ -23,6 +23,8 @@ export interface N8nInvoicePayload {
     category: string | null
     source: string
     file_path: string | null
+    /** Nota do movimento bancario conciliado (mapear para notes no TOConline). */
+    movement_note?: string | null
   }
   /** URL assinada do Supabase Storage para o ficheiro original. */
   file_url?: string | null
@@ -163,7 +165,7 @@ export async function forwardInvoiceToN8N(
   const { data: invoice, error: invErr } = await admin
     .from("invoices")
     .select(
-      "id, tenant_id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, subtotal, vat_rate, vat_amount, total, currency, description, category, source, file_path, sent_by, sender_email, project_id",
+      "id, tenant_id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, subtotal, vat_rate, vat_amount, total, currency, description, category, source, file_path, sent_by, sender_email, project_id, bank_transaction_id",
     )
     .eq("id", invoiceId)
     .eq("tenant_id", tenantId)
@@ -171,6 +173,18 @@ export async function forwardInvoiceToN8N(
 
   if (invErr || !invoice) {
     return { ok: false, error: invErr?.message ?? "Fatura não encontrada" }
+  }
+
+  // Nota do movimento bancario conciliado (se houver)
+  let movementNote: string | null = null
+  if (invoice.bank_transaction_id) {
+    const { data: tx } = await admin
+      .from("bank_transactions")
+      .select("notes")
+      .eq("id", invoice.bank_transaction_id)
+      .eq("tenant_id", tenantId)
+      .maybeSingle()
+    if (tx?.notes && tx.notes.trim().length > 0) movementNote = tx.notes
   }
 
   // 3. Signed URL do ficheiro (se houver)
@@ -204,6 +218,7 @@ export async function forwardInvoiceToN8N(
         category: invoice.category,
         source: invoice.source ?? "manual",
         file_path: invoice.file_path,
+        movement_note: movementNote,
       },
       file_url: fileUrl,
       metadata: {

@@ -90,6 +90,7 @@ export type Database = {
           matched_at: string | null
           matched_by: string | null
           mode: string | null
+          notes: string | null
           raw_data: Json | null
           tenant_id: string
           type: string | null
@@ -116,6 +117,7 @@ export type Database = {
           matched_at?: string | null
           matched_by?: string | null
           mode?: string | null
+          notes?: string | null
           raw_data?: Json | null
           tenant_id: string
           type?: string | null
@@ -142,6 +144,7 @@ export type Database = {
           matched_at?: string | null
           matched_by?: string | null
           mode?: string | null
+          notes?: string | null
           raw_data?: Json | null
           tenant_id?: string
           type?: string | null

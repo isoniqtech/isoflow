@@ -44,7 +44,7 @@ export default async function ConciliacaoPage() {
     supabase
       .from("bank_transactions")
       .select(
-        "id, date, description, counterparty_name, bank_reference, amount, external_status",
+        "id, date, description, counterparty_name, bank_reference, amount, external_status, notes",
       )
       .eq("tenant_id", session.tenant.id)
       .is("invoice_id", null)
@@ -68,7 +68,7 @@ export default async function ConciliacaoPage() {
     txIdsInSuggestions.length
       ? supabase
           .from("bank_transactions")
-          .select("id, date, description, counterparty_name, bank_reference, amount")
+          .select("id, date, description, counterparty_name, bank_reference, amount, notes")
           .in("id", txIdsInSuggestions)
       : Promise.resolve({ data: [] as Array<Record<string, unknown>> }),
   ])
@@ -99,6 +99,7 @@ export default async function ConciliacaoPage() {
             counterparty_name: string | null
             bank_reference: string | null
             amount: number
+            notes: string | null
           }
         | undefined
       if (!inv || !tx) return null
@@ -129,6 +130,7 @@ export default async function ConciliacaoPage() {
       counterparty_name: t.counterparty_name,
       bank_reference: t.bank_reference,
       amount: Number(t.amount),
+      notes: t.notes,
     }))
 
   return (

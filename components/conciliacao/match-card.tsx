@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
+import { MovementNote } from "@/components/banco/movement-note"
 
 export type SuggestionRow = {
   reconciliation_id: string
@@ -26,6 +27,7 @@ export type SuggestionRow = {
     counterparty_name: string | null
     bank_reference: string | null
     amount: number
+    notes: string | null
   }
 }
 
@@ -101,9 +103,15 @@ export function MatchCard({ suggestion }: { suggestion: SuggestionRow }) {
 
           {/* Bank tx */}
           <div className="rounded-md border bg-muted/30 p-3">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-              Movimento
-            </p>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                Movimento
+              </p>
+              <MovementNote
+                id={suggestion.bank_tx.id}
+                initialNotes={suggestion.bank_tx.notes}
+              />
+            </div>
             <p className="font-medium truncate">
               {suggestion.bank_tx.counterparty_name ??
                 suggestion.bank_tx.description ??

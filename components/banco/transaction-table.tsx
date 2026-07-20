@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/select"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
+import { MovementNote } from "@/components/banco/movement-note"
 
 export type BankTxRow = {
   id: string
@@ -45,6 +46,7 @@ export type BankTxRow = {
   counterparty_name: string | null
   counterparty_iban: string | null
   bank_reference: string | null
+  notes: string | null
 }
 
 type SortKey = "date" | "amount" | "description"
@@ -262,6 +264,7 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
                   Valor <SortIcon col="amount" sortKey={sortKey} sortDir={sortDir} />
                 </TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Nota</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -338,6 +341,11 @@ export function TransactionTable({ rows }: { rows: BankTxRow[] }) {
                           Por conciliar
                         </Badge>
                       )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end">
+                        <MovementNote id={tx.id} initialNotes={tx.notes} />
+                      </div>
                     </TableCell>
                   </TableRow>
                 )

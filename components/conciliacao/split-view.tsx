@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
+import { MovementNote } from "@/components/banco/movement-note"
 
 export type SplitInvoice = {
   id: string
@@ -24,6 +25,7 @@ export type SplitBankTx = {
   counterparty_name: string | null
   bank_reference: string | null
   amount: number
+  notes: string | null
 }
 
 export function SplitView({
@@ -175,12 +177,15 @@ export function SplitView({
                   const sel = selectedTx === tx.id
                   const isDebit = tx.amount < 0
                   return (
-                    <li key={tx.id}>
+                    <li key={tx.id} className="relative">
+                      <div className="absolute bottom-1 right-1 z-10">
+                        <MovementNote id={tx.id} initialNotes={tx.notes} />
+                      </div>
                       <button
                         type="button"
                         onClick={() => setSelectedTx(sel ? null : tx.id)}
                         className={cn(
-                          "w-full text-left rounded-md border p-2.5 transition-colors",
+                          "w-full text-left rounded-md border p-2.5 pr-9 transition-colors",
                           sel
                             ? "bg-foreground text-background border-foreground"
                             : "bg-background hover:bg-muted/50",

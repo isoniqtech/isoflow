@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   // Buscar faturas elegíveis
   const { data: invoices, error } = await supabase
     .from("invoices")
-    .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id")
+    .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id, bank_transaction_id")
     .eq("tenant_id", tenantId)
     .in("id", parsed.data.invoice_ids)
 
@@ -49,6 +49,24 @@ export async function POST(request: Request) {
 
   if (!pending.length)
     return NextResponse.json({ queued: 0, skipped: alreadyDone })
+
+  // Notas dos movimentos bancarios conciliados (para anexar ao FC no TOConline)
+  const bankTxIds = pending
+    .map((inv) => inv.bank_transaction_id)
+    .filter((v): v is string => Boolean(v))
+  const noteByTxId = new Map<string, string>()
+  if (bankTxIds.length) {
+    const { data: txNotes } = await supabase
+      .from("bank_transactions")
+      .select("id, notes")
+      .eq("tenant_id", tenantId)
+      .in("id", bankTxIds)
+    for (const t of txNotes ?? []) {
+      if (t.notes && t.notes.trim().length > 0) noteByTxId.set(t.id, t.notes)
+    }
+  }
+  const noteForInvoice = (inv: { bank_transaction_id: string | null }): string | null =>
+    inv.bank_transaction_id ? noteByTxId.get(inv.bank_transaction_id) ?? null : null
 
   // -------------------------------------------------------------------
   // MODO DIRETO: cria FC directamente no TOConline sem passar pelo n8n
@@ -81,6 +99,7 @@ export async function POST(request: Request) {
             supplierName: inv.supplier_name,
             subtotal: inv.subtotal !== null ? Number(inv.subtotal) : null,
             description: inv.description,
+            movementNote: noteForInvoice(inv),
           })
 
           // Gravar fc_number directamente - mesma logica que /api/faturas/[id]/update-fc
@@ -153,6 +172,7 @@ export async function POST(request: Request) {
               total: inv.total,
               description: inv.description,
               currency: inv.currency ?? "EUR",
+              movement_note: noteForInvoice(inv),
             },
           }),
         })

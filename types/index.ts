@@ -316,6 +316,7 @@ export interface BankTransaction {
   counterparty_iban: string | null
   bank_reference: string | null
   external_status: BankTransactionStatus | null
+  notes: string | null
   created_at: string
 }
 
