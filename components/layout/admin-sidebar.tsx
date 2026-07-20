@@ -18,7 +18,13 @@ const ADMIN_NAV = [
   { href: "/admin/receita", label: "Receita", icon: Coins },
 ]
 
-export function AdminSidebar({ className }: { className?: string }) {
+export function AdminSidebar({
+  className,
+  newTickets = 0,
+}: {
+  className?: string
+  newTickets?: number
+}) {
   const pathname = usePathname()
 
   return (
@@ -49,6 +55,7 @@ export function AdminSidebar({ className }: { className?: string }) {
                 ? pathname === "/admin"
                 : pathname === item.href || pathname.startsWith(`${item.href}/`)
             const Icon = item.icon
+            const badge = item.href === "/admin/tickets" ? newTickets : 0
             return (
               <li key={item.href}>
                 <Link
@@ -61,7 +68,19 @@ export function AdminSidebar({ className }: { className?: string }) {
                   )}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.label}
+                  <span className="flex-1">{item.label}</span>
+                  {badge > 0 && (
+                    <span
+                      className={cn(
+                        "ml-auto inline-flex min-w-5 h-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold",
+                        active
+                          ? "bg-background text-foreground"
+                          : "bg-destructive text-destructive-foreground",
+                      )}
+                    >
+                      {badge > 99 ? "99+" : badge}
+                    </span>
+                  )}
                 </Link>
               </li>
             )

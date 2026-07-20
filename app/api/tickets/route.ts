@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { log } from "@/lib/utils/audit"
+import { notifyTicketCreated } from "@/lib/resend/notifications"
 
 const ticketInputSchema = z.object({
   title: z.string().trim().min(3).max(200),
@@ -83,6 +84,17 @@ export async function POST(req: Request) {
     resourceType: "support_ticket",
     resourceId: ticket.id,
     metadata: { priority: input.priority },
+  })
+
+  // Avisa o super-admin por email (no-op se email não configurado; nunca lança).
+  await notifyTicketCreated({
+    id: ticket.id,
+    tenant_id: ticket.tenant_id,
+    created_by: ticket.created_by,
+    title: ticket.title,
+    description: ticket.description,
+    priority: ticket.priority,
+    category: ticket.category,
   })
 
   return Response.json({ data: ticket }, { status: 201 })

@@ -2,6 +2,7 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
 import { getCurrentSession } from "@/lib/queries/current-session"
+import { countNewTickets } from "@/lib/queries/admin"
 import { isSuperAdmin } from "@/lib/supabase/admin"
 import { AdminSidebar } from "@/components/layout/admin-sidebar"
 import { AdminMobileNav } from "@/components/layout/admin-mobile-nav"
@@ -15,9 +16,11 @@ export default async function AdminLayout({
   if (!session) redirect("/login")
   if (!isSuperAdmin(session.user.id)) redirect("/dashboard")
 
+  const newTickets = await countNewTickets()
+
   return (
     <div className="min-h-screen flex bg-muted/30">
-      <AdminSidebar className="hidden md:flex" />
+      <AdminSidebar className="hidden md:flex" newTickets={newTickets} />
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-14 border-b bg-background flex items-center px-4 gap-3 shrink-0">
           <Link
@@ -34,7 +37,7 @@ export default async function AdminLayout({
             {session.user.email}
           </span>
         </header>
-        <AdminMobileNav />
+        <AdminMobileNav newTickets={newTickets} />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>

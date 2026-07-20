@@ -17,7 +17,7 @@ const ADMIN_NAV = [
   { href: "/admin/receita", label: "Receita", icon: Coins },
 ]
 
-export function AdminMobileNav() {
+export function AdminMobileNav({ newTickets = 0 }: { newTickets?: number }) {
   const pathname = usePathname()
 
   return (
@@ -29,6 +29,7 @@ export function AdminMobileNav() {
               ? pathname === "/admin"
               : pathname === item.href || pathname.startsWith(`${item.href}/`)
           const Icon = item.icon
+          const badge = item.href === "/admin/tickets" ? newTickets : 0
           return (
             <li key={item.href}>
               <Link
@@ -42,6 +43,18 @@ export function AdminMobileNav() {
               >
                 <Icon className="h-3.5 w-3.5" />
                 {item.label}
+                {badge > 0 && (
+                  <span
+                    className={cn(
+                      "inline-flex min-w-4 h-4 items-center justify-center rounded-full px-1 text-[10px] font-semibold",
+                      active
+                        ? "bg-background text-foreground"
+                        : "bg-destructive text-destructive-foreground",
+                    )}
+                  >
+                    {badge > 99 ? "99+" : badge}
+                  </span>
+                )}
               </Link>
             </li>
           )

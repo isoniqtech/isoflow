@@ -486,3 +486,15 @@ export async function listAdminAudit(
     created_at: r.created_at ?? new Date().toISOString(),
   }))
 }
+
+/**
+ * Nº de tickets por tratar (estado "open"), para o badge de notificação no painel admin.
+ */
+export async function countNewTickets(): Promise<number> {
+  const supabase = createAdminClient()
+  const { count } = await supabase
+    .from("support_tickets")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "open")
+  return count ?? 0
+}
