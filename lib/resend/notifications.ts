@@ -96,9 +96,22 @@ export async function notifyTicketCreated(ticket: TicketForEmail): Promise<void>
     ].join("\n")
 
     const resend = new Resend(apiKey)
-    await resend.emails.send({ from, to, subject, html, text })
+    // O SDK do Resend NAO lanca em erros de API - devolve { data, error }.
+    // Inspecionar o error explicitamente, senao uma rejeicao (dominio nao
+    // verificado, from invalido) falha em silencio.
+    const { data, error } = await resend.emails.send({ from, to, subject, html, text })
+    if (error) {
+      console.error("notifyTicketCreated: Resend rejeitou o envio", {
+        from,
+        to,
+        name: error.name,
+        message: error.message,
+      })
+      return
+    }
+    console.log("notifyTicketCreated: email enviado", { id: data?.id, to })
   } catch (error) {
     // Falha de email nunca deve propagar para o fluxo de criação do ticket.
-    console.error("notifyTicketCreated failed:", error)
+    console.error("notifyTicketCreated threw:", error)
   }
 }
