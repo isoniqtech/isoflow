@@ -2,6 +2,9 @@ import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getApiContext, jsonError } from "@/lib/api/auth"
+import type { Database } from "@/types/supabase"
+
+type TicketUpdate = Database["public"]["Tables"]["support_tickets"]["Update"]
 
 const messageSchema = z.object({
   message: z.string().trim().min(1).max(5000),
@@ -101,7 +104,7 @@ export async function POST(
     return jsonError("Could not send message", 500, error.message)
   }
 
-  const updates: Record<string, unknown> = {
+  const updates: TicketUpdate = {
     updated_at: new Date().toISOString(),
   }
   if (isSupport && ticket.status === "open") {
