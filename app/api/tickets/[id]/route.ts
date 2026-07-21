@@ -1,6 +1,10 @@
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getApiContext, jsonError } from "@/lib/api/auth"
+import type { Database } from "@/types/supabase"
+
+type TicketUpdate = Database["public"]["Tables"]["support_tickets"]["Update"]
 import { hasPermission } from "@/lib/utils/permissions"
 import { log } from "@/lib/utils/audit"
 
@@ -62,8 +66,10 @@ export async function PATCH(
     return jsonError("Validation error", 400, parsed.error.flatten())
   }
 
-  const supabase = createClient()
-  const updateData: Record<string, unknown> = {
+  // Super-admin atua sobre tickets de qualquer tenant -> service role (bypassa RLS).
+  // A rota ja esta gated a SUPER_ADMIN_USER_ID acima, por isso sem filtro de tenant.
+  const supabase = createAdminClient()
+  const updateData: TicketUpdate = {
     ...parsed.data,
     updated_at: new Date().toISOString(),
   }
@@ -75,7 +81,6 @@ export async function PATCH(
     .from("support_tickets")
     .update(updateData)
     .eq("id", params.id)
-    .eq("tenant_id", ctx.tenantId)
     .select("*")
     .maybeSingle()
 
@@ -84,7 +89,7 @@ export async function PATCH(
 
   await log(supabase, {
     action: "ticket.updated",
-    tenantId: ctx.tenantId,
+    tenantId: data.tenant_id,
     userId: ctx.userId,
     resourceType: "support_ticket",
     resourceId: data.id,

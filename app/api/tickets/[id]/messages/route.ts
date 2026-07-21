@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 
 const messageSchema = z.object({
@@ -14,7 +15,8 @@ export async function GET(
   if (!ctx) return jsonError("Unauthorized", 401)
 
   const isSupport = process.env.SUPER_ADMIN_USER_ID === ctx.userId
-  const supabase = createClient()
+  // Super-admin (suporte) atua cross-tenant -> service role; cliente fica com RLS.
+  const supabase = isSupport ? createAdminClient() : createClient()
 
   let ticketQuery = supabase
     .from("support_tickets")
@@ -55,7 +57,8 @@ export async function POST(
   }
 
   const isSupport = process.env.SUPER_ADMIN_USER_ID === ctx.userId
-  const supabase = createClient()
+  // Super-admin (suporte) atua cross-tenant -> service role; cliente fica com RLS.
+  const supabase = isSupport ? createAdminClient() : createClient()
 
   let ticketQuery = supabase
     .from("support_tickets")
