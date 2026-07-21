@@ -4,14 +4,27 @@ import { getValidToken } from "@/lib/toconline/token"
 import { fetchDocumentAssociations } from "@/lib/integrations/toconline"
 
 export const runtime = "nodejs"
-export const maxDuration = 60
+export const maxDuration = 300
 
 const AT_POSITIVE = ["compra_registada", "Associada", "doc_contabilidade"]
 
-export async function POST() {
+export async function POST(req: Request) {
   const ctx = await getApiContext()
   if (!ctx) return jsonError("Unauthorized", 401)
   if (!hasPermission(ctx.role, "faturas", "edit")) return jsonError("Forbidden", 403)
+
+  // Quantos meses buscar (modo direto). Default 2 = mes atual + anterior
+  // (comportamento do "Atualizar", inalterado). O "Importar historico" envia
+  // um valor maior. Sem body (chamada do "Atualizar") mantem o default.
+  let months = 2
+  try {
+    const body = (await req.json()) as { months?: number } | null
+    if (body?.months && Number.isFinite(body.months)) {
+      months = Math.min(Math.max(Math.trunc(body.months), 1), 24)
+    }
+  } catch {
+    // sem body -> mantem default 2
+  }
 
   const { createServiceClient } = await import("@/lib/supabase/server")
   const supabase = createServiceClient()
@@ -34,9 +47,9 @@ export async function POST() {
     try {
       const tokenConfig = await getValidToken(ctx.tenantId)
       const now = new Date()
-      // Buscar mes actual + mes anterior
+      // Buscar os ultimos `months` meses (default 2 = mes actual + anterior)
       const ranges: Array<{ from: string; to: string }> = []
-      for (let i = 0; i <= 1; i++) {
+      for (let i = 0; i < months; i++) {
         const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
         const firstDay = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`
         const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0)

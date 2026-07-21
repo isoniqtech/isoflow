@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { FileSpreadsheet, FileText, Loader2, RefreshCw, ChevronDown, Download, Sheet } from "lucide-react"
+import { FileSpreadsheet, FileText, Loader2, RefreshCw, ChevronDown, Download, Sheet, History } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -116,6 +116,7 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
 
   const [atFilters, setAtFilters] = useState<string[]>([])
   const [isPendingRefresh, startRefresh] = useTransition()
+  const [isPendingHistory, startHistory] = useTransition()
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null)
 
   const showTip = useCallback((e: React.MouseEvent<HTMLTableCellElement>, text: string) => {
@@ -152,6 +153,39 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
         if (at_communicated_updated > 0) lines.push(`${at_communicated_updated} marcada${at_communicated_updated !== 1 ? "s" : ""} AT`)
         toast.success("e-Fatura atualizada", {
           description: lines.length ? lines.join(" · ") : "Sem alterações",
+        })
+        router.refresh()
+      } catch {
+        toast.error("Erro de ligação ao servidor")
+      }
+    })
+  }
+
+  function handleImportHistory() {
+    if (!confirm("Importar o histórico de e-Fatura dos últimos 12 meses?\n\nPode demorar até um minuto.")) return
+    startHistory(async () => {
+      try {
+        const res = await fetch("/api/efatura/refresh", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ months: 12 }),
+        })
+        const json = await res.json()
+        if (!res.ok) {
+          toast.error(json.error ?? "Erro ao importar histórico e-Fatura")
+          return
+        }
+        const { direct_fetched, matched, at_communicated_updated } = json as {
+          direct_fetched: number
+          matched: number
+          at_communicated_updated: number
+        }
+        const lines: string[] = []
+        if (typeof direct_fetched === "number") lines.push(`${direct_fetched} documento${direct_fetched !== 1 ? "s" : ""} e-Fatura`)
+        if (matched > 0) lines.push(`${matched} associada${matched !== 1 ? "s" : ""}`)
+        if (at_communicated_updated > 0) lines.push(`${at_communicated_updated} marcada${at_communicated_updated !== 1 ? "s" : ""} AT`)
+        toast.success("Histórico e-Fatura importado", {
+          description: lines.length ? lines.join(" · ") : "Sem novos documentos",
         })
         router.refresh()
       } catch {
@@ -232,7 +266,14 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button size="sm" onClick={handleRefresh} disabled={isPendingRefresh}>
+          <Button size="sm" variant="outline" onClick={handleImportHistory} disabled={isPendingHistory || isPendingRefresh}>
+            {isPendingHistory
+              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              : <History className="mr-2 h-4 w-4" />
+            }
+            Importar histórico
+          </Button>
+          <Button size="sm" onClick={handleRefresh} disabled={isPendingRefresh || isPendingHistory}>
             {isPendingRefresh
               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               : <RefreshCw className="mr-2 h-4 w-4" />
