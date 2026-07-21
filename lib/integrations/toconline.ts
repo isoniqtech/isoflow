@@ -128,14 +128,15 @@ export async function fetchEFaturaList(
   appBase: string,
   filter?: string,
 ): Promise<EFaturaItem[]> {
-  const url = new URL(
-    `${appBase.replace(/\/$/, "")}/api/commercial_purchases_documents_list_for_invoices`,
-  )
+  // Construir o URL a' mao com encodeURIComponent (espacos -> %20). NAO usar
+  // URLSearchParams: codifica espacos como '+' e o TOConline nao os interpreta
+  // como espaco no filtro, devolvendo 400 (syntax error 42601).
+  let url = `${appBase.replace(/\/$/, "")}/api/commercial_purchases_documents_list_for_invoices`
   if (filter) {
-    url.searchParams.set("filter", filter)
+    url += `?filter=${encodeURIComponent(filter)}`
   }
 
-  const res = await fetch(url.toString(), {
+  const res = await fetch(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
@@ -200,10 +201,13 @@ export async function fetchDocumentAssociations(
   dateFrom: string,
   dateTo: string,
 ): Promise<DocumentAssociation[]> {
-  const url = new URL(`${appBase.replace(/\/$/, "")}/api/document_associations`)
-  url.searchParams.set("filter", `"date BETWEEN '${dateFrom}' AND '${dateTo}'"`)
+  // Construir o URL a' mao com encodeURIComponent (espacos -> %20), tal como o
+  // workflow n8n que funciona. URLSearchParams codifica espacos como '+' e o
+  // TOConline devolve 400 (syntax error 42601) por nao os tratar como espaco.
+  const filter = `"date BETWEEN '${dateFrom}' AND '${dateTo}'"`
+  const url = `${appBase.replace(/\/$/, "")}/api/document_associations?filter=${encodeURIComponent(filter)}`
 
-  const res = await fetch(url.toString(), {
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
   })
 
