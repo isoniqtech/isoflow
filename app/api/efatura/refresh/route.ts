@@ -41,6 +41,8 @@ export async function POST(req: Request) {
   let n8nTriggered = false
   let n8nError: string | null = null
   let directFetched = 0
+  let directCreated = 0
+  let directUpdated = 0
 
   if (isDirectMode) {
     // Modo directo: buscar de document_associations (appBase = app13)
@@ -65,9 +67,23 @@ export async function POST(req: Request) {
           range.to,
         )
 
+        // Saber quais ja' existem (para distinguir novos de ja' existentes)
+        const incomingIds = docs.filter((d) => d.document_number).map((d) => String(d.id))
+        const existingIds = new Set<string>()
+        if (incomingIds.length > 0) {
+          const { data: existing } = await supabase
+            .from("efatura_documents")
+            .select("toconline_id")
+            .eq("tenant_id", ctx.tenantId)
+            .in("toconline_id", incomingIds)
+          for (const r of existing ?? []) existingIds.add(r.toconline_id as string)
+        }
+
         for (const doc of docs) {
           if (!doc.document_number) continue
           const toconlineId = String(doc.id)
+          if (existingIds.has(toconlineId)) directUpdated++
+          else directCreated++
           await supabase.from("efatura_documents").upsert(
             {
               tenant_id: ctx.tenantId,
@@ -215,6 +231,8 @@ export async function POST(req: Request) {
     n8n_triggered: n8nTriggered,
     n8n_error: n8nError,
     direct_fetched: directFetched,
+    direct_created: directCreated,
+    direct_updated: directUpdated,
     matched,
     at_communicated_updated: atUpdated,
   })

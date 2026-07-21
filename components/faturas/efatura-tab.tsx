@@ -142,16 +142,24 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
           toast.error(json.error ?? "Erro ao atualizar e-Fatura")
           return
         }
-        const { n8n_triggered, direct_fetched, matched, at_communicated_updated } = json as {
+        const { n8n_triggered, direct_fetched, direct_created, direct_updated, matched, at_communicated_updated } = json as {
           n8n_triggered: boolean
           direct_fetched: number
+          direct_created: number
+          direct_updated: number
           matched: number
           at_communicated_updated: number
         }
         const lines: string[] = []
         if (n8n_triggered) lines.push("dados frescos pedidos ao AT")
-        if (typeof direct_fetched === "number" && direct_fetched > 0)
-          lines.push(`${direct_fetched} documento${direct_fetched !== 1 ? "s" : ""} da e-Fatura`)
+        if (typeof direct_fetched === "number" && direct_fetched > 0) {
+          lines.push(
+            direct_created > 0
+              ? `${direct_created} documento${direct_created !== 1 ? "s" : ""} novo${direct_created !== 1 ? "s" : ""}`
+              : "sem documentos novos",
+          )
+          if (direct_updated > 0) lines.push(`${direct_updated} já existente${direct_updated !== 1 ? "s" : ""}`)
+        }
         if (matched > 0) lines.push(`${matched} fatura${matched !== 1 ? "s" : ""} associada${matched !== 1 ? "s" : ""}`)
         if (at_communicated_updated > 0) lines.push(`${at_communicated_updated} marcada${at_communicated_updated !== 1 ? "s" : ""} AT`)
         toast.success("e-Fatura atualizada", {
@@ -181,13 +189,22 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
           toast.error(json.error ?? "Erro ao importar histórico e-Fatura")
           return
         }
-        const { direct_fetched, matched, at_communicated_updated } = json as {
+        const { direct_fetched, direct_created, direct_updated, matched, at_communicated_updated } = json as {
           direct_fetched: number
+          direct_created: number
+          direct_updated: number
           matched: number
           at_communicated_updated: number
         }
         const lines: string[] = []
-        if (typeof direct_fetched === "number") lines.push(`${direct_fetched} documento${direct_fetched !== 1 ? "s" : ""} e-Fatura`)
+        if (typeof direct_fetched === "number" && direct_fetched > 0) {
+          lines.push(
+            direct_created > 0
+              ? `${direct_created} documento${direct_created !== 1 ? "s" : ""} novo${direct_created !== 1 ? "s" : ""}`
+              : "sem documentos novos",
+          )
+          if (direct_updated > 0) lines.push(`${direct_updated} já existente${direct_updated !== 1 ? "s" : ""}`)
+        }
         if (matched > 0) lines.push(`${matched} associada${matched !== 1 ? "s" : ""}`)
         if (at_communicated_updated > 0) lines.push(`${at_communicated_updated} marcada${at_communicated_updated !== 1 ? "s" : ""} AT`)
         toast.success("Histórico e-Fatura importado", {
