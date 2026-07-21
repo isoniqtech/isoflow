@@ -95,6 +95,9 @@ async function reauthorizeWithToken(
   if (!code) throw new Error("Nao foi possivel extrair OAuth code da pagina de auth")
 
   const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString("base64")
+  // Nota: o TOConline devolve o code a partir do HTML de /oauth/auth (sem
+  // redirect real). Tal como o Token Manager do n8n do FINMED, a troca do code
+  // NAO envia redirect_uri no body - envia-lo aqui pode causar mismatch e 400.
   const tokenRes = await fetch(`${base}/oauth/token`, {
     method: "POST",
     headers: {
@@ -106,7 +109,6 @@ async function reauthorizeWithToken(
       grant_type: "authorization_code",
       code,
       scope: "commercial",
-      redirect_uri: redirectUri,
     }).toString(),
   })
 
@@ -175,7 +177,11 @@ export async function getValidToken(tenantId: string): Promise<TOCTokenConfig> {
     ? new Date(row.toconline_token_expires_at).getTime()
     : 0
   const now = Date.now()
-  const BUFFER_MS = 60_000 // renovar 60s antes de expirar
+  // Renovar 20 min ANTES de expirar (nao nos ultimos 60s). O caminho fiavel de
+  // renovacao (re-auth server-side) exige um access token AINDA valido, por isso
+  // temos de renovar bem antes de expirar. Alinhado com o Token Manager do n8n
+  // do FINMED (schedule 15 min + threshold de 20 min) e com o cron */15.
+  const BUFFER_MS = 1_200_000 // 20 minutos
 
   if (accessToken && expiresAt > now + BUFFER_MS) {
     return { accessToken, appBase, apiBase }
@@ -209,16 +215,12 @@ export async function getValidToken(tenantId: string): Promise<TOCTokenConfig> {
     `${process.env.NEXT_PUBLIC_APP_URL}/api/integracoes/toconline/oauth/callback`
 
   let refreshResult: OAuthResponse | null = null
+  const attemptErrors: string[] = []
 
-  // 1a tentativa: grant_type=refresh_token (standard OAuth)
-  try {
-    refreshResult = await refreshOAuthToken(appBase, clientId, clientSecret, refreshToken)
-  } catch {
-    // Falhou - tentar fallback server-side (mecanismo n8n)
-  }
-
-  // 2a tentativa: re-autorizacao server-side com token atual (fallback n8n)
-  if (!refreshResult && accessToken) {
+  // 1a tentativa: re-autorizacao server-side com o access token AINDA valido.
+  // E o mecanismo fiavel (identico ao Token Manager do n8n do FINMED). So
+  // funciona com um access token vivo, garantido pelo BUFFER de 20 min acima.
+  if (accessToken) {
     try {
       refreshResult = await reauthorizeWithToken(
         appBase,
@@ -227,8 +229,17 @@ export async function getValidToken(tenantId: string): Promise<TOCTokenConfig> {
         accessToken,
         redirectUri,
       )
-    } catch {
-      // Ambas falharam - registar erro abaixo
+    } catch (e) {
+      attemptErrors.push(`re-auth: ${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  // 2a tentativa: grant_type=refresh_token (fallback OAuth standard)
+  if (!refreshResult) {
+    try {
+      refreshResult = await refreshOAuthToken(appBase, clientId, clientSecret, refreshToken)
+    } catch (e) {
+      attemptErrors.push(`refresh_token: ${e instanceof Error ? e.message : String(e)}`)
     }
   }
 
@@ -249,7 +260,7 @@ export async function getValidToken(tenantId: string): Promise<TOCTokenConfig> {
       user_id: null,
       action: "toconline_token_refresh_failed",
       resource_type: "tenant_integrations",
-      metadata: { error: msg },
+      metadata: { error: msg, detail: attemptErrors.join(" | ").slice(0, 800) },
     })
 
     throw new Error(`TOConline: ${msg}`)
