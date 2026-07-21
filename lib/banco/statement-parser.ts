@@ -295,11 +295,193 @@ function parseBankTextWithBalance(text: string): { txs: ParsedTransaction[]; err
   return { txs, errors }
 }
 
+// ── BPI (extrato colunar) ─────────────────────────────────────────────────────
+// Caminho DEDICADO e ADITIVO para extratos do Banco BPI. O `unpdf` extrai o PDF
+// do BPI coluna-a-coluna (descrições juntas, depois saldos, depois datas, depois
+// valores), e as datas são DD/MM sem ano — o parser genérico não os apanha.
+// Esta lógica só corre quando o texto é reconhecido como BPI; qualquer outro
+// banco/formato ignora este bloco. Nunca alterar os parsers acima.
+
+const BPI_MONEY_RE = /^-?\d{1,3}(?:[ .]\d{3})*,\d{2}$/
+const BPI_DATE_RE = /^\d{1,2}\/\d{1,2}$/
+const BPI_SALDO_LABEL_RE = /^SALDO\s+(ANTERIOR|ACTUAL|ATUAL|DISPON)/i
+
+export function isBpiStatement(text: string): boolean {
+  return /BANCO BPI|BBPIPTPL|bancobpi/i.test(text)
+}
+
+// Valor PT tolerante a milhares por espaço OU ponto, decimal por vírgula.
+// Local ao BPI para não mexer no parseAmount partilhado por outros bancos.
+function parseBpiAmount(s: string): number | null {
+  const neg = /^\s*-/.test(s)
+  const t = s.replace(/[^\d,]/g, "").replace(/\.(?=\d{3}\b)/g, "").replace(",", ".")
+  const n = Number(t)
+  if (isNaN(n)) return null
+  return neg ? -n : n
+}
+
+type BpiPeriod = { y1: number; y2: number; m1: number; m2: number }
+
+function inferBpiPeriod(text: string): BpiPeriod {
+  const m = text.match(/De\s+(\d{2})\/(\d{2})\/(\d{4})\s+a\s+(\d{2})\/(\d{2})\/(\d{4})/i)
+  if (!m) {
+    const y = text.match(/\b(20\d{2})\b/)
+    const yy = y ? Number(y[1]) : new Date().getFullYear()
+    return { y1: yy, y2: yy, m1: 1, m2: 12 }
+  }
+  return { y1: Number(m[3]), y2: Number(m[6]), m1: Number(m[2]), m2: Number(m[5]) }
+}
+
+// Extrato pode cruzar o ano (Dez→Jan): escolhe o ano certo pelo mês.
+function bpiYearForMonth(mm: number, p: BpiPeriod): number {
+  if (p.y1 === p.y2) return p.y1
+  return mm >= p.m1 ? p.y1 : p.y2
+}
+
+function bpiMoneyRuns(lines: string[]): { start: number; items: string[] }[] {
+  const runs: { start: number; items: string[] }[] = []
+  let cur: { start: number; items: string[] } | null = null
+  lines.forEach((l, i) => {
+    if (BPI_MONEY_RE.test(l)) {
+      if (!cur) { cur = { start: i, items: [] }; runs.push(cur) }
+      cur.items.push(l)
+    } else {
+      cur = null
+    }
+  })
+  return runs
+}
+
+type BpiTx = { date: string; description: string; amount: number; balance: number | null }
+
+function parseBpiPage(pageText: string, period: BpiPeriod): { txs: BpiTx[]; saldoAnterior: number | null } | null {
+  const lines = pageText.split("\n").map((l) => l.trim()).filter(Boolean)
+  const dateIdxs = lines.map((l, i) => (BPI_DATE_RE.test(l) ? i : -1)).filter((i) => i >= 0)
+  if (!dateIdxs.length) return null
+
+  const firstDateIdx = dateIdxs[0]
+  const lastDateIdx = dateIdxs[dateIdxs.length - 1]
+  const runs = bpiMoneyRuns(lines)
+  if (!runs.length) return null
+
+  // Estrutura colunar do BPI: SALDO vem antes das datas, VALOR depois.
+  const amountRun = runs.find((r) => r.start > lastDateIdx)
+  const balanceRun = [...runs].reverse().find((r) => r.start < firstDateIdx)
+  if (!amountRun) return null
+
+  const n = amountRun.items.length
+  if (n === 0) return null
+
+  // DATA VAL = as últimas N datas (o bloco DATA MOV, deduplicado por dia, vem antes).
+  const valDates = dateIdxs.map((i) => lines[i]).slice(-n)
+  if (valDates.length !== n) return null
+
+  // Descrições = linhas de texto antes do 1º bloco de valores, sem rótulos de saldo, últimas N.
+  const descriptions = lines
+    .slice(0, runs[0].start)
+    .filter((l) => !BPI_DATE_RE.test(l) && !BPI_MONEY_RE.test(l) && !BPI_SALDO_LABEL_RE.test(l))
+    .slice(-n)
+
+  const balVals = (balanceRun ? balanceRun.items : []).map(parseBpiAmount)
+  const hasAnterior = /SALDO\s+ANTERIOR/i.test(pageText)
+  const saldoAnterior = hasAnterior && balVals.length ? balVals[0] : null
+  const txBalances = (hasAnterior ? balVals.slice(1) : balVals).slice(0, n)
+
+  const txs: BpiTx[] = []
+  for (let i = 0; i < n; i++) {
+    const [dd, mm] = valDates[i].split("/")
+    const year = bpiYearForMonth(Number(mm), period)
+    const amount = parseBpiAmount(amountRun.items[i])
+    if (amount === null) continue
+    txs.push({
+      date: `${year}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`,
+      description: descriptions[i] || "—",
+      amount,
+      balance: txBalances[i] ?? null,
+    })
+  }
+  return { txs, saldoAnterior }
+}
+
+export function parseBpiStatement(pages: string[]): ParseResult {
+  const period = inferBpiPeriod(pages.join("\n"))
+  const rowsScanned = pages.join("\n").split("\n").filter((l) => l.trim()).length
+
+  let all: BpiTx[] = []
+  let saldoAnterior: number | null = null
+  for (const p of pages) {
+    const r = parseBpiPage(p, period)
+    if (!r) continue
+    if (r.saldoAnterior !== null && saldoAnterior === null) saldoAnterior = r.saldoAnterior
+    all = all.concat(r.txs)
+  }
+
+  if (all.length === 0) {
+    return {
+      transactions: [],
+      errors: ["Extrato BPI reconhecido mas não foi possível extrair movimentos. Verifica o PDF."],
+      format: "pdf",
+      rowsScanned,
+    }
+  }
+
+  // Validação por cadeia de saldos: saldo[i] = saldo[i-1] + valor[i].
+  const errors: string[] = []
+  let prev: number | null = saldoAnterior
+  for (let i = 0; i < all.length; i++) {
+    const t = all[i]
+    if (prev !== null && t.balance !== null) {
+      const expected = Math.round((prev + t.amount) * 100) / 100
+      if (Math.abs(expected - t.balance) > 0.01) {
+        errors.push(`Linha ${i + 1} (${t.date}): saldo esperado ${expected.toFixed(2)} difere do extraído ${t.balance.toFixed(2)}`)
+      }
+      prev = t.balance
+    } else if (prev !== null) {
+      prev = Math.round((prev + t.amount) * 100) / 100
+    }
+  }
+
+  // Reconciliação global: saldo anterior + soma dos movimentos == saldo final.
+  const soma = all.reduce((s, t) => s + t.amount, 0)
+  const saldoActual = all[all.length - 1].balance
+  if (saldoAnterior !== null && saldoActual !== null) {
+    const diff = Math.abs(saldoAnterior + soma - saldoActual)
+    if (diff > 0.02) {
+      // Não reconcilia: recusa a importação para não gravar dados errados.
+      return {
+        transactions: [],
+        errors: [
+          `Extrato BPI não reconcilia: saldo anterior ${saldoAnterior.toFixed(2)} + movimentos ${soma.toFixed(2)} = ${(saldoAnterior + soma).toFixed(2)}, mas saldo final é ${saldoActual.toFixed(2)}. Importação cancelada para evitar dados incorretos.`,
+          ...errors,
+        ],
+        format: "pdf",
+        rowsScanned,
+      }
+    }
+  }
+
+  const transactions: ParsedTransaction[] = all.map((t) => ({
+    date: t.date,
+    description: t.description,
+    amount: t.amount,
+    raw: `${t.date} | ${t.description} | ${t.amount.toFixed(2)}`,
+  }))
+
+  return { transactions, errors, format: "pdf", rowsScanned }
+}
+
 export async function parsePdf(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     const { extractText } = await import("unpdf")
     const { text: pages } = await extractText(new Uint8Array(buffer))
-    const text = Array.isArray(pages) ? pages.join("\n") : String(pages)
+    const pageArr: string[] = Array.isArray(pages) ? pages.map(String) : [String(pages)]
+    const text = pageArr.join("\n")
+
+    // Caminho dedicado BPI (aditivo). Só dispara em extratos BPI reconhecidos;
+    // qualquer outro banco cai na lógica genérica abaixo, inalterada.
+    if (isBpiStatement(text)) {
+      return parseBpiStatement(pageArr)
+    }
 
     const lines = text.split("\n").map((l: string) => l.trim()).filter(Boolean)
 
