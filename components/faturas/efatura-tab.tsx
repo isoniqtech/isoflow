@@ -162,13 +162,16 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   }
 
   function handleImportHistory() {
-    if (!confirm("Importar o histórico de e-Fatura dos últimos 12 meses?\n\nPode demorar até um minuto.")) return
+    const now = new Date()
+    const year = now.getFullYear()
+    const months = now.getMonth() + 1 // janeiro ao mes atual do ano corrente
+    if (!confirm(`Importar o histórico de e-Fatura de ${year} (janeiro ao mês atual)?\n\nPode demorar até um minuto.`)) return
     startHistory(async () => {
       try {
         const res = await fetch("/api/efatura/refresh", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ months: 12 }),
+          body: JSON.stringify({ months }),
         })
         const json = await res.json()
         if (!res.ok) {
