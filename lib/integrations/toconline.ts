@@ -212,25 +212,60 @@ export async function fetchDocumentAssociations(
   }
 
   const body = await res.json()
+
+  // A resposta do TOConline pode vir com `data` como string JSON aninhada
+  // (comportamento observado no workflow n8n da e-Fatura) ou como objeto/array
+  // direto. Resolver os dois casos, tal como o n8n faz.
+  let container: unknown = body
+  const bodyData = (body as Record<string, unknown>)?.data
+  if (typeof bodyData === "string") {
+    try {
+      container = JSON.parse(bodyData)
+    } catch {
+      container = { data: [] }
+    }
+  } else if (bodyData !== undefined) {
+    container = bodyData
+  }
+
   let items: unknown[] = []
-  if (Array.isArray(body)) items = body
-  else if (Array.isArray(body?.data)) items = body.data
+  if (Array.isArray(container)) items = container
+  else if (Array.isArray((container as Record<string, unknown>)?.data)) {
+    items = (container as Record<string, unknown>).data as unknown[]
+  }
 
   return items.map((item: unknown) => {
     const r = item as Record<string, unknown>
     const attrs = (r.attributes ?? r) as Record<string, unknown>
+    // Nomes de campos conforme o document_associations do TOConline (via n8n):
+    // document_identifier, business_name, tax_registration_number, gross_total, status.
+    // Fallback para os nomes antigos por robustez.
+    const identifier = attrs.document_identifier ?? attrs.document_number
+    const business = attrs.business_name ?? attrs.supplier_name
+    const nif = attrs.tax_registration_number ?? attrs.supplier_tax_registration_number
+    const grossTotal = attrs.gross_total ?? attrs.total
     return {
       id: Number(r.id ?? attrs.id ?? 0),
-      document_number: attrs.document_number ? String(attrs.document_number) : null,
+      document_number: identifier ? String(identifier) : null,
       date: attrs.date ? String(attrs.date) : null,
-      supplier_name: attrs.supplier_name ? String(attrs.supplier_name) : null,
-      supplier_nif: attrs.supplier_tax_registration_number
-        ? String(attrs.supplier_tax_registration_number)
-        : null,
-      total: Number(attrs.total ?? 0),
-      at_status: attrs.at_status ? String(attrs.at_status) : null,
+      supplier_name: business ? String(business) : null,
+      supplier_nif: nif ? String(nif) : null,
+      total: Number(grossTotal ?? 0),
+      at_status: mapAtStatus(attrs.status ?? attrs.at_status),
     }
   })
+}
+
+// Mapeia o estado de reconciliacao do TOConline para os rotulos usados na app
+// (identico ao workflow n8n). "Associada" e' o estado positivo reconhecido
+// pela reconciliacao em /api/efatura/refresh (AT_POSITIVE).
+function mapAtStatus(status: unknown): string | null {
+  if (status == null || status === "") return null
+  const s = String(status)
+  if (s === "pending") return "Pendente"
+  if (s === "void") return "Não considerado na atividade"
+  if (s === "associated") return "Associada"
+  return s
 }
 
 // ---------------------------------------------------------------------------
