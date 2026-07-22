@@ -33,6 +33,13 @@ export async function GET(
     return jsonError("Forbidden", 403)
   }
 
+  // Investidor: so' os projetos a que esta' associado (mesma guarda do detalhe)
+  if (ctx.role === "investidor") {
+    const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
+    const allowed = await getInvestidorProjectIds(ctx.userId)
+    if (!allowed.includes(params.id)) return jsonError("Forbidden", 403)
+  }
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from("projects")

@@ -67,6 +67,15 @@ export default async function ProjetoDetailPage({
   const data = await getProjectDetail(params.id, session.tenant.id, vatRegime)
   if (!data) notFound()
 
+  // Investidor: so' pode ver os projetos a que esta' associado. A listagem ja'
+  // filtrava (lib/queries/projects.ts), mas o acesso direto por URL nao tinha
+  // guarda. Mesmo padrao usado no detalhe da fatura.
+  if (session.role === "investidor") {
+    const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
+    const allowed = await getInvestidorProjectIds(session.user.id)
+    if (!allowed.includes(params.id)) redirect("/projetos")
+  }
+
   const { project, kpis, monthly, by_category, invoices } = data
   const status = STATUS_STYLES[project.status]
   const canEdit = hasPermission(session.role, "projetos", "edit")
