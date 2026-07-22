@@ -79,7 +79,9 @@ export async function GET(req: Request) {
     out.fornecedor_lookup = { http_status: r.status, preview: body.slice(0, 600) }
   }
 
-  // 3) Payload que seria enviado (igual ao fc.ts actual)
+  // 3) Payload que seria enviado (ja' com tax_code derivado do IVA)
+  const rate = inv.vat_rate !== null ? Number(inv.vat_rate) : null
+  const taxCode = rate === null ? "NOR" : rate === 0 ? "ISE" : rate <= 6 ? "RED" : rate <= 13 ? "INT" : "NOR"
   const invoiceDate = (inv.invoice_date as string) ?? new Date().toISOString().slice(0, 10)
   const description = (inv.description as string) ?? (inv.supplier_name as string) ?? "Fatura importada ISOFlow"
   const payload: Record<string, unknown> = {
@@ -97,15 +99,52 @@ export async function GET(req: Request) {
         description,
         quantity: 1,
         unit_price: inv.subtotal !== null ? Number(inv.subtotal) : 0,
-        tax_code: "NOR",
+        tax_code: taxCode,
       },
     ],
   }
+  out.tax_code_derivado = taxCode
   out.payload_actual = payload
 
-  // 4) Só com ?post=1: tentar criar mesmo, para capturar o erro real
+  // 4) Só com ?post=1: reproduzir a sequencia REAL (fornecedor -> FC)
   if (doPost) {
-    const r = await fetch(`${t.apiBase}/api/v1/commercial_purchases_documents`, {
+    // 4a) Criar fornecedor se nao existir (este e' o passo suspeito)
+    let supplierId: number | null = null
+    const lookup = out.fornecedor_lookup as { preview?: string } | undefined
+    const jaExiste = lookup?.preview && !lookup.preview.includes('"data":[]')
+    if (!jaExiste && inv.supplier_nif && inv.supplier_name) {
+      const r = await fetch(`${t.apiBase}/api/v1/suppliers`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${t.accessToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          tax_registration_number: inv.supplier_nif,
+          business_name: inv.supplier_name,
+          country: "PT",
+        }),
+      })
+      const body = await r.text()
+      out.post_fornecedor = { http_status: r.status, body: body.slice(0, 1200) }
+      try {
+        const j = JSON.parse(body)
+        const d = j.data ?? j
+        supplierId = d?.id ? Number(d.id) : d?.attributes?.id ? Number(d.attributes.id) : null
+      } catch {
+        supplierId = null
+      }
+      if (!r.ok) {
+        out.post_fc = "nao executado (criacao de fornecedor falhou - ver post_fornecedor)"
+        return Response.json(out)
+      }
+    }
+
+    if (supplierId !== null) payload.supplier_id = supplierId
+
+    // 4b) Criar FC
+    const r2 = await fetch(`${t.apiBase}/api/v1/commercial_purchases_documents`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${t.accessToken}`,
@@ -114,10 +153,10 @@ export async function GET(req: Request) {
       },
       body: JSON.stringify(payload),
     })
-    const body = await r.text()
-    out.post_fc = { http_status: r.status, body: body.slice(0, 1500) }
+    const body2 = await r2.text()
+    out.post_fc = { http_status: r2.status, supplier_id_usado: supplierId, body: body2.slice(0, 1500) }
   } else {
-    out.post_fc = "nao executado (usa ?post=1 para tentar criar e capturar o erro)"
+    out.post_fc = "nao executado (usa ?post=1 para reproduzir a sequencia real e capturar o erro)"
   }
 
   return Response.json(out)
