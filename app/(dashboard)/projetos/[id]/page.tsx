@@ -200,25 +200,25 @@ export default async function ProjetoDetailPage({
         )}
       </div>
 
-      {/* Tabs: padrao searchParams usado na app (ver faturas/page.tsx) */}
-      <div className="border-b">
-        <nav className="flex gap-6 -mb-px">
-          {VALID_TABS.map((tab) => (
-            <Link
-              key={tab}
-              href={`/projetos/${project.id}?tab=${tab}`}
-              className={cn(
-                "border-b-2 pb-2 text-sm font-medium transition-colors",
-                activeTab === tab
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground",
-              )}
-            >
-              {TAB_LABELS[tab]}
-            </Link>
-          ))}
-        </nav>
-      </div>
+      {/* Tabs: controlo segmentado, para se perceber de imediato a tab activa.
+          Continua a usar searchParams (padrao da app), so' muda o visual. */}
+      <nav className="inline-flex gap-1 rounded-lg border border-border/60 bg-muted p-1">
+        {VALID_TABS.map((tab) => (
+          <Link
+            key={tab}
+            href={`/projetos/${project.id}?tab=${tab}`}
+            aria-current={activeTab === tab ? "page" : undefined}
+            className={cn(
+              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
+              activeTab === tab
+                ? "bg-card text-foreground shadow-[var(--shadow-card,0_1px_3px_rgba(0,0,0,0.08))]"
+                : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
+            )}
+          >
+            {TAB_LABELS[tab]}
+          </Link>
+        ))}
+      </nav>
 
       {/* ---------- Dashboard: conteudo original, movido sem alteracoes ---------- */}
       {activeTab === "dashboard" && (

@@ -7,8 +7,11 @@
  * um cartão com o nome por cima, e o último cartão de cada secção editável é
  * um tracejado para adicionar. O formulário vive num diálogo.
  *
- * Admin: duas secções (interna / para investidores).
- * Investidor: só a secção de investidores, em leitura.
+ * Admin: duas secções (interna / partilhada).
+ * Quem acompanha o projeto de fora só vê a secção partilhada, em leitura.
+ *
+ * Nota: o valor guardado na BD continua a ser "investidores" (migration 043);
+ * só o rótulo visível mudou, para ser mais genérico.
  *
  * Os ficheiros vivem no Google Drive do tenant; aqui só se veem metadados.
  * Preview e download passam pelo proxy do backend, por isso o utilizador não
@@ -100,7 +103,7 @@ export function ProjectDocumentsTab({
 
   const podeEditar = canEdit && !isInvestidor
   const internos = docs.filter((d) => d.visibility === "interna")
-  const paraInvestidores = docs.filter((d) => d.visibility === "investidores")
+  const partilhados = docs.filter((d) => d.visibility === "investidores")
 
   if (loading) {
     return (
@@ -116,7 +119,7 @@ export function ProjectDocumentsTab({
       {!isInvestidor && (
         <Seccao
           titulo="Documentação interna"
-          descricao="Visível apenas para a equipa. Os investidores não têm acesso."
+          descricao="Visível apenas para a equipa interna."
           docs={internos}
           projectId={projectId}
           podeEditar={podeEditar}
@@ -126,13 +129,13 @@ export function ProjectDocumentsTab({
       )}
 
       <Seccao
-        titulo="Documentos para investidores"
+        titulo="Documentos partilhados"
         descricao={
           isInvestidor
             ? "Documentos que a equipa partilhou contigo."
-            : "Visíveis no portal do investidor, em leitura."
+            : "Partilhados com quem acompanha o projeto, em leitura."
         }
-        docs={paraInvestidores}
+        docs={partilhados}
         projectId={projectId}
         podeEditar={podeEditar}
         onAdicionar={() => setAdicionar("investidores")}
@@ -170,12 +173,12 @@ function Seccao({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 border-b pb-2">
-        <div>
-          <h2 className="text-sm font-semibold">{titulo}</h2>
+      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted px-4 py-2.5">
+        <div className="min-w-0">
+          <h2 className="text-sm font-semibold text-foreground">{titulo}</h2>
           <p className="text-xs text-muted-foreground">{descricao}</p>
         </div>
-        <span className="shrink-0 rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+        <span className="shrink-0 rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">
           {docs.length}
         </span>
       </div>
@@ -243,7 +246,14 @@ function CartaoDocumento({
         {doc.name}
       </p>
 
-      <div className="rounded-lg border border-emerald-200 bg-card p-3 transition-colors hover:border-emerald-400 dark:border-emerald-900/40 dark:hover:border-emerald-700">
+      <div
+        className="rounded-lg border border-border/60 p-3 shadow-[var(--shadow-card,0_1px_3px_rgba(0,0,0,0.08))] transition-shadow hover:shadow-[var(--shadow-card-hover,0_4px_12px_rgba(0,0,0,0.10))]"
+        style={{
+          // Mesmo gradiente subtil dos KpiCard do dashboard (variante neutra)
+          backgroundImage:
+            "linear-gradient(135deg, hsl(var(--card)) 40%, rgba(52,78,13,0.05) 100%)",
+        }}
+      >
         <a
           href={base}
           target="_blank"
@@ -251,7 +261,7 @@ function CartaoDocumento({
           className="flex flex-col items-center gap-1.5 py-2"
           title="Pré-visualizar"
         >
-          <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-500" />
+          <FileText className="h-6 w-6 text-primary" />
           <span className="text-xs text-muted-foreground">Ver</span>
         </a>
 
@@ -308,7 +318,7 @@ function CartaoAdicionar({ onClick }: { onClick: () => void }) {
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed border-border/70 bg-card px-3 py-[1.35rem] transition-colors hover:border-primary hover:bg-primary/5"
+        className="flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed border-border bg-background px-3 py-[1.35rem] transition-colors hover:border-primary hover:bg-primary/5"
       >
         <Plus className="h-6 w-6 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">Adicionar</span>
@@ -435,7 +445,7 @@ function DialogoAdicionar({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="interna">Interna (só a equipa)</SelectItem>
-                <SelectItem value="investidores">Para investidores</SelectItem>
+                <SelectItem value="investidores">Partilhada</SelectItem>
               </SelectContent>
             </Select>
           </div>
