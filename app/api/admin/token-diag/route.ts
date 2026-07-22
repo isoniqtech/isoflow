@@ -88,17 +88,47 @@ export async function GET(req: Request) {
       redirect: "follow",
     })
     const html = await res.text()
-    const m =
-      html.match(/&quot;code&quot;\s*:\s*&quot;([^&]+?)&quot;/) ||
-      html.match(/"code"\s*:\s*"([^"]+?)"/) ||
-      html.match(/[?&]code=([^&\s<"]+)/)
+    // Extrair o code do URL final PRIMEIRO (correcao), depois do HTML
+    let code: string | null = null
+    for (const src of [res.url ?? "", html]) {
+      const mm =
+        src.match(/[?&]code=([^&\s<"]+)/) ||
+        src.match(/&quot;code&quot;\s*:\s*&quot;([^&]+?)&quot;/) ||
+        src.match(/"code"\s*:\s*"([^"]+?)"/)
+      if (mm) {
+        code = decodeURIComponent(mm[1])
+        break
+      }
+    }
     out.reauth = {
       http_status: res.status,
       final_url: res.url,
-      code_encontrado: !!m,
+      code_encontrado: !!code,
       html_length: html.length,
-      // Só mostrar o HTML quando falha (para não expor o code)
-      html_preview: m ? "(code extraido OK, ocultado)" : html.slice(0, 1200),
+    }
+
+    // Testar a TROCA completa: code -> tokens (grant authorization_code)
+    if (code) {
+      const creds = Buffer.from(`${clientId ?? ""}:${clientSecret ?? ""}`).toString("base64")
+      const tk = await fetch(`${appBase}/oauth/token`, {
+        method: "POST",
+        headers: {
+          Authorization: `Basic ${creds}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          Accept: "application/json",
+        },
+        body: new URLSearchParams({ grant_type: "authorization_code", code, scope: "commercial" }).toString(),
+      })
+      const tb = await tk.text()
+      let tp: Record<string, unknown> | null = null
+      try {
+        tp = JSON.parse(tb)
+      } catch {
+        tp = null
+      }
+      out.reauth_exchange = tp?.access_token
+        ? { http_status: tk.status, resultado: "SUCESSO (tokens recebidos)", expires_in: tp.expires_in }
+        : { http_status: tk.status, body: tb.slice(0, 400) }
     }
   } catch (e) {
     out.reauth = { error: e instanceof Error ? e.message : String(e) }

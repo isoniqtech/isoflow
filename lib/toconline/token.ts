@@ -85,12 +85,19 @@ async function reauthorizeWithToken(
 
   const html = await authRes.text().catch(() => "")
 
-  // TOConline devolve {"code":"..."} dentro de um <pre> ou na URL
+  // O TOConline entrega o code por REDIRECT para o redirect_uri (?code=...).
+  // Ao seguir o redirect, o URL final contem o code; procurar ai' PRIMEIRO.
+  // Fallback: no corpo HTML (formato do callback n8n: &quot;code&quot;:...).
   let code: string | null = null
-  let m = html.match(/&quot;code&quot;\s*:\s*&quot;([^&]+?)&quot;/)
-  if (!m) m = html.match(/"code"\s*:\s*"([^"]+?)"/)
-  if (!m) m = html.match(/[?&]code=([^&\s<"]+)/)
-  if (m) code = decodeURIComponent(m[1])
+  for (const src of [authRes.url ?? "", html]) {
+    let m = src.match(/[?&]code=([^&\s<"]+)/)
+    if (!m) m = src.match(/&quot;code&quot;\s*:\s*&quot;([^&]+?)&quot;/)
+    if (!m) m = src.match(/"code"\s*:\s*"([^"]+?)"/)
+    if (m) {
+      code = decodeURIComponent(m[1])
+      break
+    }
+  }
 
   if (!code) throw new Error("Nao foi possivel extrair OAuth code da pagina de auth")
 
