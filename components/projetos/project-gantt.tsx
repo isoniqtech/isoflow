@@ -122,6 +122,10 @@ export function ProjectGantt({
       return { grupos, escInicio: 0, escFim: 0, dias: 0 }
     }
 
+    // O dia de hoje entra sempre na escala, mesmo que o plano esteja todo no
+    // futuro ou todo no passado: senão a linha de hoje não teria onde aparecer.
+    limites.push(inicioDoDia(Date.now()))
+
     // Uma semana de folga de cada lado, para as barras não colarem às bordas
     const escInicio = Math.min(...limites) - 3 * DIA_MS
     const escFim = Math.max(...limites) + 4 * DIA_MS
@@ -362,10 +366,18 @@ export function ProjectGantt({
                   style={{ left: c.left, width: c.largura }}
                 />
               ))}
-              {hojeLeft !== null && (
-                <div className="absolute inset-y-0 w-px bg-destructive/60" style={{ left: hojeLeft }} />
-              )}
             </div>
+
+            {/* Linha de hoje. Tem de vir DEPOIS das linhas no z-order (z-10):
+                estava na camada de fundo e desaparecia por baixo das barras e
+                do fundo das fases. Fica abaixo da coluna dos nomes (z-20), para
+                não a atravessar quando se faz scroll horizontal. */}
+            {hojeLeft !== null && (
+              <div
+                className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-destructive"
+                style={{ left: COL_NOMES + hojeLeft }}
+              />
+            )}
 
             {linhas.map((l) => {
               const g = l.grupo
@@ -383,7 +395,10 @@ export function ProjectGantt({
                 <div
                   key={l.chave}
                   className={cn(
-                    "relative z-10 flex",
+                    // Sem z-index de propósito: com um, a linha cria contexto de
+                    // empilhamento e prende lá dentro a coluna dos nomes, que
+                    // deixaria de conseguir ficar por cima da linha de hoje.
+                    "relative flex",
                     ehFase && "bg-muted/40",
                     !ehFase && onAbrir && "hover:bg-muted/30",
                   )}
@@ -477,17 +492,24 @@ export function ProjectGantt({
                             width: b.largura,
                             top: ALTURA[l.tipo] / 2 - (ehFase ? 6 : l.tipo === "macro" ? 8 : 6),
                             height: ehFase ? 12 : l.tipo === "macro" ? 16 : 12,
-                            backgroundColor: `hsl(${g.cor} / ${ehFase ? 0.3 : 0.22})`,
+                            // Corpo da barra bem visível mesmo a 0% de progresso.
+                            // Antes era um trilho a 0.22 de opacidade e, como
+                            // quase tudo está por iniciar, o cronograma inteiro
+                            // parecia desbotado.
+                            backgroundColor: `hsl(${g.cor} / ${
+                              ehFase ? 0.55 : l.tipo === "macro" ? 0.5 : 0.42
+                            })`,
+                            boxShadow: `inset 0 0 0 1px hsl(${g.cor} / 0.9)`,
                           }}
                           title={rotulo(ehFase ? g.nome : t!.title, t)}
                         >
-                          {/* Preenchimento = progresso. A 0% fica só o contorno,
-                              que é o que distingue "por fazer" de "a meio". */}
+                          {/* Preenchimento = progresso, na cor cheia. O contraste
+                              com o corpo da barra é o que mostra o avanço. */}
                           <div
                             className="h-full"
                             style={{
                               width: `${Math.max(progresso, 0)}%`,
-                              backgroundColor: `hsl(${g.cor} / ${ehFase ? 1 : 0.85})`,
+                              backgroundColor: `hsl(${g.cor})`,
                             }}
                           />
                         </div>
@@ -509,7 +531,7 @@ export function ProjectGantt({
           <span className="h-3 w-4 rounded ring-1 ring-destructive" /> Bloqueada
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-px bg-destructive/60" /> Hoje
+          <span className="h-3 w-0.5 bg-destructive" /> Hoje
         </span>
       </div>
     </div>
