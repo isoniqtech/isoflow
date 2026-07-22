@@ -13,7 +13,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Loader2, Mic, MicOff, Pencil, Plus, Sparkles, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SectionHeader } from "@/components/ui/section-header"
 import { cn } from "@/lib/utils"
 import { formatDate } from "@/lib/utils/portugal"
 
@@ -118,7 +118,7 @@ export function ProjectPlanTab({
     return podeEditar ? (
       <GerarComIA projectId={projectId} onGerado={carregar} />
     ) : (
-      <div className="rounded-lg border border-dashed border-border/60 p-10 text-center">
+      <div className="surface-empty p-10 text-center">
         <p className="text-sm text-muted-foreground">
           Ainda não há planeamento partilhado para este projeto.
         </p>
@@ -128,27 +128,29 @@ export function ProjectPlanTab({
 
   return (
     <div className="space-y-4">
-      {podeEditar && (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">
-            {tarefas.length} tarefa{tarefas.length !== 1 ? "s" : ""}
-          </p>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => setRegerar(true)}>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Voltar a gerar com IA
-            </Button>
-            <Button size="sm" onClick={() => setCriar(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova tarefa
-            </Button>
-          </div>
-        </div>
-      )}
+      <SectionHeader
+        titulo="Cronograma"
+        descricao={`${tarefas.length} tarefa${tarefas.length !== 1 ? "s" : ""} no planeamento`}
+        contador={podeEditar ? undefined : tarefas.length}
+        accao={
+          podeEditar ? (
+            <div className="flex shrink-0 gap-2">
+              <Button size="sm" variant="outline" onClick={() => setRegerar(true)}>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Voltar a gerar
+              </Button>
+              <Button size="sm" onClick={() => setCriar(true)}>
+                <Plus className="mr-2 h-4 w-4" />
+                Nova tarefa
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
 
       <Timeline tarefas={tarefas} />
 
-      <div className="rounded-lg border border-border/60 bg-card divide-y">
+      <div className="surface-card divide-y overflow-hidden">
         {tarefas.map((t) => (
           <div key={t.id} className="flex items-start gap-3 p-3">
             <div className="min-w-0 flex-1">
@@ -223,7 +225,7 @@ function Timeline({ tarefas }: { tarefas: Tarefa[] }) {
 
   if (!comDatas) {
     return (
-      <div className="rounded-lg border border-border/60 bg-card p-6 text-center">
+      <div className="surface-card p-6 text-center">
         <p className="text-xs text-muted-foreground">
           As tarefas ainda não têm datas, por isso não há cronograma para mostrar.
         </p>
@@ -232,7 +234,7 @@ function Timeline({ tarefas }: { tarefas: Tarefa[] }) {
   }
 
   return (
-    <div className="rounded-lg border border-border/60 bg-card p-4 overflow-x-auto">
+    <div className="surface-card overflow-x-auto p-4">
       <div className="min-w-[520px] space-y-2">
         {tarefas.map((t) => {
           const ini = t.start_date ? new Date(t.start_date).getTime() : null
@@ -387,8 +389,7 @@ function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () =
   }
 
   return (
-    <Card>
-      <CardContent className="p-6 space-y-4">
+    <div className="surface-card p-6 space-y-4">
         <div className="text-center">
           <Sparkles className="h-8 w-8 text-primary mx-auto mb-2" />
           <h2 className="text-lg font-display font-semibold tracking-tight">
@@ -416,8 +417,7 @@ function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () =
             {aGerar ? "A gerar cronograma..." : "Gerar cronograma"}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+    </div>
   )
 }
 
