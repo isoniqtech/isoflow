@@ -65,11 +65,19 @@ const STATUS_LABELS: Record<Status, string> = {
   bloqueada: "Bloqueada",
 }
 
+/**
+ * Estados do planeamento.
+ *
+ * "Por iniciar" fica neutro de propósito: é o estado por defeito e não deve
+ * competir por atenção. Os outros três são preenchidos, e os dois verdes
+ * distinguem-se pela luminosidade (em curso vivo, concluída verde-garrafa),
+ * para se perceberem mesmo a preto e branco.
+ */
 const STATUS_BADGE: Record<Status, string> = {
   por_iniciar: "bg-muted text-muted-foreground",
-  em_curso: "bg-primary/10 text-primary",
-  concluida: "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-200",
-  bloqueada: "bg-red-100 text-red-900 dark:bg-red-900/20 dark:text-red-200",
+  em_curso: "bg-emerald-500 text-white dark:bg-emerald-500 dark:text-emerald-950",
+  concluida: "bg-green-900 text-white dark:bg-green-900 dark:text-emerald-50",
+  bloqueada: "bg-red-600 text-white dark:bg-red-700 dark:text-red-50",
 }
 
 // ---------------------------------------------------------------------------
