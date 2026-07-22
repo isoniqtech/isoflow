@@ -81,6 +81,21 @@ export async function POST(req: Request) {
   const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString()
 
   const supabase = createClient()
+
+  // Preservar o config existente (redirect_uri, default_expense_category, ...)
+  // e so' actualizar o subdomain - antes reescrevia o objecto inteiro.
+  const { data: existing } = await supabase
+    .from("tenant_integrations")
+    .select("config")
+    .eq("tenant_id", ctx.tenantId)
+    .eq("type", "erp")
+    .eq("provider", "toconline")
+    .maybeSingle()
+  const config = {
+    ...((existing?.config ?? {}) as Record<string, unknown>),
+    subdomain: String(subdomain),
+  }
+
   const { error } = await supabase.from("tenant_integrations").upsert(
     {
       tenant_id: ctx.tenantId,
@@ -91,7 +106,7 @@ export async function POST(req: Request) {
       api_key_encrypted: encrypt(access_token),
       api_secret_encrypted: encrypt(refresh_token),
       toconline_token_expires_at: expiresAt,
-      config: { subdomain: String(subdomain) },
+      config,
       is_active: true,
       sync_error: null,
       updated_at: new Date().toISOString(),

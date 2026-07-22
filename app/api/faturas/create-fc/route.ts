@@ -82,6 +82,17 @@ export async function POST(request: Request) {
       )
     }
 
+    // Categoria de gasto configurada pelo tenant (fallback: default do fc.ts)
+    const { data: erpRow } = await supabase
+      .from("tenant_integrations")
+      .select("config")
+      .eq("tenant_id", tenantId)
+      .eq("type", "erp")
+      .eq("provider", "toconline")
+      .maybeSingle()
+    const expenseCategoryCode =
+      (erpRow?.config as { default_expense_category?: string } | null)?.default_expense_category ?? null
+
     const admin = createAdminClient()
     const now = new Date().toISOString()
     const errors: string[] = []
@@ -101,6 +112,7 @@ export async function POST(request: Request) {
             description: inv.description,
             movementNote: noteForInvoice(inv),
             vatRate: inv.vat_rate !== null ? Number(inv.vat_rate) : null,
+            expenseCategoryCode,
           })
 
           // Gravar fc_number directamente - mesma logica que /api/faturas/[id]/update-fc
