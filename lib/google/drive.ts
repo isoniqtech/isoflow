@@ -35,7 +35,19 @@ export function getGoogleClientId(): string {
 export function getGoogleClientSecret(): string {
   return process.env.GOOGLE_DRIVE_CLIENT_SECRET ?? ""
 }
-export function getDriveRedirectUri(): string {
+/**
+ * Redirect URI do OAuth.
+ *
+ * Deriva do host do proprio pedido, para funcionar em test e em producao sem
+ * depender de NEXT_PUBLIC_APP_URL estar certo em cada ambiente (mesmo padrao
+ * do callback do TOConline). O valor TEM de ser identico no pedido de
+ * autorizacao e na troca do code, senao o Google rejeita.
+ */
+export function getDriveRedirectUri(req?: Request): string {
+  if (req) {
+    const u = new URL(req.url)
+    return `${u.protocol}//${u.host}/api/integracoes/google-drive/oauth/callback`
+  }
   return `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/integracoes/google-drive/oauth/callback`
 }
 
@@ -59,7 +71,10 @@ function admin(): SupabaseClient {
 /**
  * Troca o `code` do OAuth por tokens. Usado apenas no callback.
  */
-export async function exchangeCodeForTokens(code: string): Promise<{
+export async function exchangeCodeForTokens(
+  code: string,
+  redirectUri: string,
+): Promise<{
   access_token: string
   refresh_token?: string
   expires_in: number
@@ -72,7 +87,7 @@ export async function exchangeCodeForTokens(code: string): Promise<{
       code,
       client_id: getGoogleClientId(),
       client_secret: getGoogleClientSecret(),
-      redirect_uri: getDriveRedirectUri(),
+      redirect_uri: redirectUri,
       grant_type: "authorization_code",
     }).toString(),
   })

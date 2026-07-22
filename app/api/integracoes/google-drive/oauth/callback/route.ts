@@ -8,7 +8,7 @@ import { redirect } from "next/navigation"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { encrypt } from "@/lib/utils/encryption"
-import { ensureRootFolder, exchangeCodeForTokens } from "@/lib/google/drive"
+import { ensureRootFolder, exchangeCodeForTokens, getDriveRedirectUri } from "@/lib/google/drive"
 
 export const runtime = "nodejs"
 
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
 
   let tokens: Awaited<ReturnType<typeof exchangeCodeForTokens>>
   try {
-    tokens = await exchangeCodeForTokens(code!)
+    tokens = await exchangeCodeForTokens(code!, getDriveRedirectUri(req))
   } catch {
     redirect(`${DESTINO}?drive=error&reason=token_exchange`)
   }

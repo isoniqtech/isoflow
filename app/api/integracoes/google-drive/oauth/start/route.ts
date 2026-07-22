@@ -23,7 +23,7 @@ function makeState(tenantId: string): string {
   return Buffer.from(`${payload}:${sig}`).toString("base64url")
 }
 
-export async function POST() {
+export async function POST(req: Request) {
   const ctx = await getApiContext()
   if (!ctx) return jsonError("Unauthorized", 401)
   if (!hasPermission(ctx.role, "integracoes", "edit")) return jsonError("Forbidden", 403)
@@ -37,7 +37,7 @@ export async function POST() {
 
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth")
   url.searchParams.set("client_id", getGoogleClientId())
-  url.searchParams.set("redirect_uri", getDriveRedirectUri())
+  url.searchParams.set("redirect_uri", getDriveRedirectUri(req))
   url.searchParams.set("response_type", "code")
   url.searchParams.set("scope", DRIVE_SCOPE)
   // offline + consent garantem que recebemos refresh_token (o Google so' o
