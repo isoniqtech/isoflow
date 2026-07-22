@@ -87,6 +87,8 @@ Regras sobre datas e estados:
 - As tarefas de uma fase têm de ficar dentro do período dessa fase, e as fases não se sobrepõem, salvo quando o trabalho é mesmo em paralelo.
 - Se o projeto tiver datas de início e fim, mantém o cronograma dentro desse intervalo.
 - Se não houver informação para datar, usa null em vez de inventar.
+- A data de hoje vem no contexto. Salvo indicação em contrário, o cronograma COMEÇA a partir de hoje e usa o ano corrente. Nunca datas no passado.
+- Se o utilizador indicar um mês sem ano (ex: "começa em setembro"), assume o próximo setembro a contar de hoje.
 - status é "por_iniciar" salvo indicação explícita do contrário.
 - Escreve em português de Portugal.`
 
@@ -192,7 +194,12 @@ export async function generateProjectPlan(
   projeto: ContextoProjeto,
   config?: AnthropicConfig,
 ): Promise<TarefaGerada[]> {
+  // Sem isto o modelo data o cronograma pelo ano do treino dele. Já saiu 2025
+  // num plano feito em 2026.
+  const hoje = new Date().toISOString().slice(0, 10)
+
   const contexto = [
+    `Data de hoje: ${hoje}`,
     `Projeto: ${projeto.nome}`,
     projeto.tipo ? `Tipo: ${projeto.tipo}` : null,
     projeto.descricao ? `Descrição do projeto: ${projeto.descricao}` : null,

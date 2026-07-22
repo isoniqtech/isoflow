@@ -298,18 +298,21 @@ export function ProjectGantt({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      {/* Um único contentor de scroll para os dois eixos: assim o cabeçalho
+          (sticky top) e a coluna dos nomes (sticky left) colam-se a ele, e a
+          página nunca cresce por causa do cronograma. */}
+      <div className="max-h-[min(70vh,640px)] overflow-auto overscroll-contain">
         <div style={{ width: COL_NOMES + larguraTotal }}>
           {/* Cabeçalho: mês/ano por cima, dia/semana/mês por baixo */}
-          <div className="sticky top-0 z-30 border-b border-border/60 bg-muted/50">
+          <div className="sticky top-0 z-30 border-b border-border/60 bg-muted">
             <div className="flex">
               <div
-                className="sticky left-0 z-10 shrink-0 border-r border-border/60 bg-muted/50 px-4 py-1.5 text-xs font-semibold"
+                className="sticky left-0 z-10 shrink-0 border-r border-border/60 bg-muted px-4 py-1.5 text-xs font-semibold"
                 style={{ width: COL_NOMES }}
               >
                 Fases e tarefas
               </div>
-              <div className="relative h-6" style={{ width: larguraTotal }}>
+              <div className="relative h-6 overflow-hidden" style={{ width: larguraTotal }}>
                 {cabecalhos.map((c) => (
                   <div
                     key={c.chave}
@@ -323,10 +326,10 @@ export function ProjectGantt({
             </div>
             <div className="flex">
               <div
-                className="sticky left-0 z-10 shrink-0 border-r border-border/60 bg-muted/50"
+                className="sticky left-0 z-10 shrink-0 border-r border-border/60 bg-muted"
                 style={{ width: COL_NOMES }}
               />
-              <div className="relative h-5" style={{ width: larguraTotal }}>
+              <div className="relative h-5 overflow-hidden" style={{ width: larguraTotal }}>
                 {colunas.map((c) => (
                   <div
                     key={c.chave}
@@ -349,7 +352,7 @@ export function ProjectGantt({
                 camada para todas as linhas, senão o alinhamento vertical
                 dependia da altura de cada uma. */}
             <div
-              className="pointer-events-none absolute inset-y-0 z-0"
+              className="pointer-events-none absolute inset-y-0 z-0 overflow-hidden"
               style={{ left: COL_NOMES, width: larguraTotal }}
             >
               {colunas.map((c) => (
@@ -390,7 +393,7 @@ export function ProjectGantt({
                   <div
                     className={cn(
                       "sticky left-0 z-20 flex shrink-0 items-center gap-1.5 border-r border-border/60 pr-3",
-                      ehFase ? "bg-muted/95 pl-2" : "bg-card",
+                      ehFase ? "bg-muted pl-2" : "bg-card",
                       l.tipo === "macro" && "pl-7",
                       l.tipo === "sub" && "pl-12",
                     )}
