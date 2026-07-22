@@ -58,6 +58,28 @@ export async function GET(req: Request) {
     return Response.json({ error: `token: ${e instanceof Error ? e.message : String(e)}` })
   }
 
+  // Modo sonda: ?probe=/api/suppliers,/api/v1/suppliers  -> GET cru em ambas as bases
+  const probe = searchParams.get("probe")
+  if (probe) {
+    const paths = probe.split(",").map((p) => p.trim()).filter(Boolean)
+    const results = []
+    for (const p of paths) {
+      for (const base of [t.appBase, t.apiBase]) {
+        const url = `${base}${p.startsWith("/") ? "" : "/"}${p}`
+        try {
+          const r = await fetch(url, {
+            headers: { Authorization: `Bearer ${t.accessToken}`, Accept: "application/json" },
+          })
+          const body = await r.text()
+          results.push({ url, http_status: r.status, preview: body.slice(0, 300) })
+        } catch (e) {
+          results.push({ url, error: e instanceof Error ? e.message : String(e) })
+        }
+      }
+    }
+    return Response.json({ tenantId, appBase: t.appBase, apiBase: t.apiBase, probe: results })
+  }
+
   // Categorias de gasto
   const catsRaw = await getJsonApi(`${t.appBase}/api/expense_categories`, t.accessToken)
   const cats = catsRaw.map((c) => {
