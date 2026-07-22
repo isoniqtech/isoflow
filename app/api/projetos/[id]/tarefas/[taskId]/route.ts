@@ -8,11 +8,12 @@ import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { TASK_STATUSES } from "@/lib/claude/generate-plan"
+import { resolverPhaseOrder } from "@/lib/queries/project-tasks"
 
 export const runtime = "nodejs"
 
 const CAMPOS =
-  "id, title, description, start_date, end_date, status, visibility, sort_order, created_at"
+  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, created_at"
 
 function admin(): SupabaseClient {
   // Cast: tabela da migration 044, ainda nao esta' em types/supabase.ts
@@ -28,6 +29,7 @@ const patchSchema = z
     status: z.enum(TASK_STATUSES),
     visibility: z.enum(["admin", "todos"]),
     sort_order: z.number().int().min(0),
+    phase: z.string().trim().max(120).nullable(),
   })
   .partial()
 
@@ -50,9 +52,20 @@ export async function PATCH(
   const parsed = patchSchema.safeParse(body)
   if (!parsed.success) return jsonError("Validation error", 400, parsed.error.flatten())
 
-  const { data, error } = await admin()
+  const sb = admin()
+
+  // Mudar de fase implica recalcular a ordem do grupo, senao a tarefa aparecia
+  // no sitio certo da lista mas no grupo errado do Gantt.
+  const campos: Record<string, unknown> = { ...parsed.data }
+  if ("phase" in parsed.data) {
+    const phase = parsed.data.phase?.trim() || null
+    campos.phase = phase
+    campos.phase_order = phase ? await resolverPhaseOrder(sb, params.id, phase) : null
+  }
+
+  const { data, error } = await sb
     .from("project_tasks")
-    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .update({ ...campos, updated_at: new Date().toISOString() })
     .eq("id", params.taskId)
     .eq("project_id", params.id)
     .eq("tenant_id", ctx.tenantId)

@@ -9,8 +9,8 @@
  * Investidor: leitura, e só tarefas com visibility='todos' (filtrado na API).
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { Dispatch, SetStateAction } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import type { Dispatch, MutableRefObject, SetStateAction } from "react"
 import { Loader2, Mic, MicOff, Pencil, Plus, Sparkles, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -32,6 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { SectionHeader } from "@/components/ui/section-header"
+import { ProjectGantt } from "@/components/projetos/project-gantt"
 import { cn } from "@/lib/utils"
 import { formatDate } from "@/lib/utils/portugal"
 
@@ -47,6 +48,9 @@ export type Tarefa = {
   status: Status
   visibility: Visibilidade
   sort_order: number
+  /** Fase a que a tarefa pertence. Null nas tarefas anteriores à migration 045. */
+  phase: string | null
+  phase_order: number | null
 }
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -54,13 +58,6 @@ const STATUS_LABELS: Record<Status, string> = {
   em_curso: "Em curso",
   concluida: "Concluída",
   bloqueada: "Bloqueada",
-}
-
-const STATUS_BAR: Record<Status, string> = {
-  por_iniciar: "bg-muted-foreground/40",
-  em_curso: "bg-primary",
-  concluida: "bg-emerald-500",
-  bloqueada: "bg-destructive",
 }
 
 const STATUS_BADGE: Record<Status, string> = {
@@ -149,45 +146,17 @@ export function ProjectPlanTab({
         }
       />
 
-      <Timeline tarefas={tarefas} />
+      <ProjectGantt tarefas={tarefas} onAbrir={podeEditar ? setEditar : undefined} />
 
-      <div className="surface-card divide-y overflow-hidden">
-        {tarefas.map((t) => (
-          <div key={t.id} className="flex items-start gap-3 p-3">
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium">{t.title}</p>
-                <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_BADGE[t.status])}>
-                  {STATUS_LABELS[t.status]}
-                </span>
-                {podeEditar && t.visibility === "admin" && (
-                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    só equipa
-                  </span>
-                )}
-              </div>
-              {t.description && (
-                <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
-              )}
-              <p className="text-xs text-muted-foreground mt-0.5">
-                {t.start_date ? formatDate(t.start_date) : "sem início"}
-                {" - "}
-                {t.end_date ? formatDate(t.end_date) : "sem fim"}
-              </p>
-            </div>
-            {podeEditar && (
-              <Button variant="ghost" size="sm" onClick={() => setEditar(t)} title="Editar">
-                <Pencil className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
+      <ListaPorFase tarefas={tarefas} podeEditar={podeEditar} onEditar={setEditar} />
 
       {(editar || criar) && (
         <DialogoTarefa
           projectId={projectId}
           tarefa={editar}
+          fasesConhecidas={[
+            ...new Set(tarefas.map((t) => t.phase?.trim()).filter((p): p is string => Boolean(p))),
+          ]}
           onFechar={() => {
             setEditar(null)
             setCriar(false)
@@ -208,61 +177,82 @@ export function ProjectPlanTab({
 }
 
 // ---------------------------------------------------------------------------
-// Timeline horizontal
+// Lista de tarefas, agrupada pelas mesmas fases do Gantt
 // ---------------------------------------------------------------------------
 
-function Timeline({ tarefas }: { tarefas: Tarefa[] }) {
-  const { inicio, total, comDatas } = useMemo(() => {
-    const datas = tarefas
-      .flatMap((t) => [t.start_date, t.end_date])
-      .filter((d): d is string => Boolean(d))
-      .map((d) => new Date(d).getTime())
-
-    if (datas.length === 0) return { inicio: 0, total: 0, comDatas: false }
-    const min = Math.min(...datas)
-    const max = Math.max(...datas)
-    return { inicio: min, total: Math.max(max - min, 86_400_000), comDatas: true }
-  }, [tarefas])
-
-  if (!comDatas) {
-    return (
-      <div className="surface-card p-6 text-center">
-        <p className="text-xs text-muted-foreground">
-          As tarefas ainda não têm datas, por isso não há cronograma para mostrar.
-        </p>
-      </div>
-    )
+function ListaPorFase({
+  tarefas,
+  podeEditar,
+  onEditar,
+}: {
+  tarefas: Tarefa[]
+  podeEditar: boolean
+  onEditar: (t: Tarefa) => void
+}) {
+  // A API já devolve por fase e por ordem, por isso agrupar pela ordem de
+  // chegada mantém o Gantt e a lista com a mesma sequência.
+  const grupos = new Map<string, Tarefa[]>()
+  for (const t of tarefas) {
+    const nome = t.phase?.trim() || "Sem fase"
+    const lista = grupos.get(nome)
+    if (lista) lista.push(t)
+    else grupos.set(nome, [t])
   }
 
   return (
-    <div className="surface-card overflow-x-auto p-4">
-      <div className="min-w-[520px] space-y-2">
-        {tarefas.map((t) => {
-          const ini = t.start_date ? new Date(t.start_date).getTime() : null
-          const fim = t.end_date ? new Date(t.end_date).getTime() : ini
-          const temBarra = ini !== null && fim !== null
-          const left = temBarra ? ((ini! - inicio) / total) * 100 : 0
-          // largura mínima para tarefas de 1 dia continuarem visíveis
-          const width = temBarra ? Math.max(((fim! - ini!) / total) * 100, 1.5) : 0
+    <div className="space-y-3">
+      {[...grupos.entries()].map(([nome, lista], i) => (
+        <div key={nome} className="space-y-2">
+          <div className="flex items-center gap-2 px-1">
+            <span
+              className="h-2.5 w-2.5 rounded-sm"
+              style={{ backgroundColor: `hsl(var(--chart-${(i % 5) + 1}))` }}
+            />
+            <h3 className="text-sm font-semibold">{nome}</h3>
+            <span className="text-xs text-muted-foreground">
+              {lista.length} tarefa{lista.length !== 1 ? "s" : ""}
+            </span>
+          </div>
 
-          return (
-            <div key={t.id} className="flex items-center gap-3">
-              <div className="w-40 shrink-0 truncate text-xs" title={t.title}>
-                {t.title}
-              </div>
-              <div className="relative h-5 flex-1 rounded bg-muted/50">
-                {temBarra && (
-                  <div
-                    className={cn("absolute top-0 h-5 rounded", STATUS_BAR[t.status])}
-                    style={{ left: `${left}%`, width: `${width}%` }}
-                    title={`${t.start_date ?? ""} - ${t.end_date ?? ""}`}
-                  />
+          <div className="surface-card divide-y overflow-hidden">
+            {lista.map((t) => (
+              <div key={t.id} className="flex items-start gap-3 p-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">{t.title}</p>
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs font-medium",
+                        STATUS_BADGE[t.status],
+                      )}
+                    >
+                      {STATUS_LABELS[t.status]}
+                    </span>
+                    {podeEditar && t.visibility === "admin" && (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        só equipa
+                      </span>
+                    )}
+                  </div>
+                  {t.description && (
+                    <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
+                  )}
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {t.start_date ? formatDate(t.start_date) : "sem início"}
+                    {" - "}
+                    {t.end_date ? formatDate(t.end_date) : "sem fim"}
+                  </p>
+                </div>
+                {podeEditar && (
+                  <Button variant="ghost" size="sm" onClick={() => onEditar(t)} title="Editar">
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                 )}
               </div>
-            </div>
-          )
-        })}
-      </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -285,6 +275,18 @@ function useVoz(onTexto: (t: string) => void) {
     setSuportado(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition))
   }, [])
 
+  /** Idempotente: pode ser chamada sem gravação a decorrer. */
+  const parar = useCallback(() => {
+    pararPedido.current = true
+    ;(ref.current as { stop: () => void } | null)?.stop()
+    ref.current = null
+    setAtivo(false)
+  }, [])
+
+  // Sair do ecrã (ou fechar o diálogo) tem de largar o microfone. Sem isto o
+  // browser ficava a gravar depois de o componente desaparecer.
+  useEffect(() => parar, [parar])
+
   function alternar() {
     const w = window as unknown as Record<string, unknown>
     const Ctor = (w.SpeechRecognition || w.webkitSpeechRecognition) as
@@ -302,9 +304,7 @@ function useVoz(onTexto: (t: string) => void) {
     if (!Ctor) return
 
     if (ativo) {
-      pararPedido.current = true
-      ;(ref.current as { stop: () => void } | null)?.stop()
-      setAtivo(false)
+      parar()
       return
     }
     pararPedido.current = false
@@ -343,24 +343,38 @@ function useVoz(onTexto: (t: string) => void) {
     setAtivo(true)
   }
 
-  return { ativo, suportado, alternar }
+  return { ativo, suportado, alternar, parar }
 }
 
 function CampoDescricao({
   valor,
   setValor,
   placeholder,
+  pararRef,
 }: {
   valor: string
   setValor: Dispatch<SetStateAction<string>>
   placeholder: string
+  /**
+   * O pai guarda aqui a função de parar, para desligar o microfone quando
+   * submete. Sem isto a gravação continuava aberta depois de "Gerar cronograma".
+   */
+  pararRef?: MutableRefObject<(() => void) | null>
 }) {
   // Forma funcional obrigatoria: o handler de voz e' criado uma unica vez e
   // ficaria preso ao `valor` desse momento, apagando o texto anterior a cada
   // nova frase.
-  const { ativo, suportado, alternar } = useVoz((t) =>
+  const { ativo, suportado, alternar, parar } = useVoz((t) =>
     setValor((anterior) => (anterior ? `${anterior} ${t}` : t)),
   )
+
+  useEffect(() => {
+    if (!pararRef) return
+    pararRef.current = parar
+    return () => {
+      pararRef.current = null
+    }
+  }, [pararRef, parar])
 
   return (
     <div className="space-y-2">
@@ -387,8 +401,10 @@ function CampoDescricao({
 function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () => void }) {
   const [texto, setTexto] = useState("")
   const [aGerar, setAGerar] = useState(false)
+  const pararVoz = useRef<(() => void) | null>(null)
 
   async function gerar() {
+    pararVoz.current?.()
     if (texto.trim().length < 3) return toast.error("Descreve o que queres planear")
     setAGerar(true)
     try {
@@ -428,6 +444,7 @@ function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () =
         <CampoDescricao
           valor={texto}
           setValor={setTexto}
+          pararRef={pararVoz}
           placeholder="ex: Remodelação de um T2 em Lisboa. Começa em setembro, primeiro demolições e infraestruturas, depois canalização e eletricidade, acabamentos e limpeza final. Prazo de três meses."
         />
 
@@ -457,8 +474,10 @@ function DialogoRegerar({
   const [texto, setTexto] = useState("")
   const [substituir, setSubstituir] = useState("substituir")
   const [aGerar, setAGerar] = useState(false)
+  const pararVoz = useRef<(() => void) | null>(null)
 
   async function gerar() {
+    pararVoz.current?.()
     if (texto.trim().length < 3) return toast.error("Descreve o que queres planear")
     setAGerar(true)
     try {
@@ -496,6 +515,7 @@ function DialogoRegerar({
           <CampoDescricao
             valor={texto}
             setValor={setTexto}
+            pararRef={pararVoz}
             placeholder="Descreve o cronograma que pretendes..."
           />
           <div className="space-y-1.5">
@@ -532,14 +552,18 @@ function DialogoRegerar({
 function DialogoTarefa({
   projectId,
   tarefa,
+  fasesConhecidas,
   onFechar,
   onMudou,
 }: {
   projectId: string
   tarefa: Tarefa | null
+  /** Sugestões no datalist, para reaproveitar uma fase em vez de a escrever de novo. */
+  fasesConhecidas: string[]
   onFechar: () => void
   onMudou: () => void
 }) {
+  const [phase, setPhase] = useState(tarefa?.phase ?? "")
   const [title, setTitle] = useState(tarefa?.title ?? "")
   const [description, setDescription] = useState(tarefa?.description ?? "")
   const [startDate, setStartDate] = useState(tarefa?.start_date ?? "")
@@ -557,6 +581,7 @@ function DialogoTarefa({
 
     setAGravar(true)
     const payload = {
+      phase: phase.trim() || null,
       title: title.trim(),
       description: description.trim() || null,
       start_date: startDate || null,
@@ -617,6 +642,25 @@ function DialogoTarefa({
         </DialogHeader>
 
         <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="t-phase">Fase</Label>
+            <Input
+              id="t-phase"
+              list="fases-do-projeto"
+              value={phase}
+              onChange={(e) => setPhase(e.target.value)}
+              placeholder="ex: Fase 1 - Demolições"
+            />
+            <datalist id="fases-do-projeto">
+              {fasesConhecidas.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+            <p className="text-xs text-muted-foreground">
+              Agrupa a tarefa no cronograma. Deixa vazio para ficar fora das fases.
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="t-title">Título</Label>
             <Input id="t-title" value={title} onChange={(e) => setTitle(e.target.value)} />

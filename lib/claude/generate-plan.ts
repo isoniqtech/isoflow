@@ -20,6 +20,10 @@ export interface TarefaGerada {
   start_date: string | null
   end_date: string | null
   status: TaskStatus
+  /** Nome da fase a que a tarefa pertence. Agrupa as barras no Gantt. */
+  phase: string | null
+  /** Ordem da fase no cronograma (0, 1, 2...). Null se não houver fase. */
+  phase_order: number | null
 }
 
 export interface ContextoProjeto {
@@ -30,13 +34,15 @@ export interface ContextoProjeto {
   end_date?: string | null
 }
 
-const SYSTEM = `És um gestor de obra e de projetos português. Recebes a descrição de um projeto e devolves um cronograma de tarefas.
+const SYSTEM = `És um gestor de obra e de projetos português. Recebes a descrição de um projeto e devolves um cronograma de tarefas organizado por fases.
 
 Responde APENAS com JSON válido. Sem markdown, sem backticks, sem preâmbulo, sem explicação.
 
 Formato obrigatório: um array de objetos com exatamente estes campos:
 [
   {
+    "phase": "string, nome da fase (ex: \\"Fase 1 - Demolições\\")",
+    "phase_order": 0,
     "title": "string, curto e acionável",
     "description": "string ou null, uma frase a explicar o que envolve",
     "start_date": "YYYY-MM-DD ou null",
@@ -45,9 +51,16 @@ Formato obrigatório: um array de objetos com exatamente estes campos:
   }
 ]
 
-Regras:
-- Entre 4 e 15 tarefas, por ordem cronológica.
+Regras sobre fases:
+- Organiza o trabalho em 3 a 6 fases, por ordem cronológica.
+- phase_order começa em 0 e é o mesmo número para todas as tarefas da mesma fase.
+- phase é EXATAMENTE a mesma string para todas as tarefas da mesma fase. Formato "Fase N - Nome curto", com N a começar em 1.
+- Cada fase tem 2 a 5 tarefas.
+
+Regras sobre tarefas:
+- Entre 6 e 20 tarefas no total, por ordem cronológica.
 - As datas têm de ser coerentes: end_date nunca antes de start_date, e as tarefas encadeiam-se de forma realista.
+- As tarefas de uma fase têm de ficar dentro do período dessa fase, e as fases não se sobrepõem, salvo quando o trabalho é mesmo em paralelo.
 - Se o projeto tiver datas de início e fim, mantém o cronograma dentro desse intervalo.
 - Se não houver informação para datar, usa null em vez de inventar.
 - status é "por_iniciar" salvo indicação explícita do contrário.
@@ -85,10 +98,18 @@ function normalizar(bruto: unknown): TarefaGerada[] {
   if (!Array.isArray(bruto)) return []
 
   const tarefas: TarefaGerada[] = []
+  // O modelo pode esquecer-se do phase_order ou repeti-lo entre fases. A ordem
+  // de aparecimento e' a fonte fiavel, ja' que exigimos ordem cronologica.
+  const ordemPorFase = new Map<string, number>()
+
   for (const item of bruto) {
     const o = (item ?? {}) as Record<string, unknown>
     const title = typeof o.title === "string" ? o.title.trim() : ""
     if (!title) continue
+
+    const phase =
+      typeof o.phase === "string" && o.phase.trim() ? o.phase.trim().slice(0, 120) : null
+    if (phase && !ordemPorFase.has(phase)) ordemPorFase.set(phase, ordemPorFase.size)
 
     const status = TASK_STATUSES.includes(o.status as TaskStatus)
       ? (o.status as TaskStatus)
@@ -108,6 +129,8 @@ function normalizar(bruto: unknown): TarefaGerada[] {
       start_date: start,
       end_date: end,
       status,
+      phase,
+      phase_order: phase ? (ordemPorFase.get(phase) ?? null) : null,
     })
   }
   return tarefas.slice(0, 30)

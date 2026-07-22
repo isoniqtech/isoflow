@@ -20,7 +20,7 @@ export const runtime = "nodejs"
 export const maxDuration = 120
 
 const CAMPOS =
-  "id, title, description, start_date, end_date, status, visibility, sort_order, created_at"
+  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, created_at"
 
 const bodySchema = z.object({
   descricao: z.string().trim().min(3).max(5000),
@@ -116,6 +116,8 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         start_date: t.start_date,
         end_date: t.end_date,
         status: t.status,
+        phase: t.phase,
+        phase_order: t.phase_order,
         visibility: "todos", // default pedido; editavel por tarefa
         sort_order: base + i,
         created_by: ctx.userId,

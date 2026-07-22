@@ -9,6 +9,7 @@ import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { TASK_STATUSES } from "@/lib/claude/generate-plan"
+import { resolverPhaseOrder } from "@/lib/queries/project-tasks"
 
 export const runtime = "nodejs"
 
@@ -18,7 +19,7 @@ function admin(): SupabaseClient {
 }
 
 const CAMPOS =
-  "id, title, description, start_date, end_date, status, visibility, sort_order, created_at"
+  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, created_at"
 
 async function investidorTemAcesso(userId: string, projectId: string): Promise<boolean> {
   const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
@@ -40,6 +41,8 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     .select(CAMPOS)
     .eq("tenant_id", ctx.tenantId)
     .eq("project_id", params.id)
+    // Fase primeiro (NULL = sem fase, vai para o fim), depois a ordem dentro dela
+    .order("phase_order", { ascending: true, nullsFirst: false })
     .order("sort_order", { ascending: true })
     .order("start_date", { ascending: true, nullsFirst: false })
 
@@ -59,6 +62,7 @@ const criarSchema = z.object({
   end_date: z.string().date().nullable().optional(),
   status: z.enum(TASK_STATUSES).default("por_iniciar"),
   visibility: z.enum(["admin", "todos"]).default("todos"),
+  phase: z.string().trim().max(120).nullable().optional(),
 })
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -98,12 +102,17 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .maybeSingle()
   const proximaOrdem = ((ultima as { sort_order?: number } | null)?.sort_order ?? -1) + 1
 
+  const phase = parsed.data.phase?.trim() || null
+  const phaseOrder = phase ? await resolverPhaseOrder(sb, params.id, phase) : null
+
   const { data, error } = await sb
     .from("project_tasks")
     .insert({
       tenant_id: ctx.tenantId,
       project_id: params.id,
       ...parsed.data,
+      phase,
+      phase_order: phaseOrder,
       sort_order: proximaOrdem,
       created_by: ctx.userId,
     })
