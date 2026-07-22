@@ -374,7 +374,7 @@ export function ProjectGantt({
                 não a atravessar quando se faz scroll horizontal. */}
             {hojeLeft !== null && (
               <div
-                className="pointer-events-none absolute inset-y-0 z-10 w-0.5 bg-destructive"
+                className="pointer-events-none absolute inset-y-0 z-10 w-px bg-destructive/60"
                 style={{ left: COL_NOMES + hojeLeft }}
               />
             )}
@@ -492,24 +492,18 @@ export function ProjectGantt({
                             width: b.largura,
                             top: ALTURA[l.tipo] / 2 - (ehFase ? 6 : l.tipo === "macro" ? 8 : 6),
                             height: ehFase ? 12 : l.tipo === "macro" ? 16 : 12,
-                            // Corpo da barra bem visível mesmo a 0% de progresso.
-                            // Antes era um trilho a 0.22 de opacidade e, como
-                            // quase tudo está por iniciar, o cronograma inteiro
-                            // parecia desbotado.
-                            backgroundColor: `hsl(${g.cor} / ${
-                              ehFase ? 0.55 : l.tipo === "macro" ? 0.5 : 0.42
-                            })`,
-                            boxShadow: `inset 0 0 0 1px hsl(${g.cor} / 0.9)`,
+                            backgroundColor: `hsl(${g.cor} / ${ehFase ? 0.3 : 0.22})`,
                           }}
                           title={rotulo(ehFase ? g.nome : t!.title, t)}
                         >
-                          {/* Preenchimento = progresso, na cor cheia. O contraste
-                              com o corpo da barra é o que mostra o avanço. */}
+                          {/* Preenchimento = progresso. A 0% fica só o trilho
+                              claro, que é o que distingue "por fazer" de "a
+                              meio" sem carregar o cronograma. */}
                           <div
                             className="h-full"
                             style={{
                               width: `${Math.max(progresso, 0)}%`,
-                              backgroundColor: `hsl(${g.cor})`,
+                              backgroundColor: `hsl(${g.cor} / ${ehFase ? 1 : 0.85})`,
                             }}
                           />
                         </div>
@@ -531,7 +525,7 @@ export function ProjectGantt({
           <span className="h-3 w-4 rounded ring-1 ring-destructive" /> Bloqueada
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-3 w-0.5 bg-destructive" /> Hoje
+          <span className="h-3 w-px bg-destructive/60" /> Hoje
         </span>
       </div>
     </div>
