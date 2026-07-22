@@ -266,6 +266,105 @@ export async function ensureProjectFolder(
   return folderId
 }
 
+// ---------------------------------------------------------------------------
+// Ficheiros
+// ---------------------------------------------------------------------------
+
+export interface DriveFile {
+  id: string
+  name: string
+  mimeType: string
+  webViewLink: string | null
+  size: number | null
+}
+
+/**
+ * Envia um ficheiro para uma pasta do Drive (upload multipart).
+ *
+ * Multipart e' suficiente e mais simples que resumable para os tamanhos que a
+ * app aceita (limite de 20 MB, igual ao das faturas). Se um dia for preciso
+ * suportar ficheiros grandes, trocar por resumable aqui, sem mexer no resto.
+ */
+export async function uploadFileToFolder(
+  accessToken: string,
+  folderId: string,
+  fileName: string,
+  mimeType: string,
+  bytes: Buffer,
+): Promise<DriveFile> {
+  const metadata = { name: fileName, parents: [folderId] }
+  const boundary = `isoflow-${Math.random().toString(36).slice(2)}`
+
+  const corpo = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+        `${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
+    ),
+    bytes,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ])
+
+  const campos = encodeURIComponent("id,name,mimeType,webViewLink,size")
+  const res = await fetch(`${DRIVE_UPLOAD_API}/files?uploadType=multipart&fields=${campos}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": `multipart/related; boundary=${boundary}`,
+    },
+    body: new Uint8Array(corpo),
+  })
+
+  if (!res.ok) {
+    const t = await res.text().catch(() => "")
+    throw new Error(`Erro ao enviar para o Drive ${res.status}: ${t.slice(0, 300)}`)
+  }
+
+  const b = (await res.json()) as {
+    id: string
+    name: string
+    mimeType: string
+    webViewLink?: string
+    size?: string
+  }
+  return {
+    id: b.id,
+    name: b.name,
+    mimeType: b.mimeType,
+    webViewLink: b.webViewLink ?? null,
+    size: b.size ? Number(b.size) : null,
+  }
+}
+
+/**
+ * Devolve o conteudo de um ficheiro do Drive, para ser servido por proxy.
+ * O token nunca sai do servidor - o utilizador nao precisa de conta Google.
+ */
+export async function fetchFileContent(
+  accessToken: string,
+  fileId: string,
+): Promise<Response> {
+  const res = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}?alt=media`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok) {
+    const t = await res.text().catch(() => "")
+    throw new Error(`Erro ao ler do Drive ${res.status}: ${t.slice(0, 200)}`)
+  }
+  return res
+}
+
+/** Apaga um ficheiro do Drive. Silencioso se ja' nao existir. */
+export async function deleteDriveFile(accessToken: string, fileId: string): Promise<void> {
+  const res = await fetch(`${DRIVE_API}/files/${encodeURIComponent(fileId)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+  if (!res.ok && res.status !== 404) {
+    const t = await res.text().catch(() => "")
+    throw new Error(`Erro ao apagar no Drive ${res.status}: ${t.slice(0, 200)}`)
+  }
+}
+
 /** O Drive esta' ligado neste tenant? (nao lanca) */
 export async function isDriveConnected(tenantId: string): Promise<boolean> {
   try {

@@ -16,6 +16,7 @@ import { ProjectCategoryChart } from "@/components/projetos/project-category-cha
 import { ProjectInvoices } from "@/components/projetos/project-invoices"
 import { ProjectActions } from "@/components/projetos/project-actions"
 import { ProjectInvestorBlock } from "@/components/investidores/project-investor-block"
+import { ProjectDocumentsTab } from "@/components/projetos/project-documents-tab"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { getProjectDetail } from "@/lib/queries/project-detail"
 import { listInvestidores } from "@/lib/queries/investidores"
@@ -313,13 +314,13 @@ export default async function ProjetoDetailPage({
         </>
       )}
 
-      {/* ---------- Documentacao (FASE 3) ---------- */}
+      {/* ---------- Documentacao ---------- */}
       {activeTab === "documentacao" && (
-        <div className="rounded-lg border border-border/60 bg-card p-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Documentação do projeto - disponível em breve.
-          </p>
-        </div>
+        <ProjectDocumentsTab
+          projectId={project.id}
+          canEdit={canEdit}
+          isInvestidor={session.role === "investidor"}
+        />
       )}
 
       {/* ---------- Planejamento (FASE 4) ---------- */}
