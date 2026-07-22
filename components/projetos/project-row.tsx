@@ -72,8 +72,10 @@ export function ProjectRow({ project }: { project: ProjectListItem }) {
           <span>{project.invoice_count} faturas</span>
         </div>
 
-        {/* Orçamento */}
-        <div className="min-w-0 flex-1">
+        {/* Orçamento: termina sempre no mesmo ponto, porque a coluna do estado
+            tem largura fixa (senao "Concluído" empurrava a barra mais para a
+            esquerda do que "Ativo" e as linhas ficavam desalinhadas) */}
+        <div className="min-w-0 flex-1 md:pr-2">
           <BudgetProgress
             spent={project.total_spent}
             budget={project.budget}
@@ -83,7 +85,7 @@ export function ProjectRow({ project }: { project: ProjectListItem }) {
 
         {/* Estado (as datas ficam so' na vista em grelha e no detalhe: em
             lista enchiam demasiado a linha) */}
-        <div className="flex shrink-0 items-center md:justify-end">
+        <div className="flex shrink-0 items-center md:w-28 md:justify-end">
           <Badge variant="outline" className={cn("shrink-0", status.className)}>
             {status.label}
           </Badge>
