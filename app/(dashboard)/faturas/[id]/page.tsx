@@ -6,6 +6,7 @@ import { getInvoiceDetail } from "@/lib/queries/invoice-detail"
 import { hasPermission } from "@/lib/utils/permissions"
 import { InvoiceDetail } from "@/components/faturas/invoice-detail"
 import { InvoiceActions } from "@/components/faturas/invoice-actions"
+import { ExpenseCategorySelect } from "@/components/faturas/expense-category-select"
 
 export default async function FaturaDetailPage({
   params,
@@ -27,6 +28,16 @@ export default async function FaturaDetailPage({
     const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
     const allowed = await getInvestidorProjectIds(session.user.id)
     if (!invoice.project?.id || !allowed.includes(invoice.project.id)) redirect("/faturas")
+  }
+
+  // Categoria de gasto: a IA decide na primeira vez que a fatura e' vista,
+  // se ainda nao tiver nenhuma. Silencioso - falhas deixam a escolha ao utilizador.
+  let expenseCategoryCode = (invoice as { expense_category_code?: string | null }).expense_category_code ?? null
+  const categoriaJaExistia = Boolean(expenseCategoryCode)
+  if (!expenseCategoryCode) {
+    const { createClient } = await import("@/lib/supabase/server")
+    const { ensureInvoiceExpenseCategory } = await import("@/lib/toconline/assign-expense-category")
+    expenseCategoryCode = await ensureInvoiceExpenseCategory(invoice.id, session.tenant.id, createClient())
   }
 
   const canEdit = hasPermission(session.role, "faturas", "edit")
@@ -75,6 +86,13 @@ export default async function FaturaDetailPage({
       )}
 
       {/* Conteúdo principal */}
+      <ExpenseCategorySelect
+        invoiceId={invoice.id}
+        currentCode={expenseCategoryCode}
+        decidedByAi={!categoriaJaExistia}
+        canEdit={canEdit}
+      />
+
       <InvoiceDetail invoice={invoice} canEdit={canEdit} />
     </div>
   )

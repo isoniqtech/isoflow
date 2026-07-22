@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   // Buscar faturas elegíveis
   const { data: invoices, error } = await supabase
     .from("invoices")
-    .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id, bank_transaction_id")
+    .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id, bank_transaction_id, expense_category_code")
     .eq("tenant_id", tenantId)
     .in("id", parsed.data.invoice_ids)
 
@@ -82,17 +82,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Categoria de gasto configurada pelo tenant (fallback: default do fc.ts)
-    const { data: erpRow } = await supabase
-      .from("tenant_integrations")
-      .select("config")
-      .eq("tenant_id", tenantId)
-      .eq("type", "erp")
-      .eq("provider", "toconline")
-      .maybeSingle()
-    const expenseCategoryCode =
-      (erpRow?.config as { default_expense_category?: string } | null)?.default_expense_category ?? null
-
     const admin = createAdminClient()
     const now = new Date().toISOString()
     const errors: string[] = []
@@ -112,7 +101,7 @@ export async function POST(request: Request) {
             description: inv.description,
             movementNote: noteForInvoice(inv),
             vatRate: inv.vat_rate !== null ? Number(inv.vat_rate) : null,
-            expenseCategoryCode,
+            expenseCategoryCode: inv.expense_category_code ?? null,
           })
 
           // Gravar fc_number directamente - mesma logica que /api/faturas/[id]/update-fc
