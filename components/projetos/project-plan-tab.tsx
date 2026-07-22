@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import type { Dispatch, SetStateAction } from "react"
 import { Loader2, Mic, MicOff, Pencil, Plus, Sparkles, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -275,6 +276,9 @@ function useVoz(onTexto: (t: string) => void) {
   const [ativo, setAtivo] = useState(false)
   const [suportado, setSuportado] = useState(false)
   const ref = useRef<unknown>(null)
+  // O Chrome termina o reconhecimento sozinho ao fim de uma pausa. Sem isto, o
+  // utilizador tinha de voltar a carregar no botao a meio do ditado.
+  const pararPedido = useRef(false)
 
   useEffect(() => {
     const w = window as unknown as Record<string, unknown>
@@ -298,10 +302,12 @@ function useVoz(onTexto: (t: string) => void) {
     if (!Ctor) return
 
     if (ativo) {
+      pararPedido.current = true
       ;(ref.current as { stop: () => void } | null)?.stop()
       setAtivo(false)
       return
     }
+    pararPedido.current = false
 
     const rec = new Ctor()
     rec.lang = "pt-PT"
@@ -315,8 +321,23 @@ function useVoz(onTexto: (t: string) => void) {
       }
       if (texto.trim()) onTexto(texto.trim())
     }
-    rec.onerror = () => setAtivo(false)
-    rec.onend = () => setAtivo(false)
+    rec.onerror = () => {
+      // Parar em caso de erro (ex: permissao negada), para nao entrar em ciclo
+      pararPedido.current = true
+      setAtivo(false)
+    }
+    rec.onend = () => {
+      if (pararPedido.current) {
+        setAtivo(false)
+        return
+      }
+      // Pausa natural na fala: retomar para o ditado continuar
+      try {
+        rec.start()
+      } catch {
+        setAtivo(false)
+      }
+    }
     rec.start()
     ref.current = rec
     setAtivo(true)
@@ -331,11 +352,14 @@ function CampoDescricao({
   placeholder,
 }: {
   valor: string
-  setValor: (v: string) => void
+  setValor: Dispatch<SetStateAction<string>>
   placeholder: string
 }) {
+  // Forma funcional obrigatoria: o handler de voz e' criado uma unica vez e
+  // ficaria preso ao `valor` desse momento, apagando o texto anterior a cada
+  // nova frase.
   const { ativo, suportado, alternar } = useVoz((t) =>
-    setValor(valor ? `${valor} ${t}` : t),
+    setValor((anterior) => (anterior ? `${anterior} ${t}` : t)),
   )
 
   return (
