@@ -66,13 +66,6 @@ export function ToconlineDirectCard({
     initial?.historico_importado_at ?? null,
   )
 
-  type Categoria = { codigo: string; nome: string; tax_code: string | null }
-  const [categorias, setCategorias] = useState<Categoria[]>([])
-  const [categoriaSel, setCategoriaSel] = useState<string>("")
-  const [loadingCats, setLoadingCats] = useState(false)
-  const [savingCat, setSavingCat] = useState(false)
-  const [catsErro, setCatsErro] = useState<string | null>(null)
-
   const [clientId, setClientId] = useState(initial?.client_id ?? "")
   const [clientSecret, setClientSecret] = useState("")
   const [subdomain, setSubdomain] = useState(initial?.subdomain ?? "")
@@ -94,53 +87,6 @@ export function ToconlineDirectCard({
       router.replace("/configuracoes/integracoes")
     }
   }, [searchParams, router])
-
-  // Carregar categorias de gasto do TOConline (modo direto e ligacao activa)
-  useEffect(() => {
-    if (mode !== "toconline_direct" || !initial?.configured || !initial?.is_active) return
-    let cancelado = false
-    setLoadingCats(true)
-    fetch("/api/integracoes/toconline/expense-categories")
-      .then((r) => r.json())
-      .then((body) => {
-        if (cancelado) return
-        setCategorias(body.categorias ?? [])
-        setCategoriaSel(body.configurada ?? body.default_fallback ?? "")
-        setCatsErro(body.erro ?? null)
-      })
-      .catch(() => {
-        if (!cancelado) setCatsErro("Nao foi possivel carregar as categorias")
-      })
-      .finally(() => {
-        if (!cancelado) setLoadingCats(false)
-      })
-    return () => {
-      cancelado = true
-    }
-  }, [mode, initial?.configured, initial?.is_active])
-
-  async function handleSaveCategoria(codigo: string) {
-    setCategoriaSel(codigo)
-    setSavingCat(true)
-    try {
-      const res = await fetch("/api/integracoes/toconline/expense-categories", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ codigo }),
-      })
-      const body = await res.json()
-      if (res.ok && body.ok) {
-        toast.success("Categoria de gasto guardada")
-        router.refresh()
-      } else {
-        toast.error("Falha ao guardar categoria", { description: body.error ?? `HTTP ${res.status}` })
-      }
-    } catch (e) {
-      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
-    } finally {
-      setSavingCat(false)
-    }
-  }
 
   async function handleImportHistory() {
     if (
@@ -416,39 +362,6 @@ export function ToconlineDirectCard({
             {initial.sync_error && (
               <p className="text-destructive break-all">{initial.sync_error}</p>
             )}
-          </div>
-        )}
-
-        {/* Categoria de gasto default (modo direto, ligacao activa) */}
-        {mode === "toconline_direct" && initial?.configured && initial?.is_active && canEdit && (
-          <div className="space-y-1.5 border-t pt-3">
-            <Label htmlFor="tc-expense-cat">Categoria de gasto para as faturas</Label>
-            <div className="flex items-center gap-2">
-              <Select
-                value={categoriaSel}
-                onValueChange={handleSaveCategoria}
-                disabled={loadingCats || savingCat || categorias.length === 0}
-              >
-                <SelectTrigger id="tc-expense-cat" className="w-full max-w-lg">
-                  <SelectValue placeholder={loadingCats ? "A carregar..." : "Escolhe a categoria"} />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {categorias.map((c) => (
-                    <SelectItem key={c.codigo} value={c.codigo}>
-                      {c.codigo} - {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(loadingCats || savingCat) && (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Conta usada na linha da fatura de compra criada no TOConline. As categorias vêm
-              diretamente da tua contabilidade no TOConline.
-            </p>
-            {catsErro && <p className="text-xs text-destructive">{catsErro}</p>}
           </div>
         )}
 

@@ -51,6 +51,7 @@ const invoiceUpdateSchema = z
       ])
       .nullable(),
     notes: z.string().trim().max(2000).nullable(),
+    expense_category_code: z.string().trim().max(32).nullable(),
     needs_review: z.boolean(),
   })
   .partial()

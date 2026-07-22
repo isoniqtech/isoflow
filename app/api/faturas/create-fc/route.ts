@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   // Buscar faturas elegíveis
   const { data: invoices, error } = await supabase
     .from("invoices")
-    .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id, bank_transaction_id")
+    .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id, bank_transaction_id, expense_category_code")
     .eq("tenant_id", tenantId)
     .in("id", parsed.data.invoice_ids)
 
@@ -82,17 +82,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Categoria de gasto configurada pelo tenant (fallback: default do fc.ts)
-    const { data: erpRow } = await supabase
-      .from("tenant_integrations")
-      .select("config")
-      .eq("tenant_id", tenantId)
-      .eq("type", "erp")
-      .eq("provider", "toconline")
-      .maybeSingle()
-    const expenseCategoryCode =
-      (erpRow?.config as { default_expense_category?: string } | null)?.default_expense_category ?? null
-
     const admin = createAdminClient()
     const now = new Date().toISOString()
     const errors: string[] = []
@@ -112,7 +101,7 @@ export async function POST(request: Request) {
             description: inv.description,
             movementNote: noteForInvoice(inv),
             vatRate: inv.vat_rate !== null ? Number(inv.vat_rate) : null,
-            expenseCategoryCode,
+            expenseCategoryCode: inv.expense_category_code ?? null,
           })
 
           // Gravar fc_number directamente - mesma logica que /api/faturas/[id]/update-fc
@@ -164,6 +153,14 @@ export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET ?? ""
   const errors: string[] = []
 
+  // Categoria de gasto (decidida pela IA / escolhida no detalhe da fatura).
+  // A logica e' a mesma do modo direto; aqui apenas viaja no payload para o
+  // n8n a mapear no TOConline. Campos aditivos: o n8n antigo ignora-os.
+  const { getExpenseCategories } = await import("@/lib/toconline/expense-categories")
+  const catalogo = await getExpenseCategories(tenantId, supabase)
+  const nomePorCodigo = new Map(catalogo.map((c) => [c.code, c.name]))
+  const { DEFAULT_EXPENSE_CATEGORY } = await import("@/lib/toconline/fc")
+
   await Promise.all(
     pending.map(async (inv) => {
       try {
@@ -186,6 +183,10 @@ export async function POST(request: Request) {
               description: inv.description,
               currency: inv.currency ?? "EUR",
               movement_note: noteForInvoice(inv),
+              // Categoria de gasto para a linha da FC no TOConline
+              item_code: inv.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY,
+              item_description:
+                nomePorCodigo.get(inv.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY) ?? null,
             },
           }),
         })
