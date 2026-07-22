@@ -129,37 +129,61 @@ async function findSupplier(
   return id ? Number(id) : null
 }
 
+/**
+ * Cria um fornecedor no TOConline.
+ * Formato conforme api-docs.toconline.pt/apis/empresa/fornecedores:
+ *  - caminho /api/suppliers (NAO /api/v1/suppliers - esse e' bloqueado pelo
+ *    gatekeeper com 404 FORBIDDEN_BY_GATEKEEPER)
+ *  - Content-Type application/vnd.api+json
+ *  - body JSON:API { data: { type: "suppliers", attributes: {...} } }
+ *  - tax_registration_number e' numerico
+ * Tenta apiBase e, se o caminho nao existir (404), tenta appBase.
+ */
 async function createSupplier(
   accessToken: string,
   apiBase: string,
+  appBase: string,
   nif: string,
   name: string,
 ): Promise<number> {
-  const url = `${apiBase.replace(/\/$/, "")}/api/v1/suppliers`
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-      Accept: "application/json",
+  const payload = {
+    data: {
+      type: "suppliers",
+      attributes: {
+        tax_registration_number: Number(nif),
+        business_name: name,
+      },
     },
-    body: JSON.stringify({
-      tax_registration_number: nif,
-      business_name: name,
-      country: "PT",
-    }),
-  })
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "")
-    throw new Error(`Erro ao criar fornecedor no TOConline ${res.status}: ${text.slice(0, 300)}`)
   }
 
-  const body = await res.json()
-  const data = body.data ?? body
-  const id = data?.id ?? data?.attributes?.id
-  if (!id) throw new Error("TOConline: criar fornecedor nao devolveu ID")
-  return Number(id)
+  let lastErr = "sem resposta"
+  for (const base of [apiBase, appBase]) {
+    const url = `${base.replace(/\/$/, "")}/api/suppliers`
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/vnd.api+json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    })
+
+    if (res.ok) {
+      const body = await res.json()
+      const data = body.data ?? body
+      const id = data?.id ?? data?.attributes?.id
+      if (!id) throw new Error("TOConline: criar fornecedor nao devolveu ID")
+      return Number(id)
+    }
+
+    const text = await res.text().catch(() => "")
+    lastErr = `${res.status}: ${text.slice(0, 300)}`
+    // Só vale a pena tentar a outra base se o caminho nao existir nesta.
+    if (res.status !== 404) break
+  }
+
+  throw new Error(`Erro ao criar fornecedor no TOConline ${lastErr}`)
 }
 
 async function lookupOrCreateSupplier(
@@ -175,7 +199,7 @@ async function lookupOrCreateSupplier(
   if (existing !== null) return existing
 
   if (!name) return null
-  return createSupplier(accessToken, apiBase, nif, name)
+  return createSupplier(accessToken, apiBase, appBase, nif, name)
 }
 
 // ---------------------------------------------------------------------------
