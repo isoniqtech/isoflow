@@ -31,6 +31,12 @@ export interface TarefaGerada extends SubtarefaGerada {
   subtarefas: SubtarefaGerada[]
 }
 
+/** O que já existe no cronograma, para a IA não repetir trabalho. */
+export interface PlanoExistente {
+  fases: string[]
+  titulos: string[]
+}
+
 export interface ContextoProjeto {
   nome: string
   tipo?: string | null
@@ -193,10 +199,28 @@ export async function generateProjectPlan(
   descricao: string,
   projeto: ContextoProjeto,
   config?: AnthropicConfig,
+  existente?: PlanoExistente,
 ): Promise<TarefaGerada[]> {
   // Sem isto o modelo data o cronograma pelo ano do treino dele. Já saiu 2025
   // num plano feito em 2026.
   const hoje = new Date().toISOString().slice(0, 10)
+
+  // O que já lá está vai no prompt para a IA acrescentar em vez de repetir:
+  // como nunca apagamos nada, sem isto o plano encheria-se de duplicados.
+  const jaExiste =
+    existente && existente.titulos.length > 0
+      ? [
+          "",
+          "O cronograma deste projeto JÁ TEM as seguintes fases:",
+          ...existente.fases.map((f) => `- ${f}`),
+          "",
+          "E as seguintes tarefas:",
+          ...existente.titulos.slice(0, 80).map((t) => `- ${t}`),
+          "",
+          "NÃO repitas nada disto. Devolve apenas o que falta acrescentar.",
+          "Se o novo trabalho pertencer a uma fase que já existe, usa EXACTAMENTE o mesmo nome de fase.",
+        ].join("\n")
+      : ""
 
   const contexto = [
     `Data de hoje: ${hoje}`,
@@ -205,6 +229,7 @@ export async function generateProjectPlan(
     projeto.descricao ? `Descrição do projeto: ${projeto.descricao}` : null,
     projeto.start_date ? `Início previsto: ${projeto.start_date}` : null,
     projeto.end_date ? `Fim previsto: ${projeto.end_date}` : null,
+    jaExiste || null,
     "",
     "O que o utilizador pretende planear:",
     descricao,

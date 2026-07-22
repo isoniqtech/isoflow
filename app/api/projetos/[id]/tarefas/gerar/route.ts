@@ -24,7 +24,6 @@ const CAMPOS =
 
 const bodySchema = z.object({
   descricao: z.string().trim().min(3).max(5000),
-  substituir: z.boolean().optional(),
 })
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -63,6 +62,33 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     end_date: string | null
   }
 
+  // O que ja' existe: serve para a IA nao repetir e para encaixar as fases
+  // novas a seguir as atuais, sem colidir com a numeracao delas.
+  const { data: atuais } = await sb
+    .from("project_tasks")
+    .select("title, phase, phase_order")
+    .eq("project_id", p.id)
+    .eq("tenant_id", ctx.tenantId)
+    .order("phase_order", { ascending: true, nullsFirst: false })
+    .order("sort_order", { ascending: true })
+
+  const existentes = (atuais ?? []) as {
+    title: string
+    phase: string | null
+    phase_order: number | null
+  }[]
+
+  // Fase -> ordem que ja' tem. Reaproveitar evita que "Fase 1" apareca duas
+  // vezes no Gantt quando a IA volta a nomea-la.
+  const ordemPorFase = new Map<string, number>()
+  let maiorOrdem = -1
+  for (const t of existentes) {
+    if (t.phase && t.phase_order !== null) {
+      if (!ordemPorFase.has(t.phase)) ordemPorFase.set(t.phase, t.phase_order)
+      maiorOrdem = Math.max(maiorOrdem, t.phase_order)
+    }
+  }
+
   let tarefas
   try {
     const aiConfig = await resolveAnthropicConfig(ctx.tenantId, sb)
@@ -76,6 +102,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         end_date: p.end_date,
       },
       aiConfig,
+      { fases: [...ordemPorFase.keys()], titulos: existentes.map((t) => t.title) },
     )
   } catch (e) {
     return jsonError(
@@ -91,11 +118,22 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     )
   }
 
-  if (parsed.data.substituir) {
-    await sb.from("project_tasks").delete().eq("project_id", p.id).eq("tenant_id", ctx.tenantId)
+  // A geracao NUNCA apaga: acrescenta sempre ao que ja' esta'. Perder um plano
+  // ajustado a mao por causa de um clique num botao nao e' um risco aceitavel.
+  // A phase_order que a IA devolve (0, 1, 2...) colidiria com as fases atuais,
+  // por isso as fases novas entram a seguir a maior ordem que ja' existe.
+  let proximaOrdemFase = maiorOrdem + 1
+  for (const t of tarefas) {
+    if (!t.phase) continue
+    let ordem = ordemPorFase.get(t.phase)
+    if (ordem === undefined) {
+      ordem = proximaOrdemFase++
+      ordemPorFase.set(t.phase, ordem)
+    }
+    t.phase_order = ordem
   }
 
-  // Continuar a numeracao se estivermos a acrescentar
+  // Continuar a numeracao das tarefas
   const { data: ultima } = await sb
     .from("project_tasks")
     .select("sort_order")
@@ -189,7 +227,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     metadata: {
       tarefas: tarefas.length,
       subtarefas: subtarefas.length,
-      substituir: Boolean(parsed.data.substituir),
+      ja_existiam: existentes.length,
     },
   })
 

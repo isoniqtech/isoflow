@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -140,7 +141,7 @@ export function ProjectPlanTab({
             <div className="flex shrink-0 gap-2">
               <Button size="sm" variant="outline" onClick={() => setRegerar(true)}>
                 <Sparkles className="mr-2 h-4 w-4" />
-                Voltar a gerar
+                Gerar com IA
               </Button>
               <Button size="sm" onClick={() => setCriar({ paiId: null })}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -178,7 +179,7 @@ export function ProjectPlanTab({
       )}
 
       {regerar && (
-        <DialogoRegerar
+        <DialogoGerar
           projectId={projectId}
           onFechar={() => setRegerar(false)}
           onGerado={carregar}
@@ -552,7 +553,14 @@ function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () =
   )
 }
 
-function DialogoRegerar({
+/**
+ * Acrescentar ao cronograma com IA.
+ *
+ * Não há hipótese de substituir: a geração só acrescenta. Um botão capaz de
+ * apagar um plano ajustado à mão é um risco que não compensa, e o servidor
+ * também já não aceita substituição.
+ */
+function DialogoGerar({
   projectId,
   onFechar,
   onGerado,
@@ -562,7 +570,6 @@ function DialogoRegerar({
   onGerado: () => void
 }) {
   const [texto, setTexto] = useState("")
-  const [substituir, setSubstituir] = useState("substituir")
   const [aGerar, setAGerar] = useState(false)
   const pararVoz = useRef<(() => void) | null>(null)
 
@@ -574,10 +581,7 @@ function DialogoRegerar({
       const res = await fetch(`/api/projetos/${projectId}/tarefas/gerar`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          descricao: texto.trim(),
-          substituir: substituir === "substituir",
-        }),
+        body: JSON.stringify({ descricao: texto.trim() }),
       })
       const body = await res.json().catch(() => ({}))
       if (res.ok) {
@@ -599,35 +603,36 @@ function DialogoRegerar({
     <Dialog open onOpenChange={onFechar}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Voltar a gerar com IA</DialogTitle>
+          <DialogTitle>Gerar com IA</DialogTitle>
+          <DialogDescription>
+            O que a IA propuser é acrescentado ao cronograma atual. Nada do que já
+            existe é alterado nem apagado.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <CampoDescricao
             valor={texto}
             setValor={setTexto}
             pararRef={pararVoz}
-            placeholder="Descreve o cronograma que pretendes..."
+            placeholder="ex: falta a fase de acabamentos - pinturas, roupeiros e limpeza final."
           />
-          <div className="space-y-1.5">
-            <Label>O que fazer às tarefas atuais</Label>
-            <Select value={substituir} onValueChange={setSubstituir}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="substituir">Substituir todas</SelectItem>
-                <SelectItem value="acrescentar">Acrescentar às existentes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            A IA recebe as fases e as tarefas que já existem, para não repetir o que
+            já está planeado. Se indicares uma fase que já existe, as tarefas novas
+            entram nessa mesma fase.
+          </p>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onFechar} disabled={aGerar}>
             Cancelar
           </Button>
           <Button onClick={gerar} disabled={aGerar}>
-            {aGerar && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Gerar
+            {aGerar ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="mr-2 h-4 w-4" />
+            )}
+            {aGerar ? "A gerar..." : "Acrescentar ao cronograma"}
           </Button>
         </DialogFooter>
       </DialogContent>
