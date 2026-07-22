@@ -55,10 +55,21 @@ const STATUS_STYLES: Record<ProjectStatus, { label: string; className: string }>
   },
 }
 
+const VALID_TABS = ["dashboard", "documentacao", "planejamento"] as const
+type ProjectTab = (typeof VALID_TABS)[number]
+
+const TAB_LABELS: Record<ProjectTab, string> = {
+  dashboard: "Dashboard",
+  documentacao: "Documentação",
+  planejamento: "Planejamento",
+}
+
 export default async function ProjetoDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string }
+  searchParams: { tab?: string }
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
@@ -83,6 +94,10 @@ export default async function ProjetoDetailPage({
   const canExportReport = hasPermission(session.role, "relatorios", "view_all")
   const canViewInvestidores = hasPermission(session.role, "investidores", "view_all")
   const canEditInvestidores = hasPermission(session.role, "investidores", "edit")
+
+  const activeTab: ProjectTab = (VALID_TABS as readonly string[]).includes(searchParams.tab ?? "")
+    ? (searchParams.tab as ProjectTab)
+    : "dashboard"
 
   let linkedInvestidores: Array<{
     investidor_id: string
@@ -183,6 +198,29 @@ export default async function ProjetoDetailPage({
         )}
       </div>
 
+      {/* Tabs: padrao searchParams usado na app (ver faturas/page.tsx) */}
+      <div className="border-b">
+        <nav className="flex gap-6 -mb-px">
+          {VALID_TABS.map((tab) => (
+            <Link
+              key={tab}
+              href={`/projetos/${project.id}?tab=${tab}`}
+              className={cn(
+                "border-b-2 pb-2 text-sm font-medium transition-colors",
+                activeTab === tab
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground",
+              )}
+            >
+              {TAB_LABELS[tab]}
+            </Link>
+          ))}
+        </nav>
+      </div>
+
+      {/* ---------- Dashboard: conteudo original, movido sem alteracoes ---------- */}
+      {activeTab === "dashboard" && (
+        <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total gasto"
@@ -272,6 +310,26 @@ export default async function ProjetoDetailPage({
       )}
 
       <ProjectInvoices invoices={invoices} projectId={project.id} />
+        </>
+      )}
+
+      {/* ---------- Documentacao (FASE 3) ---------- */}
+      {activeTab === "documentacao" && (
+        <div className="rounded-lg border border-border/60 bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Documentação do projeto - disponível em breve.
+          </p>
+        </div>
+      )}
+
+      {/* ---------- Planejamento (FASE 4) ---------- */}
+      {activeTab === "planejamento" && (
+        <div className="rounded-lg border border-border/60 bg-card p-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            Planeamento do projeto - disponível em breve.
+          </p>
+        </div>
+      )}
     </div>
   )
 }
