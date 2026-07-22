@@ -18,6 +18,7 @@ import { ProjectActions } from "@/components/projetos/project-actions"
 import { ProjectInvestorBlock } from "@/components/investidores/project-investor-block"
 import { ProjectDocumentsTab } from "@/components/projetos/project-documents-tab"
 import { ProjectPlanTab } from "@/components/projetos/project-plan-tab"
+import { SegmentedTabs } from "@/components/ui/segmented-tabs"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { getProjectDetail } from "@/lib/queries/project-detail"
 import { listInvestidores } from "@/lib/queries/investidores"
@@ -200,25 +201,11 @@ export default async function ProjetoDetailPage({
         )}
       </div>
 
-      {/* Tabs: controlo segmentado, para se perceber de imediato a tab activa.
-          Continua a usar searchParams (padrao da app), so' muda o visual. */}
-      <nav className="inline-flex gap-1 rounded-lg border border-border/60 bg-muted p-1">
-        {VALID_TABS.map((tab) => (
-          <Link
-            key={tab}
-            href={`/projetos/${project.id}?tab=${tab}`}
-            aria-current={activeTab === tab ? "page" : undefined}
-            className={cn(
-              "rounded-md px-4 py-1.5 text-sm font-medium transition-colors",
-              activeTab === tab
-                ? "bg-card text-foreground shadow-[var(--shadow-card,0_1px_3px_rgba(0,0,0,0.08))]"
-                : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
-            )}
-          >
-            {TAB_LABELS[tab]}
-          </Link>
-        ))}
-      </nav>
+      <SegmentedTabs
+        tabs={VALID_TABS.map((t) => ({ id: t, label: TAB_LABELS[t] }))}
+        activeId={activeTab}
+        hrefFor={(id) => `/projetos/${project.id}?tab=${id}`}
+      />
 
       {/* ---------- Dashboard: conteudo original, movido sem alteracoes ---------- */}
       {activeTab === "dashboard" && (

@@ -47,6 +47,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { SectionHeader } from "@/components/ui/section-header"
 import { cn } from "@/lib/utils"
 import { formatDate } from "@/lib/utils/portugal"
 
@@ -173,15 +174,7 @@ function Seccao({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted px-4 py-2.5">
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-foreground">{titulo}</h2>
-          <p className="text-xs text-muted-foreground">{descricao}</p>
-        </div>
-        <span className="shrink-0 rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-primary-foreground">
-          {docs.length}
-        </span>
-      </div>
+      <SectionHeader titulo={titulo} descricao={descricao} contador={docs.length} />
 
       {docs.length === 0 && !podeEditar ? (
         <div className="rounded-lg border border-dashed border-border/60 p-8 text-center">
@@ -246,14 +239,7 @@ function CartaoDocumento({
         {doc.name}
       </p>
 
-      <div
-        className="rounded-lg border border-border/60 p-3 shadow-[var(--shadow-card,0_1px_3px_rgba(0,0,0,0.08))] transition-shadow hover:shadow-[var(--shadow-card-hover,0_4px_12px_rgba(0,0,0,0.10))]"
-        style={{
-          // Mesmo gradiente subtil dos KpiCard do dashboard (variante neutra)
-          backgroundImage:
-            "linear-gradient(135deg, hsl(var(--card)) 40%, rgba(52,78,13,0.05) 100%)",
-        }}
-      >
+      <div className="surface-card surface-card-hover p-3">
         <a
           href={base}
           target="_blank"
@@ -318,7 +304,7 @@ function CartaoAdicionar({ onClick }: { onClick: () => void }) {
       <button
         type="button"
         onClick={onClick}
-        className="flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed border-border bg-background px-3 py-[1.35rem] transition-colors hover:border-primary hover:bg-primary/5"
+        className="surface-empty flex w-full flex-col items-center gap-1.5 px-3 py-[1.35rem]"
       >
         <Plus className="h-6 w-6 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">Adicionar</span>
