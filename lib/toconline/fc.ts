@@ -19,7 +19,19 @@ export interface FCPayload {
   movementNote?: string | null
   /** Taxa de IVA da fatura (23, 13, 6, 0) para derivar o tax_code do TOConline. */
   vatRate?: number | null
+  /**
+   * Categoria de gasto do TOConline (accounting_number, ex: "6221").
+   * Configurada por tenant; se ausente usa DEFAULT_EXPENSE_CATEGORY.
+   */
+  expenseCategoryCode?: string | null
 }
+
+/**
+ * Categoria de gasto usada quando o tenant nao tem nenhuma configurada.
+ * "6221" = Trabalhos especializados / Servicos (conta SNC comum).
+ * Mantem o comportamento anterior para quem nao configurar nada.
+ */
+export const DEFAULT_EXPENSE_CATEGORY = "6221"
 
 /**
  * Mapeia a taxa de IVA da fatura para o tax_code do TOConline (regiao PT).
@@ -234,7 +246,7 @@ async function doCreateFC(
     lines: [
       {
         item_type: "Purchases::ExpenseCategory",
-        item_code: "6221",
+        item_code: payload.expenseCategoryCode?.trim() || DEFAULT_EXPENSE_CATEGORY,
         description,
         quantity: 1,
         unit_price: payload.subtotal ?? 0,
