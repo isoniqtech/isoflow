@@ -1,7 +1,6 @@
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { BudgetProgress } from "@/components/projetos/budget-progress"
-import { formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
 import type { ProjectListItem } from "@/lib/queries/projects"
 import type { ProjectStatus, ProjectType } from "@/types"
@@ -82,15 +81,9 @@ export function ProjectRow({ project }: { project: ProjectListItem }) {
           />
         </div>
 
-        {/* Datas e estado */}
-        <div className="flex shrink-0 items-center justify-between gap-3 md:justify-end">
-          {(project.start_date || project.end_date) && (
-            <p className="hidden text-xs text-muted-foreground lg:block">
-              {project.start_date ? formatDate(project.start_date) : "-"}
-              {" → "}
-              {project.end_date ? formatDate(project.end_date) : "Em curso"}
-            </p>
-          )}
+        {/* Estado (as datas ficam so' na vista em grelha e no detalhe: em
+            lista enchiam demasiado a linha) */}
+        <div className="flex shrink-0 items-center md:justify-end">
           <Badge variant="outline" className={cn("shrink-0", status.className)}>
             {status.label}
           </Badge>
