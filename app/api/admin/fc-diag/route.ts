@@ -113,29 +113,43 @@ export async function GET(req: Request) {
     const lookup = out.fornecedor_lookup as { preview?: string } | undefined
     const jaExiste = lookup?.preview && !lookup.preview.includes('"data":[]')
     if (!jaExiste && inv.supplier_nif && inv.supplier_name) {
-      const r = await fetch(`${t.apiBase}/api/v1/suppliers`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${t.accessToken}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
+      // Formato JSON:API conforme a doc oficial (/api/suppliers, vnd.api+json)
+      const supPayload = {
+        data: {
+          type: "suppliers",
+          attributes: {
+            tax_registration_number: Number(inv.supplier_nif),
+            business_name: inv.supplier_name,
+          },
         },
-        body: JSON.stringify({
-          tax_registration_number: inv.supplier_nif,
-          business_name: inv.supplier_name,
-          country: "PT",
-        }),
-      })
-      const body = await r.text()
-      out.post_fornecedor = { http_status: r.status, body: body.slice(0, 1200) }
-      try {
-        const j = JSON.parse(body)
-        const d = j.data ?? j
-        supplierId = d?.id ? Number(d.id) : d?.attributes?.id ? Number(d.attributes.id) : null
-      } catch {
-        supplierId = null
       }
-      if (!r.ok) {
+      const tentativas = []
+      for (const base of [t.apiBase, t.appBase]) {
+        const r = await fetch(`${base}/api/suppliers`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${t.accessToken}`,
+            "Content-Type": "application/vnd.api+json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify(supPayload),
+        })
+        const body = await r.text()
+        tentativas.push({ url: `${base}/api/suppliers`, http_status: r.status, body: body.slice(0, 900) })
+        if (r.ok) {
+          try {
+            const j = JSON.parse(body)
+            const d = j.data ?? j
+            supplierId = d?.id ? Number(d.id) : d?.attributes?.id ? Number(d.attributes.id) : null
+          } catch {
+            supplierId = null
+          }
+          break
+        }
+        if (r.status !== 404) break
+      }
+      out.post_fornecedor = { payload: supPayload, tentativas, supplier_id: supplierId }
+      if (supplierId === null) {
         out.post_fc = "nao executado (criacao de fornecedor falhou - ver post_fornecedor)"
         return Response.json(out)
       }
