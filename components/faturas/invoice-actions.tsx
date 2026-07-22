@@ -2,15 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import {
-  CheckCircle2,
-  Loader2,
-  MoreHorizontal,
-  Send,
-  Trash2,
-  XCircle,
-  RefreshCw,
-} from "lucide-react"
+import { Check, CheckCircle2, Loader2, MoreHorizontal, Send, Trash2, XCircle } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -73,19 +65,40 @@ export function InvoiceActions({
   async function handleResendErp() {
     setResending(true)
     try {
-      const res = await fetch(`/api/faturas/${invoiceId}/resend-erp`, {
+      // create-fc trata os dois modos (toconline_direct e n8n), leva a
+      // categoria de gasto e faz dedup. O resend-erp antigo so' servia n8n.
+      const res = await fetch("/api/faturas/create-fc", {
         method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invoice_ids: [invoiceId] }),
       })
       const body = await res.json().catch(() => ({}))
-      if (res.ok && body.ok) {
-        toast.success(`Enviada para ERP (HTTP ${body.status ?? 200})`)
-        router.refresh()
-      } else {
-        toast.error("Falha ao re-enviar para ERP", {
-          description:
-            body.error ?? `HTTP ${res.status}${body.status ? ` · resposta ${body.status}` : ""}`,
+
+      if (!res.ok) {
+        toast.error("Falha ao enviar para ERP", {
+          description: body.error ?? `HTTP ${res.status}`,
           duration: 12000,
         })
+        return
+      }
+
+      const erros: string[] = body.errors ?? []
+      if (erros.length > 0) {
+        toast.error("Falha ao enviar para ERP", {
+          description: erros[0],
+          duration: 12000,
+        })
+      } else if (body.queued > 0) {
+        toast.success("Fatura enviada para o ERP")
+        router.refresh()
+      } else if (body.skipped > 0) {
+        toast.info("Já estava lançada no ERP", {
+          description: "Nada foi enviado de novo.",
+        })
+        router.refresh()
+      } else {
+        toast.success("Pedido enviado ao ERP")
+        router.refresh()
       }
     } catch (e) {
       toast.error("Erro a contactar o servidor", {
@@ -137,18 +150,26 @@ export function InvoiceActions({
 
   return (
     <div className="flex items-center gap-2">
-      {canEdit && (
+      {/* Ja' lancada no ERP: nao se reenvia (criaria duplicado / divergencia) */}
+      {canEdit && erpSynced && (
+        <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Check className="h-3.5 w-3.5 text-emerald-600" />
+          Lançada no ERP
+        </span>
+      )}
+      {canEdit && !erpSynced && (
         <Button
           variant="outline"
           size="sm"
           onClick={handleResendErp}
           disabled={resending}
         >
-          {resending
-            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            : erpSynced ? <RefreshCw className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />
-          }
-          {erpSynced ? "Re-enviar ao ERP" : "Enviar ao ERP"}
+          {resending ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="mr-2 h-4 w-4" />
+          )}
+          Enviar ao ERP
         </Button>
       )}
       {needsReview && canEdit && (
