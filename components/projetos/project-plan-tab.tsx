@@ -326,6 +326,20 @@ function ListaPorFase({
 // ---------------------------------------------------------------------------
 
 /**
+ * Mensagem de erro a mostrar no toast.
+ *
+ * As rotas devolvem a mensagem genérica em `error` e a real do Postgres em
+ * `details`. Mostrar só `error` dava "Database error" e não dizia nada - é
+ * exactamente o tipo de erro cego que custou horas noutras integrações.
+ */
+function detalheErro(body: { error?: string; details?: unknown }, status: number): string {
+  const detalhe =
+    typeof body.details === "string" ? body.details : body.details ? JSON.stringify(body.details) : ""
+  const base = body.error ?? `HTTP ${status}`
+  return detalhe ? `${base}: ${detalhe}` : base
+}
+
+/**
  * Resumo do que a IA gerou. A resposta traz a árvore inteira, por isso contar
  * `length` diria "24 tarefas" quando são 8 tarefas com 16 subtarefas.
  */
@@ -495,7 +509,7 @@ function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () =
         onGerado()
       } else {
         toast.error("Não foi possível gerar", {
-          description: body.error ?? `HTTP ${res.status}`,
+          description: detalheErro(body, res.status),
           duration: 12000,
         })
       }
@@ -572,7 +586,7 @@ function DialogoRegerar({
         onFechar()
       } else {
         toast.error("Não foi possível gerar", {
-          description: body.error ?? `HTTP ${res.status}`,
+          description: detalheErro(body, res.status),
           duration: 12000,
         })
       }
@@ -693,7 +707,7 @@ function DialogoTarefa({
         onMudou()
         onFechar()
       } else {
-        toast.error("Falha ao gravar", { description: body.error ?? `HTTP ${res.status}` })
+        toast.error("Falha ao gravar", { description: detalheErro(body, res.status) })
       }
     } finally {
       setAGravar(false)
