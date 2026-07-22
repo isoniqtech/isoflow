@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, Sparkles } from "lucide-react"
+import { Loader2, Lock, Sparkles } from "lucide-react"
 import { toast } from "sonner"
 import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -27,11 +27,14 @@ export function ExpenseCategorySelect({
   currentCode,
   decidedByAi,
   canEdit,
+  alreadySent,
 }: {
   invoiceId: string
   currentCode: string | null
   decidedByAi: boolean
   canEdit: boolean
+  /** Fatura ja' lancada no ERP: a categoria fica bloqueada. */
+  alreadySent: boolean
 }) {
   const router = useRouter()
   const [categorias, setCategorias] = useState<Categoria[]>([])
@@ -88,15 +91,23 @@ export function ExpenseCategorySelect({
       <CardContent className="p-5 space-y-2">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <Label htmlFor="expense-cat">Categoria de gasto (ERP)</Label>
-          {decidedByAi && valor && (
+          {alreadySent ? (
             <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-              <Sparkles className="h-3 w-3" />
-              sugerida automaticamente
+              <Lock className="h-3 w-3" />
+              bloqueada (já enviada ao ERP)
             </span>
+          ) : (
+            decidedByAi &&
+            valor && (
+              <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                <Sparkles className="h-3 w-3" />
+                sugerida automaticamente
+              </span>
+            )
           )}
         </div>
 
-        {canEdit ? (
+        {canEdit && !alreadySent ? (
           <div className="flex items-center gap-2">
             <Select value={valor} onValueChange={guardar} disabled={loading || saving || categorias.length === 0}>
               <SelectTrigger id="expense-cat" className="w-full">
@@ -128,7 +139,9 @@ export function ExpenseCategorySelect({
         )}
 
         <p className="text-xs text-muted-foreground">
-          Conta usada na fatura de compra criada no TOConline. Podes trocá-la antes de enviar para o ERP.
+          {alreadySent
+            ? "Esta fatura já foi lançada no ERP, por isso a categoria não pode ser alterada."
+            : "Conta usada na fatura de compra criada no TOConline. Podes trocá-la antes de enviar para o ERP."}
         </p>
       </CardContent>
     </Card>
