@@ -17,6 +17,24 @@ export interface FCPayload {
   description: string | null
   /** Nota do movimento bancario conciliado, anexada ao campo notes do FC. */
   movementNote?: string | null
+  /** Taxa de IVA da fatura (23, 13, 6, 0) para derivar o tax_code do TOConline. */
+  vatRate?: number | null
+}
+
+/**
+ * Mapeia a taxa de IVA da fatura para o tax_code do TOConline (regiao PT).
+ * Codigos confirmados via /api/taxes: NOR=23, INT=13, RED=6, ISE=0
+ * (existem tambem taxas historicas/regionais: NOR 21/20/19/17, INT 12, RED 5).
+ * Default NOR quando a taxa e' desconhecida (comportamento anterior).
+ */
+function taxCodeFromRate(rate: number | null | undefined): string {
+  if (rate === null || rate === undefined) return "NOR"
+  const r = Number(rate)
+  if (!Number.isFinite(r)) return "NOR"
+  if (r === 0) return "ISE"
+  if (r <= 6) return "RED"
+  if (r <= 13) return "INT"
+  return "NOR"
 }
 
 export interface FCResult {
@@ -196,7 +214,7 @@ async function doCreateFC(
         description,
         quantity: 1,
         unit_price: payload.subtotal ?? 0,
-        tax_code: "NOR",
+        tax_code: taxCodeFromRate(payload.vatRate),
       },
     ],
   }

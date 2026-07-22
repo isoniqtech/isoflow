@@ -100,6 +100,7 @@ export async function POST(request: Request) {
             subtotal: inv.subtotal !== null ? Number(inv.subtotal) : null,
             description: inv.description,
             movementNote: noteForInvoice(inv),
+            vatRate: inv.vat_rate !== null ? Number(inv.vat_rate) : null,
           })
 
           // Gravar fc_number directamente - mesma logica que /api/faturas/[id]/update-fc
