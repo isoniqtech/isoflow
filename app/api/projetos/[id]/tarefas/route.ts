@@ -9,7 +9,7 @@ import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { TASK_STATUSES } from "@/lib/claude/generate-plan"
-import { resolverPhaseOrder } from "@/lib/queries/project-tasks"
+import { resolverPhaseOrder, validarPai } from "@/lib/queries/project-tasks"
 
 export const runtime = "nodejs"
 
@@ -19,7 +19,7 @@ function admin(): SupabaseClient {
 }
 
 const CAMPOS =
-  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, created_at"
+  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, parent_id, progress, created_at"
 
 async function investidorTemAcesso(userId: string, projectId: string): Promise<boolean> {
   const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
@@ -63,6 +63,8 @@ const criarSchema = z.object({
   status: z.enum(TASK_STATUSES).default("por_iniciar"),
   visibility: z.enum(["admin", "todos"]).default("todos"),
   phase: z.string().trim().max(120).nullable().optional(),
+  parent_id: z.string().uuid().nullable().optional(),
+  progress: z.number().int().min(0).max(100).default(0),
 })
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
@@ -102,8 +104,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .maybeSingle()
   const proximaOrdem = ((ultima as { sort_order?: number } | null)?.sort_order ?? -1) + 1
 
-  const phase = parsed.data.phase?.trim() || null
-  const phaseOrder = phase ? await resolverPhaseOrder(sb, params.id, phase) : null
+  // Subtarefa: a fase vem sempre do pai, para os dois níveis não divergirem
+  let phase = parsed.data.phase?.trim() || null
+  let phaseOrder = phase ? await resolverPhaseOrder(sb, params.id, phase) : null
+
+  if (parsed.data.parent_id) {
+    const pai = await validarPai(sb, params.id, parsed.data.parent_id)
+    if (!pai) return jsonError("A tarefa-mãe não é válida", 400)
+    phase = pai.phase
+    phaseOrder = pai.phase_order
+  }
 
   const { data, error } = await sb
     .from("project_tasks")

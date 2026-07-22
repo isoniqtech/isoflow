@@ -8,12 +8,12 @@ import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { TASK_STATUSES } from "@/lib/claude/generate-plan"
-import { resolverPhaseOrder } from "@/lib/queries/project-tasks"
+import { resolverPhaseOrder, validarPai } from "@/lib/queries/project-tasks"
 
 export const runtime = "nodejs"
 
 const CAMPOS =
-  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, created_at"
+  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, parent_id, progress, created_at"
 
 function admin(): SupabaseClient {
   // Cast: tabela da migration 044, ainda nao esta' em types/supabase.ts
@@ -30,6 +30,8 @@ const patchSchema = z
     visibility: z.enum(["admin", "todos"]),
     sort_order: z.number().int().min(0),
     phase: z.string().trim().max(120).nullable(),
+    parent_id: z.string().uuid().nullable(),
+    progress: z.number().int().min(0).max(100),
   })
   .partial()
 
@@ -61,6 +63,17 @@ export async function PATCH(
     const phase = parsed.data.phase?.trim() || null
     campos.phase = phase
     campos.phase_order = phase ? await resolverPhaseOrder(sb, params.id, phase) : null
+  }
+
+  if ("parent_id" in parsed.data && parsed.data.parent_id) {
+    if (parsed.data.parent_id === params.taskId) {
+      return jsonError("Uma tarefa não pode ser mãe de si própria", 400)
+    }
+    const pai = await validarPai(sb, params.id, parsed.data.parent_id)
+    if (!pai) return jsonError("A tarefa-mãe não é válida", 400)
+    // A fase do pai ganha sempre, mesmo que venha `phase` no mesmo pedido
+    campos.phase = pai.phase
+    campos.phase_order = pai.phase_order
   }
 
   const { data, error } = await sb

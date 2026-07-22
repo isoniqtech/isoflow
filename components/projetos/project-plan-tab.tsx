@@ -51,6 +51,10 @@ export type Tarefa = {
   /** Fase a que a tarefa pertence. Null nas tarefas anteriores à migration 045. */
   phase: string | null
   phase_order: number | null
+  /** Tarefa macro a que pertence. Null = é ela própria uma tarefa macro. */
+  parent_id: string | null
+  /** 0 a 100. Desenha o preenchimento da barra no Gantt. */
+  progress: number
 }
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -81,7 +85,8 @@ export function ProjectPlanTab({
   const [tarefas, setTarefas] = useState<Tarefa[]>([])
   const [loading, setLoading] = useState(true)
   const [editar, setEditar] = useState<Tarefa | null>(null)
-  const [criar, setCriar] = useState(false)
+  // `criar` guarda o pai da nova tarefa: null = tarefa macro, id = subtarefa
+  const [criar, setCriar] = useState<{ paiId: string | null } | null>(null)
   const [regerar, setRegerar] = useState(false)
 
   const podeEditar = canEdit && !isInvestidor
@@ -137,7 +142,7 @@ export function ProjectPlanTab({
                 <Sparkles className="mr-2 h-4 w-4" />
                 Voltar a gerar
               </Button>
-              <Button size="sm" onClick={() => setCriar(true)}>
+              <Button size="sm" onClick={() => setCriar({ paiId: null })}>
                 <Plus className="mr-2 h-4 w-4" />
                 Nova tarefa
               </Button>
@@ -148,18 +153,25 @@ export function ProjectPlanTab({
 
       <ProjectGantt tarefas={tarefas} onAbrir={podeEditar ? setEditar : undefined} />
 
-      <ListaPorFase tarefas={tarefas} podeEditar={podeEditar} onEditar={setEditar} />
+      <ListaPorFase
+        tarefas={tarefas}
+        podeEditar={podeEditar}
+        onEditar={setEditar}
+        onNovaSubtarefa={(pai) => setCriar({ paiId: pai.id })}
+      />
 
       {(editar || criar) && (
         <DialogoTarefa
           projectId={projectId}
           tarefa={editar}
+          paiInicial={criar?.paiId ?? null}
+          macros={tarefas.filter((t) => !t.parent_id)}
           fasesConhecidas={[
             ...new Set(tarefas.map((t) => t.phase?.trim()).filter((p): p is string => Boolean(p))),
           ]}
           onFechar={() => {
             setEditar(null)
-            setCriar(false)
+            setCriar(null)
           }}
           onMudou={carregar}
         />
@@ -180,19 +192,86 @@ export function ProjectPlanTab({
 // Lista de tarefas, agrupada pelas mesmas fases do Gantt
 // ---------------------------------------------------------------------------
 
+function LinhaTarefa({
+  tarefa: t,
+  sub,
+  podeEditar,
+  onEditar,
+  onNovaSubtarefa,
+}: {
+  tarefa: Tarefa
+  sub: boolean
+  podeEditar: boolean
+  onEditar: (t: Tarefa) => void
+  onNovaSubtarefa?: () => void
+}) {
+  return (
+    <div className={cn("flex items-start gap-3 p-3", sub && "pl-9")}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <p className={cn("text-sm", sub ? "text-muted-foreground" : "font-medium")}>{t.title}</p>
+          <span
+            className={cn("rounded-full px-2 py-0.5 text-xs font-medium", STATUS_BADGE[t.status])}
+          >
+            {STATUS_LABELS[t.status]}
+          </span>
+          {t.progress > 0 && t.status !== "concluida" && (
+            <span className="text-xs text-muted-foreground">{t.progress}%</span>
+          )}
+          {podeEditar && t.visibility === "admin" && (
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+              só equipa
+            </span>
+          )}
+        </div>
+        {t.description && <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>}
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {t.start_date ? formatDate(t.start_date) : "sem início"}
+          {" - "}
+          {t.end_date ? formatDate(t.end_date) : "sem fim"}
+        </p>
+      </div>
+
+      {podeEditar && (
+        <div className="flex shrink-0 gap-1">
+          {onNovaSubtarefa && (
+            <Button variant="ghost" size="sm" onClick={onNovaSubtarefa} title="Nova subtarefa">
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => onEditar(t)} title="Editar">
+            <Pencil className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ListaPorFase({
   tarefas,
   podeEditar,
   onEditar,
+  onNovaSubtarefa,
 }: {
   tarefas: Tarefa[]
   podeEditar: boolean
   onEditar: (t: Tarefa) => void
+  onNovaSubtarefa: (pai: Tarefa) => void
 }) {
   // A API já devolve por fase e por ordem, por isso agrupar pela ordem de
   // chegada mantém o Gantt e a lista com a mesma sequência.
+  const filhos = new Map<string, Tarefa[]>()
+  for (const t of tarefas) {
+    if (!t.parent_id) continue
+    const lista = filhos.get(t.parent_id)
+    if (lista) lista.push(t)
+    else filhos.set(t.parent_id, [t])
+  }
+
   const grupos = new Map<string, Tarefa[]>()
   for (const t of tarefas) {
+    if (t.parent_id) continue
     const nome = t.phase?.trim() || "Sem fase"
     const lista = grupos.get(nome)
     if (lista) lista.push(t)
@@ -201,7 +280,7 @@ function ListaPorFase({
 
   return (
     <div className="space-y-3">
-      {[...grupos.entries()].map(([nome, lista], i) => (
+      {[...grupos.entries()].map(([nome, macros], i) => (
         <div key={nome} className="space-y-2">
           <div className="flex items-center gap-2 px-1">
             <span
@@ -210,44 +289,29 @@ function ListaPorFase({
             />
             <h3 className="text-sm font-semibold">{nome}</h3>
             <span className="text-xs text-muted-foreground">
-              {lista.length} tarefa{lista.length !== 1 ? "s" : ""}
+              {macros.length} tarefa{macros.length !== 1 ? "s" : ""}
             </span>
           </div>
 
           <div className="surface-card divide-y overflow-hidden">
-            {lista.map((t) => (
-              <div key={t.id} className="flex items-start gap-3 p-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium">{t.title}</p>
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-xs font-medium",
-                        STATUS_BADGE[t.status],
-                      )}
-                    >
-                      {STATUS_LABELS[t.status]}
-                    </span>
-                    {podeEditar && t.visibility === "admin" && (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                        só equipa
-                      </span>
-                    )}
-                  </div>
-                  {t.description && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">{t.description}</p>
-                  )}
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {t.start_date ? formatDate(t.start_date) : "sem início"}
-                    {" - "}
-                    {t.end_date ? formatDate(t.end_date) : "sem fim"}
-                  </p>
-                </div>
-                {podeEditar && (
-                  <Button variant="ghost" size="sm" onClick={() => onEditar(t)} title="Editar">
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                )}
+            {macros.map((t) => (
+              <div key={t.id} className="divide-y divide-border/40">
+                <LinhaTarefa
+                  tarefa={t}
+                  sub={false}
+                  podeEditar={podeEditar}
+                  onEditar={onEditar}
+                  onNovaSubtarefa={podeEditar ? () => onNovaSubtarefa(t) : undefined}
+                />
+                {(filhos.get(t.id) ?? []).map((f) => (
+                  <LinhaTarefa
+                    key={f.id}
+                    tarefa={f}
+                    sub
+                    podeEditar={podeEditar}
+                    onEditar={onEditar}
+                  />
+                ))}
               </div>
             ))}
           </div>
@@ -260,6 +324,18 @@ function ListaPorFase({
 // ---------------------------------------------------------------------------
 // Geração com IA (voz + texto)
 // ---------------------------------------------------------------------------
+
+/**
+ * Resumo do que a IA gerou. A resposta traz a árvore inteira, por isso contar
+ * `length` diria "24 tarefas" quando são 8 tarefas com 16 subtarefas.
+ */
+function resumoGerado(tarefas: Tarefa[] | undefined): string {
+  const todas = tarefas ?? []
+  const macros = todas.filter((t) => !t.parent_id).length
+  const subs = todas.length - macros
+  const base = `${macros} tarefa${macros !== 1 ? "s" : ""}`
+  return subs > 0 ? `${base} e ${subs} subtarefa${subs !== 1 ? "s" : ""}` : base
+}
 
 /** Reconhecimento de voz do browser. Ausente no Firefox, daí o fallback. */
 function useVoz(onTexto: (t: string) => void) {
@@ -415,7 +491,7 @@ function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () =
       })
       const body = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success(`${body.tarefas?.length ?? 0} tarefas criadas`)
+        toast.success(resumoGerado(body.tarefas))
         onGerado()
       } else {
         toast.error("Não foi possível gerar", {
@@ -491,7 +567,7 @@ function DialogoRegerar({
       })
       const body = await res.json().catch(() => ({}))
       if (res.ok) {
-        toast.success(`${body.tarefas?.length ?? 0} tarefas criadas`)
+        toast.success(resumoGerado(body.tarefas))
         onGerado()
         onFechar()
       } else {
@@ -552,18 +628,26 @@ function DialogoRegerar({
 function DialogoTarefa({
   projectId,
   tarefa,
+  paiInicial,
+  macros,
   fasesConhecidas,
   onFechar,
   onMudou,
 }: {
   projectId: string
   tarefa: Tarefa | null
+  /** Pai pré-escolhido ao criar (botão "nova subtarefa"). */
+  paiInicial: string | null
+  /** Tarefas macro do projeto: as únicas que podem ser mãe. */
+  macros: Tarefa[]
   /** Sugestões no datalist, para reaproveitar uma fase em vez de a escrever de novo. */
   fasesConhecidas: string[]
   onFechar: () => void
   onMudou: () => void
 }) {
+  const [parentId, setParentId] = useState(tarefa?.parent_id ?? paiInicial ?? "")
   const [phase, setPhase] = useState(tarefa?.phase ?? "")
+  const [progress, setProgress] = useState(String(tarefa?.progress ?? 0))
   const [title, setTitle] = useState(tarefa?.title ?? "")
   const [description, setDescription] = useState(tarefa?.description ?? "")
   const [startDate, setStartDate] = useState(tarefa?.start_date ?? "")
@@ -581,7 +665,10 @@ function DialogoTarefa({
 
     setAGravar(true)
     const payload = {
-      phase: phase.trim() || null,
+      parent_id: parentId || null,
+      // Numa subtarefa a fase é herdada do pai, por isso nem vale a pena enviá-la
+      phase: parentId ? undefined : phase.trim() || null,
+      progress: Math.min(Math.max(Number(progress) || 0, 0), 100),
       title: title.trim(),
       description: description.trim() || null,
       start_date: startDate || null,
@@ -615,7 +702,8 @@ function DialogoTarefa({
 
   async function apagar() {
     if (!tarefa) return
-    if (!confirm(`Apagar a tarefa "${tarefa.title}"?`)) return
+    const aviso = tarefa.parent_id ? "" : "\n\nAs subtarefas dela também são apagadas."
+    if (!confirm(`Apagar a tarefa "${tarefa.title}"?${aviso}`)) return
     setAApagar(true)
     try {
       const res = await fetch(`/api/projetos/${projectId}/tarefas/${tarefa.id}`, {
@@ -643,23 +731,49 @@ function DialogoTarefa({
 
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label htmlFor="t-phase">Fase</Label>
-            <Input
-              id="t-phase"
-              list="fases-do-projeto"
-              value={phase}
-              onChange={(e) => setPhase(e.target.value)}
-              placeholder="ex: Fase 1 - Demolições"
-            />
-            <datalist id="fases-do-projeto">
-              {fasesConhecidas.map((f) => (
-                <option key={f} value={f} />
-              ))}
-            </datalist>
-            <p className="text-xs text-muted-foreground">
-              Agrupa a tarefa no cronograma. Deixa vazio para ficar fora das fases.
-            </p>
+            <Label>Nível</Label>
+            <Select
+              value={parentId || "macro"}
+              onValueChange={(v) => setParentId(v === "macro" ? "" : v)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="macro">Tarefa (dentro de uma fase)</SelectItem>
+                {/* Só as macro podem ser mãe: o cronograma tem dois níveis de
+                    tarefa, não uma árvore infinita */}
+                {macros
+                  .filter((m) => m.id !== tarefa?.id)
+                  .map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      Subtarefa de: {m.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </div>
+
+          {!parentId && (
+            <div className="space-y-1.5">
+              <Label htmlFor="t-phase">Fase</Label>
+              <Input
+                id="t-phase"
+                list="fases-do-projeto"
+                value={phase}
+                onChange={(e) => setPhase(e.target.value)}
+                placeholder="ex: Fase 1 - Fundações"
+              />
+              <datalist id="fases-do-projeto">
+                {fasesConhecidas.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+              <p className="text-xs text-muted-foreground">
+                Agrupa a tarefa no cronograma. Deixa vazio para ficar fora das fases.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="t-title">Título</Label>
@@ -713,6 +827,19 @@ function DialogoTarefa({
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="t-prog">Progresso (%)</Label>
+              <Input
+                id="t-prog"
+                type="number"
+                min={0}
+                max={100}
+                step={5}
+                value={progress}
+                onChange={(e) => setProgress(e.target.value)}
+              />
+            </div>
+
             <div className="space-y-1.5">
               <Label>Visibilidade</Label>
               <Select value={visibility} onValueChange={(v) => setVisibility(v as Visibilidade)}>

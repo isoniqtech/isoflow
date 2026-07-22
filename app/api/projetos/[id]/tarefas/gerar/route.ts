@@ -20,7 +20,7 @@ export const runtime = "nodejs"
 export const maxDuration = 120
 
 const CAMPOS =
-  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, created_at"
+  "id, title, description, start_date, end_date, status, visibility, sort_order, phase, phase_order, parent_id, progress, created_at"
 
 const bodySchema = z.object({
   descricao: z.string().trim().min(3).max(5000),
@@ -105,12 +105,28 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     .maybeSingle()
   const base = ((ultima as { sort_order?: number } | null)?.sort_order ?? -1) + 1
 
-  const { data, error } = await sb
+  // Dois passos: as tarefas macro primeiro, para as subtarefas terem parent_id.
+  // O sort_order avanca em ordem de leitura (macro, as suas subtarefas, macro
+  // seguinte...), por isso deixamos espaco para os filhos de cada macro.
+  const comum = {
+    tenant_id: ctx.tenantId,
+    project_id: p.id,
+    visibility: "todos", // default pedido; editavel por tarefa
+    created_by: ctx.userId,
+  }
+
+  let ordem = base
+  const ordemMacro: number[] = []
+  for (const t of tarefas) {
+    ordemMacro.push(ordem)
+    ordem += 1 + t.subtarefas.length
+  }
+
+  const { data: macros, error } = await sb
     .from("project_tasks")
     .insert(
       tarefas.map((t, i) => ({
-        tenant_id: ctx.tenantId,
-        project_id: p.id,
+        ...comum,
         title: t.title,
         description: t.description,
         start_date: t.start_date,
@@ -118,14 +134,51 @@ export async function POST(req: Request, { params }: { params: { id: string } })
         status: t.status,
         phase: t.phase,
         phase_order: t.phase_order,
-        visibility: "todos", // default pedido; editavel por tarefa
-        sort_order: base + i,
-        created_by: ctx.userId,
+        sort_order: ordemMacro[i],
       })),
     )
-    .select(CAMPOS)
+    .select("id, sort_order")
 
   if (error) return jsonError("Database error", 500, error.message)
+
+  // O insert nao garante a ordem do retorno: casar pelo sort_order, que e' unico
+  // dentro deste lote.
+  const idPorOrdem = new Map(
+    ((macros ?? []) as { id: string; sort_order: number }[]).map((m) => [m.sort_order, m.id]),
+  )
+
+  const subtarefas = tarefas.flatMap((t, i) => {
+    const parentId = idPorOrdem.get(ordemMacro[i])
+    if (!parentId) return []
+    return t.subtarefas.map((s, j) => ({
+      ...comum,
+      parent_id: parentId,
+      title: s.title,
+      description: s.description,
+      start_date: s.start_date,
+      end_date: s.end_date,
+      status: s.status,
+      // Herdam a fase da macro, para o agrupamento do Gantt ser coerente
+      phase: t.phase,
+      phase_order: t.phase_order,
+      sort_order: ordemMacro[i] + 1 + j,
+    }))
+  })
+
+  if (subtarefas.length > 0) {
+    const { error: erroSub } = await sb.from("project_tasks").insert(subtarefas)
+    // Falhar aqui nao deita fora as macro ja' inseridas: o plano fica utilizavel
+    // e o utilizador pode acrescentar os passos a mao.
+    if (erroSub) return jsonError("Database error", 500, erroSub.message)
+  }
+
+  const { data } = await sb
+    .from("project_tasks")
+    .select(CAMPOS)
+    .eq("project_id", p.id)
+    .eq("tenant_id", ctx.tenantId)
+    .order("phase_order", { ascending: true, nullsFirst: false })
+    .order("sort_order", { ascending: true })
 
   await log(sb, {
     action: "project_plan.generated",
@@ -133,7 +186,11 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     userId: ctx.userId,
     resourceType: "project",
     resourceId: p.id,
-    metadata: { tarefas: tarefas.length, substituir: Boolean(parsed.data.substituir) },
+    metadata: {
+      tarefas: tarefas.length,
+      subtarefas: subtarefas.length,
+      substituir: Boolean(parsed.data.substituir),
+    },
   })
 
   return Response.json({ tarefas: data ?? [] }, { status: 201 })

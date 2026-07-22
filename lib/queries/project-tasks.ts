@@ -37,3 +37,33 @@ export async function resolverPhaseOrder(
 
   return ((ultima as { phase_order?: number | null } | null)?.phase_order ?? -1) + 1
 }
+
+export type Pai = { phase: string | null; phase_order: number | null }
+
+/**
+ * Valida que `parentId` pode ser pai de uma tarefa deste projeto e devolve a
+ * fase dele, que a subtarefa herda.
+ *
+ * O cronograma tem exactamente dois níveis de tarefa (macro > subtarefa), por
+ * isso uma tarefa que já tenha pai não pode ser pai de mais ninguém.
+ * Devolve null se o pai não serve - o caller responde 400.
+ */
+export async function validarPai(
+  sb: SupabaseClient,
+  projectId: string,
+  parentId: string,
+): Promise<Pai | null> {
+  const { data } = await sb
+    .from("project_tasks")
+    .select("id, parent_id, phase, phase_order")
+    .eq("id", parentId)
+    .eq("project_id", projectId)
+    .maybeSingle()
+
+  const pai = data as
+    | { parent_id: string | null; phase: string | null; phase_order: number | null }
+    | null
+  if (!pai || pai.parent_id) return null
+
+  return { phase: pai.phase, phase_order: pai.phase_order }
+}
