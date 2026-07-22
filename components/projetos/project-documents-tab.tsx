@@ -3,8 +3,12 @@
 /**
  * Tab de Documentação do projeto.
  *
- * Admin: duas secções (interna / para investidores) e um cartão para adicionar.
- * Investidor: só a secção de documentos para investidores, em leitura.
+ * Layout em grelha de cartões (não linhas de largura total): cada documento é
+ * um cartão com o nome por cima, e o último cartão de cada secção editável é
+ * um tracejado para adicionar. O formulário vive num diálogo.
+ *
+ * Admin: duas secções (interna / para investidores).
+ * Investidor: só a secção de investidores, em leitura.
  *
  * Os ficheiros vivem no Google Drive do tenant; aqui só se veem metadados.
  * Preview e download passam pelo proxy do backend, por isso o utilizador não
@@ -18,14 +22,21 @@ import {
   Eye,
   FileText,
   Loader2,
+  Plus,
   Trash2,
   Upload,
 } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -55,6 +66,9 @@ function formatarTamanho(bytes: number | null): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+/** Grelha partilhada por todas as secções, para manter os cartões alinhados. */
+const GRELHA = "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+
 export function ProjectDocumentsTab({
   projectId,
   canEdit,
@@ -66,6 +80,7 @@ export function ProjectDocumentsTab({
 }) {
   const [docs, setDocs] = useState<Documento[]>([])
   const [loading, setLoading] = useState(true)
+  const [adicionar, setAdicionar] = useState<Visibilidade | null>(null)
 
   const carregar = useCallback(async () => {
     try {
@@ -83,6 +98,7 @@ export function ProjectDocumentsTab({
     carregar()
   }, [carregar])
 
+  const podeEditar = canEdit && !isInvestidor
   const internos = docs.filter((d) => d.visibility === "interna")
   const paraInvestidores = docs.filter((d) => d.visibility === "investidores")
 
@@ -96,18 +112,15 @@ export function ProjectDocumentsTab({
   }
 
   return (
-    <div className="space-y-6">
-      {canEdit && !isInvestidor && (
-        <AdicionarDocumento projectId={projectId} onAdicionado={carregar} />
-      )}
-
+    <div className="space-y-8">
       {!isInvestidor && (
         <Seccao
           titulo="Documentação interna"
           descricao="Visível apenas para a equipa. Os investidores não têm acesso."
           docs={internos}
           projectId={projectId}
-          canEdit={canEdit}
+          podeEditar={podeEditar}
+          onAdicionar={() => setAdicionar("interna")}
           onMudou={carregar}
         />
       )}
@@ -121,9 +134,19 @@ export function ProjectDocumentsTab({
         }
         docs={paraInvestidores}
         projectId={projectId}
-        canEdit={canEdit && !isInvestidor}
+        podeEditar={podeEditar}
+        onAdicionar={() => setAdicionar("investidores")}
         onMudou={carregar}
       />
+
+      {adicionar && (
+        <DialogoAdicionar
+          projectId={projectId}
+          visibilidadeInicial={adicionar}
+          onFechar={() => setAdicionar(null)}
+          onAdicionado={carregar}
+        />
+      )}
     </div>
   )
 }
@@ -133,54 +156,63 @@ function Seccao({
   descricao,
   docs,
   projectId,
-  canEdit,
+  podeEditar,
+  onAdicionar,
   onMudou,
 }: {
   titulo: string
   descricao: string
   docs: Documento[]
   projectId: string
-  canEdit: boolean
+  podeEditar: boolean
+  onAdicionar: () => void
   onMudou: () => void
 }) {
   return (
-    <div className="space-y-2">
-      <div>
-        <h2 className="text-sm font-semibold">{titulo}</h2>
-        <p className="text-xs text-muted-foreground">{descricao}</p>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 border-b pb-2">
+        <div>
+          <h2 className="text-sm font-semibold">{titulo}</h2>
+          <p className="text-xs text-muted-foreground">{descricao}</p>
+        </div>
+        <span className="shrink-0 rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+          {docs.length}
+        </span>
       </div>
 
-      {docs.length === 0 ? (
+      {docs.length === 0 && !podeEditar ? (
         <div className="rounded-lg border border-dashed border-border/60 p-8 text-center">
           <FileText className="h-7 w-7 text-muted-foreground mx-auto mb-2" />
           <p className="text-sm text-muted-foreground">Sem documentos.</p>
         </div>
       ) : (
-        <div className="rounded-lg border border-border/60 bg-card divide-y">
+        <div className={GRELHA}>
           {docs.map((doc) => (
-            <LinhaDocumento
+            <CartaoDocumento
               key={doc.id}
               doc={doc}
               projectId={projectId}
-              canEdit={canEdit}
+              podeEditar={podeEditar}
               onMudou={onMudou}
             />
           ))}
+          {podeEditar && <CartaoAdicionar onClick={onAdicionar} />}
         </div>
       )}
     </div>
   )
 }
 
-function LinhaDocumento({
+/** Cartão de um documento já carregado. */
+function CartaoDocumento({
   doc,
   projectId,
-  canEdit,
+  podeEditar,
   onMudou,
 }: {
   doc: Documento
   projectId: string
-  canEdit: boolean
+  podeEditar: boolean
   onMudou: () => void
 }) {
   const [apagando, setApagando] = useState(false)
@@ -206,61 +238,100 @@ function LinhaDocumento({
   }
 
   return (
-    <div className="flex items-center gap-3 p-3">
-      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate">{doc.name}</p>
-        <p className="text-xs text-muted-foreground">
-          {formatDate(doc.created_at)}
-          {doc.size_bytes ? ` · ${formatarTamanho(doc.size_bytes)}` : ""}
-        </p>
-      </div>
+    <div className="space-y-1.5">
+      <p className="truncate text-sm font-medium" title={doc.name}>
+        {doc.name}
+      </p>
 
-      <div className="flex items-center gap-1 shrink-0">
-        <Button asChild variant="ghost" size="sm" title="Pré-visualizar">
-          <a href={base} target="_blank" rel="noopener noreferrer">
-            <Eye className="h-4 w-4" />
-          </a>
-        </Button>
-        <Button asChild variant="ghost" size="sm" title="Descarregar">
-          <a href={`${base}?download=1`}>
-            <Download className="h-4 w-4" />
-          </a>
-        </Button>
-        {doc.web_view_link && (
-          <Button asChild variant="ghost" size="sm" title="Abrir no Drive">
-            <a href={doc.web_view_link} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="h-4 w-4" />
+      <div className="rounded-lg border border-emerald-200 bg-card p-3 transition-colors hover:border-emerald-400 dark:border-emerald-900/40 dark:hover:border-emerald-700">
+        <a
+          href={base}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center gap-1.5 py-2"
+          title="Pré-visualizar"
+        >
+          <FileText className="h-6 w-6 text-emerald-600 dark:text-emerald-500" />
+          <span className="text-xs text-muted-foreground">Ver</span>
+        </a>
+
+        <div className="mt-2 flex items-center justify-center gap-0.5 border-t pt-1.5">
+          <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0" title="Pré-visualizar">
+            <a href={base} target="_blank" rel="noopener noreferrer">
+              <Eye className="h-3.5 w-3.5" />
             </a>
           </Button>
-        )}
-        {canEdit && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={apagar}
-            disabled={apagando}
-            title="Apagar"
-            className="text-destructive hover:text-destructive"
-          >
-            {apagando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0" title="Descarregar">
+            <a href={`${base}?download=1`}>
+              <Download className="h-3.5 w-3.5" />
+            </a>
           </Button>
-        )}
+          {doc.web_view_link && (
+            <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0" title="Abrir no Drive">
+              <a href={doc.web_view_link} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </Button>
+          )}
+          {podeEditar && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+              onClick={apagar}
+              disabled={apagando}
+              title="Apagar"
+            >
+              {apagando ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Trash2 className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          )}
+        </div>
       </div>
+
+      <p className="truncate text-xs text-muted-foreground">
+        {formatDate(doc.created_at)}
+        {doc.size_bytes ? ` · ${formatarTamanho(doc.size_bytes)}` : ""}
+      </p>
     </div>
   )
 }
 
-function AdicionarDocumento({
+/** Cartão tracejado para adicionar, no fim da grelha. */
+function CartaoAdicionar({ onClick }: { onClick: () => void }) {
+  return (
+    <div className="space-y-1.5">
+      <p className="truncate text-sm font-medium text-muted-foreground">Novo documento</p>
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full flex-col items-center gap-1.5 rounded-lg border border-dashed border-border/70 bg-card px-3 py-[1.35rem] transition-colors hover:border-primary hover:bg-primary/5"
+      >
+        <Plus className="h-6 w-6 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">Adicionar</span>
+      </button>
+      <p className="text-xs text-muted-foreground">Qualquer ficheiro, até 20 MB</p>
+    </div>
+  )
+}
+
+function DialogoAdicionar({
   projectId,
+  visibilidadeInicial,
+  onFechar,
   onAdicionado,
 }: {
   projectId: string
+  visibilidadeInicial: Visibilidade
+  onFechar: () => void
   onAdicionado: () => void
 }) {
   const [nome, setNome] = useState("")
   const [ficheiro, setFicheiro] = useState<File | null>(null)
-  const [visibilidade, setVisibilidade] = useState<Visibilidade>("interna")
+  const [visibilidade, setVisibilidade] = useState<Visibilidade>(visibilidadeInicial)
   const [aEnviar, setAEnviar] = useState(false)
   const [arrastar, setArrastar] = useState(false)
 
@@ -289,9 +360,8 @@ function AdicionarDocumento({
 
       if (res.ok) {
         toast.success("Documento adicionado")
-        setNome("")
-        setFicheiro(null)
         onAdicionado()
+        onFechar()
       } else {
         toast.error("Falha ao adicionar", {
           description: body.error ?? `HTTP ${res.status}`,
@@ -306,52 +376,47 @@ function AdicionarDocumento({
   }
 
   return (
-    <Card>
-      <CardContent className="p-5 space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold">Adicionar documento</h2>
-          <p className="text-xs text-muted-foreground">
-            Qualquer tipo de ficheiro, até 20 MB. É guardado no Google Drive da empresa.
-          </p>
-        </div>
+    <Dialog open onOpenChange={onFechar}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Adicionar documento</DialogTitle>
+        </DialogHeader>
 
-        <div
-          onDragOver={(e) => {
-            e.preventDefault()
-            setArrastar(true)
-          }}
-          onDragLeave={() => setArrastar(false)}
-          onDrop={(e) => {
-            e.preventDefault()
-            setArrastar(false)
-            escolher(e.dataTransfer.files?.[0] ?? null)
-          }}
-          className={cn(
-            "rounded-lg border border-dashed p-6 text-center transition-colors",
-            arrastar ? "border-primary bg-primary/5" : "border-border/60",
-          )}
-        >
-          <Upload className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-          {ficheiro ? (
-            <p className="text-sm font-medium truncate">{ficheiro.name}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Arrasta um ficheiro para aqui ou
-            </p>
-          )}
-          <label className="mt-2 inline-block">
-            <input
-              type="file"
-              className="hidden"
-              onChange={(e) => escolher(e.target.files?.[0] ?? null)}
-            />
-            <span className="text-sm underline underline-offset-2 cursor-pointer">
-              {ficheiro ? "escolher outro" : "escolher ficheiro"}
-            </span>
-          </label>
-        </div>
+        <div className="space-y-3">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault()
+              setArrastar(true)
+            }}
+            onDragLeave={() => setArrastar(false)}
+            onDrop={(e) => {
+              e.preventDefault()
+              setArrastar(false)
+              escolher(e.dataTransfer.files?.[0] ?? null)
+            }}
+            className={cn(
+              "rounded-lg border border-dashed p-6 text-center transition-colors",
+              arrastar ? "border-primary bg-primary/5" : "border-border/60",
+            )}
+          >
+            <Upload className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+            {ficheiro ? (
+              <p className="truncate text-sm font-medium">{ficheiro.name}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Arrasta um ficheiro para aqui ou</p>
+            )}
+            <label className="mt-2 inline-block">
+              <input
+                type="file"
+                className="hidden"
+                onChange={(e) => escolher(e.target.files?.[0] ?? null)}
+              />
+              <span className="cursor-pointer text-sm underline underline-offset-2">
+                {ficheiro ? "escolher outro" : "escolher ficheiro"}
+              </span>
+            </label>
+          </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="doc-nome">Nome do documento</Label>
             <Input
@@ -361,6 +426,7 @@ function AdicionarDocumento({
               placeholder="ex: Licença de construção"
             />
           </div>
+
           <div className="space-y-1.5">
             <Label htmlFor="doc-vis">Visibilidade</Label>
             <Select value={visibilidade} onValueChange={(v) => setVisibilidade(v as Visibilidade)}>
@@ -375,13 +441,16 @@ function AdicionarDocumento({
           </div>
         </div>
 
-        <div className="flex justify-end">
-          <Button size="sm" onClick={enviar} disabled={aEnviar || !ficheiro}>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onFechar} disabled={aEnviar}>
+            Cancelar
+          </Button>
+          <Button onClick={enviar} disabled={aEnviar || !ficheiro}>
             {aEnviar && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {aEnviar ? "A enviar..." : "Adicionar"}
           </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
