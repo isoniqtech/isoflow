@@ -106,6 +106,29 @@ export async function PATCH(
   }
 
   const supabase = createClient()
+
+  // A categoria de gasto nao pode mudar depois de a fatura ir para o ERP: o
+  // documento ja' esta' lancado na contabilidade e mudar aqui criaria divergencia.
+  if ("expense_category_code" in parsed.data) {
+    const { data: atual } = await supabase
+      .from("invoices")
+      .select("erp_synced, toconline_fc_id")
+      .eq("id", params.id)
+      .eq("tenant_id", ctx.tenantId)
+      .maybeSingle()
+
+    const jaEnviada =
+      Boolean(atual?.erp_synced) ||
+      Boolean((atual as { toconline_fc_id?: string | null } | null)?.toconline_fc_id)
+
+    if (jaEnviada) {
+      return jsonError(
+        "Fatura ja enviada para o ERP: a categoria de gasto nao pode ser alterada",
+        409,
+      )
+    }
+  }
+
   const { data, error } = await supabase
     .from("invoices")
     .update({ ...parsed.data, updated_at: new Date().toISOString() })

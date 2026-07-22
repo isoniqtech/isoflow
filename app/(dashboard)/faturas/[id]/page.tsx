@@ -91,6 +91,10 @@ export default async function FaturaDetailPage({
         currentCode={expenseCategoryCode}
         decidedByAi={!categoriaJaExistia}
         canEdit={canEdit}
+        alreadySent={
+          Boolean(invoice.erp_synced) ||
+          Boolean((invoice as { toconline_fc_id?: string | null }).toconline_fc_id)
+        }
       />
 
       <InvoiceDetail invoice={invoice} canEdit={canEdit} />
