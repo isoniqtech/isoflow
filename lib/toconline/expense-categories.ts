@@ -71,6 +71,32 @@ function normalizar(items: unknown[], tenantId: string, now: string) {
     .filter((r) => r.code && r.name)
 }
 
+/**
+ * Normaliza e grava um lote de categorias. Usado tanto pelo sync interno
+ * (modo direto / pull n8n) como pelo webhook de push do n8n.
+ * Devolve o numero de categorias gravadas.
+ */
+export async function storeCategories(
+  tenantId: string,
+  items: unknown[],
+  supabase: SupabaseClient,
+): Promise<number> {
+  const rows = normalizar(items, tenantId, new Date().toISOString())
+  if (rows.length === 0) return 0
+
+  const BATCH = 200
+  for (let i = 0; i < rows.length; i += BATCH) {
+    const { error } = await supabase
+      .from("toconline_expense_categories")
+      .upsert(rows.slice(i, i + BATCH), { onConflict: "tenant_id,code" })
+    if (error) throw new Error(`Erro a gravar categorias: ${error.message}`)
+  }
+  return rows.length
+}
+
+/** Reexportado para o webhook aceitar os mesmos formatos de payload. */
+export { extrairLista }
+
 /** Modo direto: buscar directamente ao TOConline. */
 async function buscarNoToconline(tenantId: string): Promise<unknown[]> {
   const t = await getValidToken(tenantId)
