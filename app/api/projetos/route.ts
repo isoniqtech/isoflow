@@ -69,6 +69,19 @@ export async function POST(req: Request) {
   const supabase = createClient()
   const input = parsed.data
 
+  // Nome unico por tenant: a pasta no Drive e' identificada pelo nome do
+  // projeto, por isso nomes repetidos criariam ambiguidade. Validado aqui para
+  // dar erro legivel, e garantido no indice unico da migration 042.
+  const { data: duplicado } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("tenant_id", ctx.tenantId)
+    .eq("name", input.name)
+    .maybeSingle()
+  if (duplicado) {
+    return jsonError("Já existe um projeto com este nome", 409)
+  }
+
   let code = input.code?.trim() || null
   if (!code) {
     const { count } = await supabase
@@ -103,6 +116,10 @@ export async function POST(req: Request) {
     .single()
 
   if (insertError) {
+    // 23505 = unique_violation (indice (tenant_id, name)) numa corrida
+    if (insertError.code === "23505") {
+      return jsonError("Já existe um projeto com este nome", 409)
+    }
     console.error("POST /api/projetos insert failed:", insertError)
     return jsonError("Could not create project", 500, insertError.message)
   }
@@ -115,6 +132,16 @@ export async function POST(req: Request) {
     resourceId: project.id,
     metadata: { name: project.name, type: project.type },
   })
+
+  // Subpasta no Google Drive. Silencioso por design: se o Drive nao estiver
+  // ligado ou falhar, o projeto e' criado na mesma e a pasta e' criada de
+  // forma lazy no primeiro upload de documento.
+  try {
+    const { ensureProjectFolder } = await import("@/lib/google/drive")
+    await ensureProjectFolder(ctx.tenantId, project.id, project.name)
+  } catch {
+    // ignorar
+  }
 
   return Response.json({ data: project }, { status: 201 })
 }

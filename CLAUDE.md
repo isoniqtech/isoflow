@@ -373,6 +373,23 @@ linha divisória decorativa, glow do product shot. Nunca em parágrafo, label,
 `animate-in fade-in slide-in-from-bottom-4`, hover `-translate-y-0.5`, sempre com
 `motion-reduce:animate-none`.
 
+### Padrões reutilizáveis (usar SEMPRE em vez de recriar à mão)
+
+| Padrão | Onde | Para quê |
+|---|---|---|
+| `<SegmentedTabs>` | `components/ui/segmented-tabs.tsx` | Tabs de página. Fundo `bg-muted`, tab activa levantada em `bg-card` com sombra. Navega por `searchParams`, mantém Server Components e dá URL própria a cada tab |
+| `<SectionHeader>` | `components/ui/section-header.tsx` | Cabeçalho de subsecção. Barra `bg-muted` com contador em `bg-primary` |
+| `.surface-card` | `globals.css` (`@layer components`) | Cartão de conteúdo: borda, gradiente subtil sobre `--card` e `--shadow-card`. A mesma linguagem dos `KpiCard`. Juntar `.surface-card-hover` para realce |
+| `.surface-empty` | `globals.css` | Estado vazio ou acção "adicionar": tracejado ao nível da página (`--background`), **sem** elevação. Contrasta de propósito com `.surface-card` |
+
+Regra de ouro do contraste: **conteúdo existente = elevado** (`.surface-card`),
+**espaço por preencher = ao nível da página** (`.surface-empty`). É isso que
+distingue de relance o que já lá está do que falta.
+
+Se precisares de um destes padrões noutro sítio, **importa o componente ou usa a
+classe**. Não voltar a escrever o gradiente e a sombra à mão: foi assim que
+apareceram inconsistências entre tabs.
+
 ### Branding por tenant
 Bucket público `tenant-assets`, path `{tenant_id}/logo.{ext}`. `logo_url`,
 `primary_color` e `app_name` na tabela `tenants`.

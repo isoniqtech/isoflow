@@ -9,6 +9,7 @@ import { WhatsAppIntegrationCard } from "@/components/configuracoes/whatsapp-int
 import { BankAccountsCard } from "@/components/configuracoes/bank-accounts-card"
 import { ToconlineDirectCard } from "@/components/configuracoes/toconline-direct-card"
 import { AiIntegrationCard } from "@/components/configuracoes/ai-integration-card"
+import { GoogleDriveCard } from "@/components/configuracoes/google-drive-card"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { createClient } from "@/lib/supabase/server"
@@ -284,6 +285,9 @@ export default async function IntegracoesPage() {
         />
 
         <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
+
+        {/* Google Drive - documentos dos projetos */}
+        <GoogleDriveCard canEdit={canEditErp} />
 
         <WhatsAppIntegrationCard
           isActive={whatsappActive}

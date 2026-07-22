@@ -33,6 +33,13 @@ export async function GET(
     return jsonError("Forbidden", 403)
   }
 
+  // Investidor: so' os projetos a que esta' associado (mesma guarda do detalhe)
+  if (ctx.role === "investidor") {
+    const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
+    const allowed = await getInvestidorProjectIds(ctx.userId)
+    if (!allowed.includes(params.id)) return jsonError("Forbidden", 403)
+  }
+
   const supabase = createClient()
   const { data, error } = await supabase
     .from("projects")
@@ -69,6 +76,22 @@ export async function PATCH(
   }
 
   const supabase = createClient()
+
+  // Renomear: o nome tem de continuar unico no tenant (a pasta do Drive e'
+  // identificada pelo nome do projeto).
+  if (typeof parsed.data.name === "string") {
+    const { data: duplicado } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("tenant_id", ctx.tenantId)
+      .eq("name", parsed.data.name)
+      .neq("id", params.id)
+      .maybeSingle()
+    if (duplicado) {
+      return jsonError("Já existe um projeto com este nome", 409)
+    }
+  }
+
   const { data, error } = await supabase
     .from("projects")
     .update({ ...parsed.data, updated_at: new Date().toISOString() })
@@ -77,8 +100,30 @@ export async function PATCH(
     .select("*")
     .maybeSingle()
 
-  if (error) return jsonError("Could not update project", 500, error.message)
+  if (error) {
+    // 23505 = unique_violation do indice (tenant_id, name) numa corrida
+    if (error.code === "23505") {
+      return jsonError("Já existe um projeto com este nome", 409)
+    }
+    return jsonError("Could not update project", 500, error.message)
+  }
   if (!data) return jsonError("Not found", 404)
+
+  // Refletir o novo nome na pasta do Drive, se existir. Silencioso: uma falha
+  // aqui nao deve impedir a renomeacao do projeto.
+  if (typeof parsed.data.name === "string" && data.drive_folder_id) {
+    try {
+      const { getValidDriveToken, DRIVE_API } = await import("@/lib/google/drive")
+      const token = await getValidDriveToken(ctx.tenantId)
+      await fetch(`${DRIVE_API}/files/${data.drive_folder_id}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: parsed.data.name }),
+      })
+    } catch {
+      // ignorar
+    }
+  }
 
   await log(supabase, {
     action: "project.updated",

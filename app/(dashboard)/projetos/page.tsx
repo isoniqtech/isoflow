@@ -3,6 +3,8 @@ import { redirect } from "next/navigation"
 import { Download, FolderPlus, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ProjectCard } from "@/components/projetos/project-card"
+import { ProjectRow } from "@/components/projetos/project-row"
+import { ViewToggle, type VistaProjetos } from "@/components/projetos/view-toggle"
 import { ProjectsFilters } from "./projects-filters"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { listProjects } from "@/lib/queries/projects"
@@ -28,7 +30,7 @@ const VALID_TYPE: Array<ProjectType | "all"> = [
 export default async function ProjetosPage({
   searchParams,
 }: {
-  searchParams: { status?: string; type?: string }
+  searchParams: { status?: string; type?: string; vista?: string }
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
@@ -50,6 +52,15 @@ export default async function ProjetosPage({
     filter: { status: statusFilter, type: typeFilter },
     vatRegime,
   })
+
+  const vista: VistaProjetos = searchParams.vista === "lista" ? "lista" : "grelha"
+  // Preservar os filtros ao trocar de vista
+  const hrefVista = (v: VistaProjetos) =>
+    `/projetos?${new URLSearchParams({
+      ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+      ...(typeFilter !== "all" ? { type: typeFilter } : {}),
+      ...(v === "lista" ? { vista: "lista" } : {}),
+    }).toString()}`
 
   const canCreate = hasPermission(session.role, "projetos", "create")
 
@@ -90,16 +101,29 @@ export default async function ProjetosPage({
         </div>
       </div>
 
-      <ProjectsFilters status={statusFilter} type={typeFilter} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <ProjectsFilters status={statusFilter} type={typeFilter} />
+        <ViewToggle vista={vista} hrefFor={hrefVista} />
+      </div>
 
       {projects.length === 0 ? (
         <EmptyState canCreate={canCreate} />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map((p) => (
-            <ProjectCard key={p.id} project={p} />
-          ))}
-        </div>
+        <>
+          {vista === "grelha" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {projects.map((p) => (
+                <ProjectCard key={p.id} project={p} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {projects.map((p) => (
+                <ProjectRow key={p.id} project={p} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

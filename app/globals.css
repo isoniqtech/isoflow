@@ -292,4 +292,38 @@
   .btn-glow:hover {
     box-shadow: var(--glow-cta, 0 10px 30px -8px rgba(61,174,175,.3));
   }
+
+  /* ---------------------------------------------------------------------
+   * Superficie de cartao (linguagem visual dos KpiCard do dashboard).
+   * Usar em qualquer cartao de conteudo, para nao repetir o gradiente e a
+   * sombra a mao. Contrasta de proposito com .surface-empty.
+   * ------------------------------------------------------------------- */
+  .surface-card {
+    border: 1px solid hsl(var(--border) / 0.6);
+    border-radius: var(--radius);
+    background-image: linear-gradient(
+      135deg,
+      hsl(var(--card)) 40%,
+      rgba(52, 78, 13, 0.05) 100%
+    );
+    box-shadow: var(--shadow-card, 0 1px 3px rgba(0, 0, 0, 0.08));
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .surface-card-hover:hover {
+    border-color: hsl(var(--border));
+    box-shadow: var(--shadow-card-hover, var(--shadow-card));
+  }
+
+  /* Estado vazio / accao "adicionar": fica ao nivel da pagina (sem elevacao),
+   * para criar contraste com os cartoes preenchidos acima. */
+  .surface-empty {
+    border: 1px dashed hsl(var(--border));
+    border-radius: var(--radius);
+    background-color: hsl(var(--background));
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+  }
+  .surface-empty:hover {
+    border-color: hsl(var(--primary));
+    background-color: hsl(var(--primary) / 0.05);
+  }
 }

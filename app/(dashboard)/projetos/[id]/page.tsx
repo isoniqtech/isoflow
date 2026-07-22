@@ -16,6 +16,9 @@ import { ProjectCategoryChart } from "@/components/projetos/project-category-cha
 import { ProjectInvoices } from "@/components/projetos/project-invoices"
 import { ProjectActions } from "@/components/projetos/project-actions"
 import { ProjectInvestorBlock } from "@/components/investidores/project-investor-block"
+import { ProjectDocumentsTab } from "@/components/projetos/project-documents-tab"
+import { ProjectPlanTab } from "@/components/projetos/project-plan-tab"
+import { SegmentedTabs } from "@/components/ui/segmented-tabs"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { getProjectDetail } from "@/lib/queries/project-detail"
 import { listInvestidores } from "@/lib/queries/investidores"
@@ -55,10 +58,21 @@ const STATUS_STYLES: Record<ProjectStatus, { label: string; className: string }>
   },
 }
 
+const VALID_TABS = ["dashboard", "documentacao", "planeamento"] as const
+type ProjectTab = (typeof VALID_TABS)[number]
+
+const TAB_LABELS: Record<ProjectTab, string> = {
+  dashboard: "Dashboard",
+  documentacao: "Documentação",
+  planeamento: "Planeamento",
+}
+
 export default async function ProjetoDetailPage({
   params,
+  searchParams,
 }: {
   params: { id: string }
+  searchParams: { tab?: string }
 }) {
   const session = await getCurrentSession()
   if (!session) redirect("/login")
@@ -67,6 +81,15 @@ export default async function ProjetoDetailPage({
   const data = await getProjectDetail(params.id, session.tenant.id, vatRegime)
   if (!data) notFound()
 
+  // Investidor: so' pode ver os projetos a que esta' associado. A listagem ja'
+  // filtrava (lib/queries/projects.ts), mas o acesso direto por URL nao tinha
+  // guarda. Mesmo padrao usado no detalhe da fatura.
+  if (session.role === "investidor") {
+    const { getInvestidorProjectIds } = await import("@/lib/queries/investidores")
+    const allowed = await getInvestidorProjectIds(session.user.id)
+    if (!allowed.includes(params.id)) redirect("/projetos")
+  }
+
   const { project, kpis, monthly, by_category, invoices } = data
   const status = STATUS_STYLES[project.status]
   const canEdit = hasPermission(session.role, "projetos", "edit")
@@ -74,6 +97,10 @@ export default async function ProjetoDetailPage({
   const canExportReport = hasPermission(session.role, "relatorios", "view_all")
   const canViewInvestidores = hasPermission(session.role, "investidores", "view_all")
   const canEditInvestidores = hasPermission(session.role, "investidores", "edit")
+
+  const activeTab: ProjectTab = (VALID_TABS as readonly string[]).includes(searchParams.tab ?? "")
+    ? (searchParams.tab as ProjectTab)
+    : "dashboard"
 
   let linkedInvestidores: Array<{
     investidor_id: string
@@ -174,6 +201,15 @@ export default async function ProjetoDetailPage({
         )}
       </div>
 
+      <SegmentedTabs
+        tabs={VALID_TABS.map((t) => ({ id: t, label: TAB_LABELS[t] }))}
+        activeId={activeTab}
+        hrefFor={(id) => `/projetos/${project.id}?tab=${id}`}
+      />
+
+      {/* ---------- Dashboard: conteudo original, movido sem alteracoes ---------- */}
+      {activeTab === "dashboard" && (
+        <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label="Total gasto"
@@ -263,6 +299,26 @@ export default async function ProjetoDetailPage({
       )}
 
       <ProjectInvoices invoices={invoices} projectId={project.id} />
+        </>
+      )}
+
+      {/* ---------- Documentacao ---------- */}
+      {activeTab === "documentacao" && (
+        <ProjectDocumentsTab
+          projectId={project.id}
+          canEdit={canEdit}
+          isInvestidor={session.role === "investidor"}
+        />
+      )}
+
+      {/* ---------- Planeamento ---------- */}
+      {activeTab === "planeamento" && (
+        <ProjectPlanTab
+          projectId={project.id}
+          canEdit={canEdit}
+          isInvestidor={session.role === "investidor"}
+        />
+      )}
     </div>
   )
 }
