@@ -71,7 +71,7 @@ function formatarTamanho(bytes: number | null): string {
 }
 
 /** Grelha partilhada por todas as secções, para manter os cartões alinhados. */
-const GRELHA = "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+const GRELHA = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
 
 export function ProjectDocumentsTab({
   projectId,
@@ -234,29 +234,37 @@ function CartaoDocumento({
   }
 
   return (
-    <div className="space-y-1.5">
-      <p className="truncate text-sm font-medium" title={doc.name}>
-        {doc.name}
-      </p>
+    <div className="surface-card surface-card-hover flex flex-col p-3">
+      {/* Icone a esquerda, nome + data/tamanho a direita */}
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-primary/10">
+          <FileText className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium leading-tight" title={doc.name}>
+            {doc.name}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            {formatDate(doc.created_at)}
+            {doc.size_bytes ? ` · ${formatarTamanho(doc.size_bytes)}` : ""}
+          </p>
+        </div>
+      </div>
 
-      <div className="surface-card surface-card-hover p-3">
+      {/* "Ver" logo abaixo, com as restantes accoes a direita */}
+      <div className="mt-3 flex items-center justify-between gap-2 border-t pt-2">
         <a
           href={base}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex flex-col items-center gap-1.5 py-2"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
           title="Pré-visualizar"
         >
-          <FileText className="h-6 w-6 text-primary" />
-          <span className="text-xs text-muted-foreground">Ver</span>
+          <Eye className="h-3.5 w-3.5" />
+          Ver
         </a>
 
-        <div className="mt-2 flex items-center justify-center gap-0.5 border-t pt-1.5">
-          <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0" title="Pré-visualizar">
-            <a href={base} target="_blank" rel="noopener noreferrer">
-              <Eye className="h-3.5 w-3.5" />
-            </a>
-          </Button>
+        <div className="flex items-center gap-0.5">
           <Button asChild variant="ghost" size="sm" className="h-7 w-7 p-0" title="Descarregar">
             <a href={`${base}?download=1`}>
               <Download className="h-3.5 w-3.5" />
@@ -287,11 +295,6 @@ function CartaoDocumento({
           )}
         </div>
       </div>
-
-      <p className="truncate text-xs text-muted-foreground">
-        {formatDate(doc.created_at)}
-        {doc.size_bytes ? ` · ${formatarTamanho(doc.size_bytes)}` : ""}
-      </p>
     </div>
   )
 }
@@ -299,18 +302,28 @@ function CartaoDocumento({
 /** Cartão tracejado para adicionar, no fim da grelha. */
 function CartaoAdicionar({ onClick }: { onClick: () => void }) {
   return (
-    <div className="space-y-1.5">
-      <p className="truncate text-sm font-medium text-muted-foreground">Novo documento</p>
-      <button
-        type="button"
-        onClick={onClick}
-        className="surface-empty flex w-full flex-col items-center gap-1.5 px-3 py-[1.35rem]"
-      >
-        <Plus className="h-6 w-6 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">Adicionar</span>
-      </button>
-      <p className="text-xs text-muted-foreground">Qualquer ficheiro, até 20 MB</p>
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="surface-empty flex w-full flex-col p-3 text-left"
+    >
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-dashed border-border">
+          <Plus className="h-5 w-5 text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium leading-tight text-muted-foreground">
+            Adicionar documento
+          </p>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            Qualquer ficheiro, até 20 MB
+          </p>
+        </div>
+      </div>
+      <div className="mt-3 border-t border-dashed pt-2 text-xs font-medium text-muted-foreground">
+        Carregar
+      </div>
+    </button>
   )
 }
 
