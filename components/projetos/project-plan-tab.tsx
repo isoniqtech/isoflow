@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Tab de Planejamento do projeto.
+ * Tab de Planeamento do projeto.
  *
  * Sem tarefas: ecrã para gerar o cronograma com IA, por voz (Web Speech API,
  * pt-PT) ou texto. Com tarefas: timeline horizontal + CRUD.
@@ -392,7 +392,7 @@ function GerarComIA({ projectId, onGerado }: { projectId: string; onGerado: () =
         <div className="text-center">
           <Sparkles className="h-8 w-8 text-primary mx-auto mb-2" />
           <h2 className="text-lg font-display font-semibold tracking-tight">
-            Fazer o planejamento com inteligência artificial
+            Fazer o planeamento com inteligência artificial
           </h2>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl mx-auto">
             Descreve a obra ou o projeto por palavras tuas, por voz ou por escrito, e a IA

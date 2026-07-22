@@ -57,13 +57,13 @@ const STATUS_STYLES: Record<ProjectStatus, { label: string; className: string }>
   },
 }
 
-const VALID_TABS = ["dashboard", "documentacao", "planejamento"] as const
+const VALID_TABS = ["dashboard", "documentacao", "planeamento"] as const
 type ProjectTab = (typeof VALID_TABS)[number]
 
 const TAB_LABELS: Record<ProjectTab, string> = {
   dashboard: "Dashboard",
   documentacao: "Documentação",
-  planejamento: "Planejamento",
+  planeamento: "Planeamento",
 }
 
 export default async function ProjetoDetailPage({
@@ -324,8 +324,8 @@ export default async function ProjetoDetailPage({
         />
       )}
 
-      {/* ---------- Planejamento ---------- */}
-      {activeTab === "planejamento" && (
+      {/* ---------- Planeamento ---------- */}
+      {activeTab === "planeamento" && (
         <ProjectPlanTab
           projectId={project.id}
           canEdit={canEdit}
