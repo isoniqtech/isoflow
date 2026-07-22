@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { hasPermission } from "@/lib/utils/permissions"
 import { getValidToken } from "@/lib/toconline/token"
 import { createDirectFC } from "@/lib/toconline/fc"
+import { PRE_ERP_STATUSES } from "@/lib/utils/invoice-status"
 
 const bodySchema = z.object({
   invoice_ids: z.array(z.string().uuid()).min(1).max(50),
@@ -115,6 +116,14 @@ export async function POST(request: Request) {
             })
             .eq("id", inv.id)
             .eq("tenant_id", tenantId)
+
+          // Promover o estado so' a partir de fases anteriores ao ERP
+          await admin
+            .from("invoices")
+            .update({ status: "enviada_erp", updated_at: now })
+            .eq("id", inv.id)
+            .eq("tenant_id", tenantId)
+            .in("status", PRE_ERP_STATUSES as unknown as string[])
 
           if (result.alreadyExisted) {
             skipped++
