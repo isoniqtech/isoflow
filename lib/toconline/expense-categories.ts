@@ -107,37 +107,61 @@ async function buscarNoToconline(tenantId: string): Promise<unknown[]> {
   return extrairLista(await res.json())
 }
 
+/** Intervalo minimo entre disparos do workflow n8n, para nao insistir em vao. */
+const TRIGGER_THROTTLE_HOURS = 1
+
 /**
- * Modo n8n: chamar o workflow do tenant, que devolve as categorias.
- * URL: tenant_integrations(config.expense_categories_url) ou, em alternativa,
- * a variavel de ambiente N8N_EXPENSE_CATEGORIES_URL.
+ * Modo n8n: o ISOFlow DISPARA o workflow do tenant (fire-and-forget).
+ *
+ * O n8n responde logo ("Workflow was started") sem devolver dados; e' o proprio
+ * workflow que, em segundo plano, vai buscar as categorias ao TOConline e as
+ * empurra para POST /api/webhooks/categorias. Ou seja: a cadencia e' decidida
+ * aqui, o tenant nao tem de agendar nada.
+ *
+ * URL: tenant_integrations(config.expense_categories_url) ou a variavel de
+ * ambiente N8N_EXPENSE_CATEGORIES_URL.
  */
-async function buscarNoN8n(tenantId: string, supabase: SupabaseClient): Promise<unknown[]> {
+async function dispararWorkflowN8n(tenantId: string, supabase: SupabaseClient): Promise<void> {
   const { data: integ } = await supabase
     .from("tenant_integrations")
-    .select("config")
+    .select("id, config")
     .eq("tenant_id", tenantId)
     .eq("type", "erp")
     .eq("provider", "n8n")
     .maybeSingle()
 
+  const config = (integ?.config ?? {}) as Record<string, unknown>
   const url =
-    (integ?.config as { expense_categories_url?: string } | null)?.expense_categories_url ||
+    (config.expense_categories_url as string | undefined) ||
     process.env.N8N_EXPENSE_CATEGORIES_URL
+  if (!url) return
 
-  if (!url) throw new Error("Webhook n8n de categorias nao configurado")
+  // Throttle: se ja' disparamos ha' pouco, nao insistir (o push pode estar a
+  // caminho, ou o workflow pode estar em baixo).
+  const ultimo = config.categories_triggered_at as string | undefined
+  if (ultimo && Date.now() - new Date(ultimo).getTime() < TRIGGER_THROTTLE_HOURS * 3600_000) {
+    return
+  }
 
-  const res = await fetch(url, {
+  if (integ?.id) {
+    await supabase
+      .from("tenant_integrations")
+      .update({
+        config: { ...config, categories_triggered_at: new Date().toISOString() },
+      })
+      .eq("id", integ.id)
+  }
+
+  // Fire-and-forget: nao esperamos dados, so' que o workflow arranque.
+  await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       tenant_id: tenantId,
       callback_secret: process.env.CRON_SECRET ?? "",
     }),
-    signal: AbortSignal.timeout(20000),
+    signal: AbortSignal.timeout(15000),
   })
-  if (!res.ok) throw new Error(`n8n categorias HTTP ${res.status}`)
-  return extrairLista(await res.json())
 }
 
 /**
@@ -159,7 +183,14 @@ export async function syncExpenseCategories(
     direto = (t as { integration_mode?: string } | null)?.integration_mode === "toconline_direct"
   }
 
-  const items = direto ? await buscarNoToconline(tenantId) : await buscarNoN8n(tenantId, supabase)
+  if (!direto) {
+    // Modo n8n: nao ha' nada a buscar aqui. Disparamos o workflow do tenant e
+    // as categorias chegam depois, por push, a /api/webhooks/categorias.
+    await dispararWorkflowN8n(tenantId, supabase)
+    return []
+  }
+
+  const items = await buscarNoToconline(tenantId)
   const rows = normalizar(items, tenantId, new Date().toISOString())
   if (rows.length === 0) return []
 
