@@ -153,6 +153,14 @@ export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET ?? ""
   const errors: string[] = []
 
+  // Categoria de gasto (decidida pela IA / escolhida no detalhe da fatura).
+  // A logica e' a mesma do modo direto; aqui apenas viaja no payload para o
+  // n8n a mapear no TOConline. Campos aditivos: o n8n antigo ignora-os.
+  const { getExpenseCategories } = await import("@/lib/toconline/expense-categories")
+  const catalogo = await getExpenseCategories(tenantId, supabase)
+  const nomePorCodigo = new Map(catalogo.map((c) => [c.code, c.name]))
+  const { DEFAULT_EXPENSE_CATEGORY } = await import("@/lib/toconline/fc")
+
   await Promise.all(
     pending.map(async (inv) => {
       try {
@@ -175,6 +183,10 @@ export async function POST(request: Request) {
               description: inv.description,
               currency: inv.currency ?? "EUR",
               movement_note: noteForInvoice(inv),
+              // Categoria de gasto para a linha da FC no TOConline
+              item_code: inv.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY,
+              item_description:
+                nomePorCodigo.get(inv.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY) ?? null,
             },
           }),
         })
