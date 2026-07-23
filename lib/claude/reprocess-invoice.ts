@@ -35,11 +35,20 @@ export async function reprocessInvoice(
     .eq("tenant_id", tenantId)
     .maybeSingle()
 
-  if (fetchErr || !invoice) {
-    return { invoiceId, ok: false, supplierName: null, confidence: 0, error: "Not found" }
+  if (fetchErr) {
+    return { invoiceId, ok: false, supplierName: null, confidence: 0, error: `Erro a ler a fatura: ${fetchErr.message}` }
+  }
+  if (!invoice) {
+    return {
+      invoiceId,
+      ok: false,
+      supplierName: null,
+      confidence: 0,
+      error: `Fatura nao encontrada para este tenant (id ${invoiceId}, tenant ${tenantId})`,
+    }
   }
   if (!invoice.file_path) {
-    return { invoiceId, ok: false, supplierName: null, confidence: 0, error: "No file" }
+    return { invoiceId, ok: false, supplierName: null, confidence: 0, error: "A fatura nao tem ficheiro para reprocessar" }
   }
 
   const attempts = (invoice.ai_attempts ?? 0) + 1
