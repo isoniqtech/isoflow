@@ -162,7 +162,9 @@ async function sendViaN8N(
   tenantId: string,
   invoice: InvoiceRow,
 ): Promise<SendNCFResult> {
-  // URL do webhook PROPRIO da NCF (distinto do FC): config do tenant ou env.
+  // MESMO webhook do FC. O workflow diferencia FC de NC pelo document_type; o
+  // shape do payload e' identico ao do create-fc (create-fc/route.ts), so muda
+  // document_type: "NC". Assim basta um if no workflow existente.
   const { data: integration } = await admin
     .from("tenant_integrations")
     .select("config")
@@ -172,42 +174,55 @@ async function sendViaN8N(
     .eq("is_active", true)
     .maybeSingle()
 
-  const ncfUrl =
-    (integration?.config as { ncf_url?: string } | null)?.ncf_url ||
-    process.env.N8N_NCF_WEBHOOK_URL
-  if (!ncfUrl) {
-    return { ok: false, error: "Webhook n8n da NCF nao configurado (N8N_NCF_WEBHOOK_URL)" }
+  const n8nUrl =
+    (integration?.config as { url?: string } | null)?.url || process.env.N8N_WEBHOOK_URL
+  if (!n8nUrl) {
+    return { ok: false, error: "Integracao ERP n8n nao configurada" }
+  }
+
+  // item_description (nome da categoria) para paridade total com o payload do FC.
+  let itemDescription: string | null = null
+  const itemCode = invoice.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY
+  try {
+    const { getExpenseCategories } = await import("@/lib/toconline/expense-categories")
+    const catalogo = await getExpenseCategories(tenantId, admin)
+    itemDescription = catalogo.find((c) => c.code === itemCode)?.name ?? null
+  } catch {
+    // best-effort: o item_description e' opcional
   }
 
   const cronSecret = process.env.CRON_SECRET ?? ""
   try {
-    const res = await fetch(ncfUrl, {
+    const res = await fetch(n8nUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "X-ISOFlow-Secret": cronSecret },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         tenant_id: tenantId,
         callback_secret: cronSecret,
-        credit_note: {
+        document_type: "NC", // <- o workflow trata como nota de credito (NCF)
+        invoice: {
           id: invoice.id,
           supplier_name: invoice.supplier_name,
           supplier_nif: invoice.supplier_nif,
-          credit_note_number: invoice.invoice_number,
-          date: invoice.invoice_date,
-          subtotal: invoice.subtotal !== null ? Number(invoice.subtotal) : null,
-          vat_rate: invoice.vat_rate !== null ? Number(invoice.vat_rate) : null,
-          vat_amount: invoice.vat_amount !== null ? Number(invoice.vat_amount) : null,
-          total: invoice.total !== null ? Number(invoice.total) : null,
+          invoice_number: invoice.invoice_number, // nº da NC -> external_reference
+          invoice_date: invoice.invoice_date,
+          subtotal: invoice.subtotal,
+          vat_rate: invoice.vat_rate,
+          vat_amount: invoice.vat_amount,
+          total: invoice.total,
           description: invoice.description,
           currency: invoice.currency ?? "EUR",
-          item_code: invoice.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY,
+          movement_note: null,
+          item_code: itemCode,
+          item_description: itemDescription,
         },
       }),
     })
     if (!res.ok) {
       const text = await res.text().catch(() => "")
-      return { ok: false, error: `n8n NCF ${res.status}: ${text.slice(0, 300)}` }
+      return { ok: false, error: `n8n NC ${res.status}: ${text.slice(0, 300)}` }
     }
-    // O workflow n8n cria a NCF e faz callback para gravar o numero (como no FC).
+    // O workflow cria a NCF e faz callback /api/faturas/[id]/update-fc (como o FC).
     return { ok: true, queued: true }
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
