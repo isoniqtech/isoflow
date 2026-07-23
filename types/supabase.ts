@@ -321,6 +321,10 @@ export type Database = {
           updated_at: string | null
           vat_amount: number | null
           vat_rate: number | null
+          document_kind: string
+          expense_category_code: string | null
+          referenced_document_number: string | null
+          related_invoice_id: string | null
         }
         Insert: {
           ai_attempts?: number
@@ -375,6 +379,10 @@ export type Database = {
           updated_at?: string | null
           vat_amount?: number | null
           vat_rate?: number | null
+          document_kind?: string
+          expense_category_code?: string | null
+          referenced_document_number?: string | null
+          related_invoice_id?: string | null
         }
         Update: {
           ai_attempts?: number
@@ -429,6 +437,10 @@ export type Database = {
           updated_at?: string | null
           vat_amount?: number | null
           vat_rate?: number | null
+          document_kind?: string
+          expense_category_code?: string | null
+          referenced_document_number?: string | null
+          related_invoice_id?: string | null
         }
         Relationships: [
           {

@@ -39,7 +39,7 @@ export const DEFAULT_EXPENSE_CATEGORY = "6221"
  * (existem tambem taxas historicas/regionais: NOR 21/20/19/17, INT 12, RED 5).
  * Default NOR quando a taxa e' desconhecida (comportamento anterior).
  */
-function taxCodeFromRate(rate: number | null | undefined): string {
+export function taxCodeFromRate(rate: number | null | undefined): string {
   if (rate === null || rate === undefined) return "NOR"
   const r = Number(rate)
   if (!Number.isFinite(r)) return "NOR"
@@ -198,7 +198,7 @@ async function createSupplier(
   throw new Error(`Erro ao criar fornecedor no TOConline ${lastErr}`)
 }
 
-async function lookupOrCreateSupplier(
+export async function lookupOrCreateSupplier(
   accessToken: string,
   appBase: string,
   apiBase: string,

@@ -55,6 +55,8 @@ const formSchema = z.object({
   description: z.string().trim().max(500),
   project_id: z.string().trim(),
   notes: z.string().trim().max(2000),
+  document_kind: z.enum(["invoice", "credit_note"]),
+  referenced_document_number: z.string().trim().max(100),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -108,8 +110,13 @@ export function InvoiceForm({
       description: "",
       project_id: defaultProjectId ?? "",
       notes: "",
+      document_kind: "invoice",
+      referenced_document_number: "",
     },
   })
+
+  const documentKind = form.watch("document_kind")
+  const isCreditNote = documentKind === "credit_note"
 
   const subtotalValue = form.watch("subtotal")
   const vatRateValue = form.watch("vat_rate")
@@ -159,7 +166,13 @@ export function InvoiceForm({
         if (e.category)      form.setValue("category", e.category)
         if (e.description)   form.setValue("description", e.description)
         if (e.notes)         form.setValue("notes", e.notes)
-        toast.success("Dados extraídos com IA. Revê e confirma.")
+        if (e.document_kind === "credit_note") form.setValue("document_kind", "credit_note")
+        if (e.referenced_document_number) form.setValue("referenced_document_number", e.referenced_document_number)
+        toast.success(
+          e.document_kind === "credit_note"
+            ? "Nota de crédito detetada pela IA. Revê e confirma."
+            : "Dados extraídos com IA. Revê e confirma.",
+        )
       }
     } catch { toast.error("Erro de ligação ao servidor") }
     finally { setExtracting(false) }
@@ -195,6 +208,11 @@ export function InvoiceForm({
       description: values.description || null,
       notes: values.notes || null,
       needs_review: false,
+      document_kind: values.document_kind,
+      referenced_document_number:
+        values.document_kind === "credit_note"
+          ? values.referenced_document_number || null
+          : null,
       ...(uploadedFile ? {
         file_path: uploadedFile.path,
         file_name: uploadedFile.name,
@@ -282,6 +300,56 @@ export function InvoiceForm({
             </div>
           )}
         </div>
+
+        <section className="space-y-4">
+          <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+            Tipo de documento
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="document_kind"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Documento</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="invoice">Fatura</SelectItem>
+                      <SelectItem value="credit_note">Nota de crédito</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Nota de crédito do fornecedor - subtrai nos gastos.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {isCreditNote && (
+              <FormField
+                control={form.control}
+                name="referenced_document_number"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fatura original referida</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Nº da fatura que esta nota credita" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Para ligar a nota de crédito à fatura original.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+          </div>
+        </section>
 
         <section className="space-y-4">
           <h2 className="text-sm font-semibold tracking-wide text-muted-foreground uppercase">

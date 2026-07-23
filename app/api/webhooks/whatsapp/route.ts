@@ -8,6 +8,10 @@ import {
 import { decrypt } from '@/lib/utils/encryption'
 import { extractInvoiceData } from '@/lib/claude/extract-invoice'
 import { matchProjectFromTextWithAI } from '@/lib/utils/projects'
+import {
+  matchCreditNoteToInvoice,
+  matchPendingCreditNotesToInvoice,
+} from '@/lib/utils/credit-note-match'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { log } from '@/lib/utils/audit'
 import { Invoice } from '@/types'
@@ -166,6 +170,8 @@ export async function POST(req: Request) {
           currency: extraction.currency,
           description: extraction.description,
           category: extraction.category,
+          document_kind: extraction.document_kind,
+          referenced_document_number: extraction.referenced_document_number,
           ai_confidence: extraction.confidence,
           ai_raw_response: extraction as unknown as Record<string, unknown>,
           ai_processed_at: new Date().toISOString(),
@@ -199,6 +205,25 @@ export async function POST(req: Request) {
           resourceId: invoice.id,
           metadata: { sender_phone: from, confidence: extraction.confidence },
         })
+
+        // Matching FC<->NCF dentro da app (best-effort)
+        try {
+          const matchable = {
+            id: invoice.id as string,
+            tenant_id: tenantId,
+            document_kind: extraction.document_kind,
+            referenced_document_number: extraction.referenced_document_number,
+            invoice_number: extraction.invoice_number,
+            supplier_nif: extraction.supplier_nif,
+          }
+          if (extraction.document_kind === 'credit_note') {
+            await matchCreditNoteToInvoice(supabase, matchable)
+          } else {
+            await matchPendingCreditNotesToInvoice(supabase, matchable)
+          }
+        } catch (e) {
+          console.warn('credit-note match (whatsapp) failed:', e)
+        }
 
         let response = '✅ Fatura recebida!'
         if (extraction.supplier_name) {

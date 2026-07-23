@@ -200,6 +200,14 @@ export function InvoiceTable({
                   <TableCell>
                     <Link href={`/faturas/${inv.id}`} className="block">
                       <div className="flex items-center gap-2">
+                        {inv.document_kind === "credit_note" && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40"
+                          >
+                            NC
+                          </Badge>
+                        )}
                         <span className="font-medium truncate">
                           {inv.supplier_name ?? "Fornecedor desconhecido"}
                         </span>

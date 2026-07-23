@@ -39,6 +39,14 @@ export type InvoiceDetail = {
   at_communicated: boolean
   at_communicated_at: string | null
   project: { id: string; name: string; color: string } | null
+  // Notas de credito (NCF)
+  document_kind: "invoice" | "credit_note"
+  related_invoice_id: string | null
+  referenced_document_number: string | null
+  // Fatura original que esta nota de credito credita (quando ligada)
+  related_invoice: { id: string; invoice_number: string | null; supplier_name: string | null } | null
+  // Notas de credito que apontam para esta fatura (quando e' uma fatura)
+  credit_notes: Array<{ id: string; invoice_number: string | null; total: number | null }>
   created_at: string
   updated_at: string
 }
@@ -75,6 +83,49 @@ export async function getInvoiceDetail(
     }
   }
 
+  const documentKind =
+    (invoice as { document_kind?: string | null }).document_kind === "credit_note"
+      ? "credit_note"
+      : "invoice"
+  const relatedInvoiceId =
+    (invoice as { related_invoice_id?: string | null }).related_invoice_id ?? null
+  const referencedDocumentNumber =
+    (invoice as { referenced_document_number?: string | null }).referenced_document_number ?? null
+
+  // Nota de credito -> a fatura original que credita
+  let relatedInvoice: InvoiceDetail["related_invoice"] = null
+  if (documentKind === "credit_note" && relatedInvoiceId) {
+    const { data: orig } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, supplier_name")
+      .eq("id", relatedInvoiceId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle()
+    if (orig) {
+      relatedInvoice = {
+        id: orig.id,
+        invoice_number: orig.invoice_number,
+        supplier_name: orig.supplier_name,
+      }
+    }
+  }
+
+  // Fatura -> notas de credito que apontam para ela
+  let creditNotes: InvoiceDetail["credit_notes"] = []
+  if (documentKind === "invoice") {
+    const { data: cns } = await supabase
+      .from("invoices")
+      .select("id, invoice_number, total")
+      .eq("tenant_id", tenantId)
+      .eq("related_invoice_id", invoice.id)
+      .eq("document_kind", "credit_note")
+    creditNotes = (cns ?? []).map((c) => ({
+      id: c.id,
+      invoice_number: c.invoice_number,
+      total: c.total !== null ? Number(c.total) : null,
+    }))
+  }
+
   return {
     id: invoice.id,
     type: (invoice.type ?? "incoming") as InvoiceType,
@@ -108,6 +159,11 @@ export async function getInvoiceDetail(
     at_communicated: invoice.at_communicated ?? false,
     at_communicated_at: invoice.at_communicated_at,
     project,
+    document_kind: documentKind,
+    related_invoice_id: relatedInvoiceId,
+    referenced_document_number: referencedDocumentNumber,
+    related_invoice: relatedInvoice,
+    credit_notes: creditNotes,
     created_at: invoice.created_at ?? new Date().toISOString(),
     updated_at: invoice.updated_at ?? new Date().toISOString(),
   }

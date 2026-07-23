@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { Database } from "@/types/supabase"
 import { extractInvoiceData } from "@/lib/claude/extract-invoice"
 import type { InvoiceFileType } from "@/lib/claude/extract-invoice"
+import {
+  matchCreditNoteToInvoice,
+  matchPendingCreditNotesToInvoice,
+} from "@/lib/utils/credit-note-match"
 
 const BUCKET = process.env.INVOICE_FILES_BUCKET ?? "invoice-files"
 const MAX_AI_ATTEMPTS = 20
@@ -95,6 +99,8 @@ export async function reprocessInvoice(
       currency: extraction.currency,
       description: extraction.description,
       category: extraction.category,
+      document_kind: extraction.document_kind,
+      referenced_document_number: extraction.referenced_document_number,
       ai_confidence: extraction.confidence,
       ai_raw_response: extraction as never,
       ai_processed_at: now,
@@ -107,6 +113,25 @@ export async function reprocessInvoice(
 
   if (updateErr) {
     return { invoiceId, ok: false, supplierName: null, confidence: 0, error: `DB: ${updateErr.message}` }
+  }
+
+  // Matching FC<->NCF apos a (re)classificacao (nao bloqueia o resultado).
+  try {
+    const matchable = {
+      id: invoiceId,
+      tenant_id: tenantId,
+      document_kind: extraction.document_kind,
+      referenced_document_number: extraction.referenced_document_number,
+      invoice_number: extraction.invoice_number,
+      supplier_nif: extraction.supplier_nif,
+    }
+    if (extraction.document_kind === "credit_note") {
+      await matchCreditNoteToInvoice(supabase, matchable)
+    } else {
+      await matchPendingCreditNotesToInvoice(supabase, matchable)
+    }
+  } catch {
+    // best-effort: uma falha de matching nao invalida a reprocessamento
   }
 
   return { invoiceId, ok: true, supplierName: extraction.supplier_name, confidence: extraction.confidence }

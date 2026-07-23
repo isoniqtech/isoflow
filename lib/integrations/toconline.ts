@@ -105,6 +105,31 @@ export async function fetchSalesDocuments(
 }
 
 // ---------------------------------------------------------------------------
+// Receita liquida de notas de credito (Fase 2)
+// receita = soma(FR + FT + FS) - soma(NC). NLD/NLC (lancamentos) e SHI (guia de
+// remessa) sao ignorados. Codigos SAF-T PT confirmados contra o TOConline real.
+// Os valores vem positivos no v1 (o sinal esta' no document_type).
+// ---------------------------------------------------------------------------
+
+const SALES_REVENUE_TYPES = new Set(["FR", "FT", "FS"])
+
+export function salesRevenueSign(documentType: string | null | undefined): number {
+  const t = (documentType ?? "").toUpperCase()
+  if (t === "NC") return -1
+  if (SALES_REVENUE_TYPES.has(t)) return 1
+  return 0
+}
+
+export function sumSalesRevenue(
+  docs: Array<{ document_type?: string | null; net_total?: number | null; subtotal?: number | null }>,
+): number {
+  return docs.reduce(
+    (sum, d) => sum + salesRevenueSign(d.document_type) * Number(d.net_total ?? d.subtotal ?? 0),
+    0,
+  )
+}
+
+// ---------------------------------------------------------------------------
 // e-Fatura list - endpoint especifico com filtros encodeados em duplas aspas.
 // Resposta vem como string JSON aninhada em .data que precisa de JSON.parse.
 // ---------------------------------------------------------------------------

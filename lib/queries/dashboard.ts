@@ -117,7 +117,7 @@ export async function getDashboardData(
     // Period invoices (for KPIs)
     supabase
       .from("invoices")
-      .select("id, total, subtotal, vat_amount, status, invoice_date, created_at, type")
+      .select("id, total, subtotal, vat_amount, status, invoice_date, created_at, type, document_kind")
       .eq("tenant_id", tenantId)
       .gte("invoice_date", startDate)
       .lte("invoice_date", endDate)
@@ -139,7 +139,7 @@ export async function getDashboardData(
     // Annual rows for chart
     supabase
       .from("invoices")
-      .select("invoice_date, total, subtotal, type")
+      .select("invoice_date, total, subtotal, type, document_kind")
       .eq("tenant_id", tenantId)
       .gte("invoice_date", `${year}-01-01`)
       .lte("invoice_date", `${year}-12-31`)
@@ -169,10 +169,20 @@ export async function getDashboardData(
   const periodList = periodInvoices ?? []
   const invoicesThisPeriod = periodList.length
 
+  // Valor liquido com sinal: a nota de credito (NCF nas compras, NC nas vendas)
+  // SUBTRAI. gasto = soma(FC) - soma(NCF); receita = soma(FR) - soma(NC).
+  // Ver migration 047 / handoff das notas de credito.
+  const signedNet = (i: {
+    document_kind?: string | null
+    subtotal?: number | string | null
+    total?: number | string | null
+  }) =>
+    (i.document_kind === "credit_note" ? -1 : 1) * Number(i.subtotal ?? i.total ?? 0)
+
   // Expenses without VAT: use subtotal for incoming (fallback quando nao ha snapshot)
   const expensesFromInvoices = periodList
     .filter((i) => i.type === "incoming")
-    .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+    .reduce((s, i) => s + signedNet(i), 0)
 
   // Revenue without VAT
   const cachedRevenue = tenantCache
@@ -199,7 +209,7 @@ export async function getDashboardData(
       expensesRaw += (snapshotExpenses.get(m) ?? 0)
       expensesRaw += periodList
         .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-        .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+        .reduce((s, i) => s + signedNet(i), 0)
     }
   } else {
     // Acumulado
@@ -208,7 +218,7 @@ export async function getDashboardData(
       expensesRaw += (snapshotExpenses.get(m) ?? 0)
       expensesRaw += periodList
         .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-        .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+        .reduce((s, i) => s + signedNet(i), 0)
     }
   }
 
@@ -224,7 +234,7 @@ export async function getDashboardData(
       useToconlineCache = true
     } else {
       revenueRaw = snapshotMap.get(month) ??
-        periodList.filter(i => i.type === "outgoing").reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+        periodList.filter(i => i.type === "outgoing").reduce((s, i) => s + signedNet(i), 0)
       if (snapshotMap.has(month)) useToconlineCache = true
     }
   } else if (mode === "trimestral") {
@@ -242,7 +252,7 @@ export async function getDashboardData(
         const ms = `${year}-${String(m).padStart(2, "0")}`
         revenueRaw += periodList
           .filter(i => i.type === "outgoing" && (i.invoice_date ?? "").startsWith(ms))
-          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+          .reduce((s, i) => s + signedNet(i), 0)
       }
     }
   } else {
@@ -258,7 +268,7 @@ export async function getDashboardData(
         const ms = `${year}-${String(m).padStart(2, "0")}`
         revenueRaw += periodList
           .filter(i => i.type === "outgoing" && (i.invoice_date ?? "").startsWith(ms))
-          .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+          .reduce((s, i) => s + signedNet(i), 0)
       }
     }
   }
@@ -434,17 +444,21 @@ function buildAnnualChart(
     const m = parseInt(row.invoice_date.slice(5, 7), 10)
     if (m < 1 || m > 12) continue
     const amount = Number(row.subtotal ?? row.total ?? 0)
+    // Nota de credito subtrai: gasto = soma(FC) - soma(NCF); receita = soma(FR) - soma(NC).
+    const sign =
+      (row as { document_kind?: string | null }).document_kind === "credit_note" ? -1 : 1
+    const signedAmount = sign * amount
     if (row.type === "incoming") {
-      result[m - 1].expenses += amount
+      result[m - 1].expenses += signedAmount
     } else if (row.type === "outgoing") {
       if (displayYear !== currentYear) {
         // Anos anteriores sem snapshot: fallback para faturas (evita dupla contagem com snapshots)
         if (!snapshotRevenue.has(m)) {
-          result[m - 1].revenue += amount
+          result[m - 1].revenue += signedAmount
         }
       } else if (!snapshotRevenue.has(m) && !(m === currentMonth && mode === "mensal")) {
         // Ano atual sem snapshot: fallback para faturas (evita dupla contagem com periodRevenue)
-        result[m - 1].revenue += amount
+        result[m - 1].revenue += signedAmount
       }
     }
     result[m - 1].count += 1
