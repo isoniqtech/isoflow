@@ -40,7 +40,6 @@ export async function GET(req: NextRequest) {
   try {
     const sales = await fetchDocsNetByDate(
       accessToken,
-      appBase,
       apiBase,
       "commercial_sales_documents",
       from,
@@ -49,7 +48,6 @@ export async function GET(req: NextRequest) {
     )
     const purchases = await fetchDocsNetByDate(
       accessToken,
-      appBase,
       apiBase,
       "commercial_purchases_documents",
       from,

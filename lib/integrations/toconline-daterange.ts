@@ -1,35 +1,32 @@
 /**
- * Leitura FIAVEL de documentos (vendas/compras) por intervalo de datas no
- * TOConline modo direto.
+ * Leitura de documentos (vendas/compras) por intervalo de datas no TOConline
+ * modo direto, com net_total fiavel.
  *
- * Porque: o endpoint v1 `/api/v1/commercial_{sales,purchases}_documents` REJEITA
- * date_from/date_to (400 JA010) e filter (400 JA000). A vista custom
- * `.../{segment}_list_for_invoices?filter="date BETWEEN..."` aceita datas mas so
- * traz gross_total (sem net_total). Como a receita/gastos sao em LIQUIDO,
- * listamos por data na vista custom e vamos buscar o net_total de cada documento
- * ao v1 por id.
- *
- * Confirmado contra dados reais (Revive Home, app13/api13, 2026-07-23):
- *  - list_for_invoices devolve document_id, document_type, date, gross_total
- *  - v1/{segment}/{id} devolve net_total
+ * Como: o endpoint v1 `/api/v1/commercial_{sales,purchases}_documents` devolve
+ * TODOS os documentos com net_total + date + document_type, e PAGINA com
+ * page[number]/page[size] (confirmado contra dados reais - Revive, 292 compras).
+ * Rejeita date_from/date_to e filter (400), por isso o filtro por data e' feito
+ * do lado do cliente. (A vista `_list_for_invoices` aceita datas mas nao tem
+ * net_total e ignora o filtro de data nas compras - nao serve.)
  */
 
 export type Segment = "commercial_sales_documents" | "commercial_purchases_documents"
 
-export interface DocByDate {
+export interface DocNet {
   id: number
   document_type: string
   date: string | null
-}
-
-export interface DocNet extends DocByDate {
   net_total: number
   gross_total: number
 }
 
+const PAGE_SIZE = 200
+const MAX_PAGES = 500 // salvaguarda (200 * 500 = 100k docs)
+
 function toArray(body: unknown): Array<Record<string, unknown>> {
   if (Array.isArray(body)) return body as Array<Record<string, unknown>>
   const obj = (body ?? {}) as Record<string, unknown>
+  if (Array.isArray(obj.data)) return obj.data as Array<Record<string, unknown>>
   if (typeof obj.data === "string") {
     try {
       const parsed = JSON.parse(obj.data) as unknown
@@ -40,155 +37,79 @@ function toArray(body: unknown): Array<Record<string, unknown>> {
       return []
     }
   }
-  if (Array.isArray(obj.data)) return obj.data as Array<Record<string, unknown>>
   return []
 }
 
 function flat(el: Record<string, unknown>): Record<string, unknown> {
-  const attrs = el.attributes
-  return attrs && typeof attrs === "object" && !Array.isArray(attrs)
-    ? { ...(attrs as Record<string, unknown>), id: el.id }
+  const a = el.attributes
+  return a && typeof a === "object" && !Array.isArray(a)
+    ? { id: el.id, ...(a as Record<string, unknown>) }
     : el
 }
 
 /**
- * Lista os documentos de um segmento num intervalo de datas (via list_for_invoices).
- * Devolve id + document_type + date (o gross_total nao e' fiavel em liquido).
+ * Todos os documentos de um segmento (paginacao v1 ate esgotar).
  */
-// O list_for_invoices limita (~10 docs por resposta, ordenados por data) e IGNORA
-// os parametros de paginacao (page[number]/page[size]). Por isso, em vez de
-// paginar, DIVIDIMOS o intervalo de datas recursivamente: se uma resposta vier no
-// limite, parte-se o intervalo ao meio e repete-se, ate cada troco vir abaixo do
-// limite. Robusto seja qual for o cap real.
-const PAGE_CAP_HINT = 10
-
-function addDaysISO(iso: string, days: number): string {
-  const dt = new Date(`${iso}T00:00:00Z`)
-  dt.setUTCDate(dt.getUTCDate() + days)
-  return dt.toISOString().slice(0, 10)
-}
-
-async function fetchListPage(
-  accessToken: string,
-  appBase: string,
-  segment: Segment,
-  from: string,
-  to: string,
-): Promise<DocByDate[]> {
-  const filter = encodeURIComponent(`"date BETWEEN '${from}' AND '${to}'"`)
-  const url = `${appBase.replace(/\/$/, "")}/api/${segment}_list_for_invoices?filter=${filter}`
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-  })
-  if (!res.ok) {
-    throw new Error(
-      `TOConline ${segment}_list_for_invoices ${res.status}: ${(await res.text()).slice(0, 200)}`,
-    )
-  }
-  const rows = toArray(await res.json()).map(flat)
-  const seen = new Set<number>()
-  const out: DocByDate[] = []
-  for (const r of rows) {
-    const id = Number(r.document_id ?? r.id ?? 0)
-    if (id > 0 && !seen.has(id)) {
-      seen.add(id)
-      out.push({
-        id,
-        document_type: String(r.document_type ?? ""),
-        date: (r.date as string | null) ?? null,
-      })
-    }
-  }
-  return out
-}
-
-export async function listDocsByDate(
-  accessToken: string,
-  appBase: string,
-  segment: Segment,
-  from: string,
-  to: string,
-): Promise<DocByDate[]> {
-  const page = await fetchListPage(accessToken, appBase, segment, from, to)
-
-  // Resposta no limite + intervalo com mais de 1 dia -> pode estar truncada: dividir.
-  if (page.length >= PAGE_CAP_HINT && from < to) {
-    const midTime = (Date.parse(`${from}T00:00:00Z`) + Date.parse(`${to}T00:00:00Z`)) / 2
-    let left = new Date(midTime).toISOString().slice(0, 10)
-    if (left < from) left = from
-    if (left >= to) left = addDaysISO(to, -1)
-    const rightStart = addDaysISO(left, 1)
-
-    const [a, b] = await Promise.all([
-      listDocsByDate(accessToken, appBase, segment, from, left),
-      listDocsByDate(accessToken, appBase, segment, rightStart, to),
-    ])
-    const seen = new Set<number>()
-    const merged: DocByDate[] = []
-    for (const d of [...a, ...b]) {
-      if (!seen.has(d.id)) {
-        seen.add(d.id)
-        merged.push(d)
-      }
-    }
-    return merged
-  }
-
-  return page
-}
-
-/** Vai buscar o net_total (e gross_total) de um documento ao v1 por id. */
-async function fetchDocNet(
+export async function fetchAllV1Docs(
   accessToken: string,
   apiBase: string,
   segment: Segment,
-  doc: DocByDate,
-): Promise<DocNet | null> {
-  const url = `${apiBase.replace(/\/$/, "")}/api/v1/${segment}/${doc.id}`
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-  })
-  if (!res.ok) return null
-  const body = (await res.json()) as Record<string, unknown>
-  const d = (body.data ?? body) as Record<string, unknown>
-  const attrs = (d.attributes ?? d) as Record<string, unknown>
-  const net = Number(attrs.net_total ?? attrs.subtotal ?? 0)
-  const gross = Number(attrs.gross_total ?? attrs.total ?? 0)
-  return { ...doc, net_total: net, gross_total: gross }
-}
+): Promise<DocNet[]> {
+  const out: DocNet[] = []
+  const seen = new Set<number>()
 
-async function inBatches<T, R>(
-  items: T[],
-  size: number,
-  fn: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const out: R[] = []
-  for (let i = 0; i < items.length; i += size) {
-    const batch = items.slice(i, i + size)
-    out.push(...(await Promise.all(batch.map(fn))))
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `${apiBase.replace(/\/$/, "")}/api/v1/${segment}?page%5Bnumber%5D=${page}&page%5Bsize%5D=${PAGE_SIZE}`
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    })
+    if (!res.ok) {
+      if (page === 1) {
+        throw new Error(`TOConline v1 ${segment} ${res.status}: ${(await res.text()).slice(0, 200)}`)
+      }
+      break
+    }
+    const rows = toArray(await res.json()).map(flat)
+    if (rows.length === 0) break
+
+    let added = 0
+    for (const r of rows) {
+      const id = Number(r.id ?? r.document_id ?? 0)
+      if (id > 0 && !seen.has(id)) {
+        seen.add(id)
+        out.push({
+          id,
+          document_type: String(r.document_type ?? ""),
+          date: (r.date as string | null) ?? null,
+          net_total: Number(r.net_total ?? r.subtotal ?? 0),
+          gross_total: Number(r.gross_total ?? r.total ?? 0),
+        })
+        added++
+      }
+    }
+    // Fim: pagina incompleta, ou pagina repetida (servidor ignora page[number]).
+    if (rows.length < PAGE_SIZE || added === 0) break
   }
+
   return out
 }
 
 /**
- * Documentos de um segmento num intervalo de datas, com net_total fiavel.
- * Opcionalmente filtra por tipos de documento (para reduzir chamadas ao v1).
+ * Documentos de um segmento num intervalo de datas (filtro por data e, opcional,
+ * por tipo, do lado do cliente). net_total fiavel do v1.
  */
 export async function fetchDocsNetByDate(
   accessToken: string,
-  appBase: string,
   apiBase: string,
   segment: Segment,
   from: string,
   to: string,
   onlyTypes?: Set<string>,
 ): Promise<DocNet[]> {
-  const listed = await listDocsByDate(accessToken, appBase, segment, from, to)
-  const relevant = onlyTypes
-    ? listed.filter((d) => onlyTypes.has(d.document_type.toUpperCase()))
-    : listed
-  const fetched = await inBatches(relevant, 5, (d) =>
-    fetchDocNet(accessToken, apiBase, segment, d),
-  )
-  return fetched.filter((d): d is DocNet => d !== null)
+  const all = await fetchAllV1Docs(accessToken, apiBase, segment)
+  return all.filter((d) => {
+    if (!d.date || d.date < from || d.date > to) return false
+    if (onlyTypes && !onlyTypes.has(d.document_type.toUpperCase())) return false
+    return true
+  })
 }
