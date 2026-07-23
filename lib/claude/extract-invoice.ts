@@ -94,6 +94,12 @@ export interface InvoiceExtraction {
     vat_rate: number
     total: number
   }>
+  // Tipo de documento: 'invoice' (fatura de compra normal) ou 'credit_note'
+  // (nota de credito do fornecedor -> NCF no ERP). Ver migration 047.
+  document_kind: "invoice" | "credit_note"
+  // Se for nota de credito e referir a fatura de origem, o numero dessa fatura
+  // (para ligar a NCF a fatura original na app). Senao null.
+  referenced_document_number: string | null
   confidence: number
   needs_review: boolean
   notes: string | null
@@ -124,6 +130,8 @@ Schema obrigatório:
   "description": string | null,
   "category": "transporte"|"alimentacao"|"tecnologia"|"servicos"|"material"|"combustivel"|"comunicacoes"|"alojamento"|"formacao"|"outro",
   "line_items": [{"description": string, "quantity": number, "unit_price": number, "vat_rate": number, "total": number}],
+  "document_kind": "invoice" | "credit_note",
+  "referenced_document_number": string | null,
   "confidence": number,
   "needs_review": boolean,
   "notes": string | null
@@ -136,7 +144,14 @@ Regras estritas:
 - Se um campo não for visível ou não confias → null.
 - Múltiplos IVAs → usar o predominante em vat_rate.
 - invoice_date e due_date no formato YYYY-MM-DD.
-- currency sempre "EUR".`
+- currency sempre "EUR".
+- document_kind: "credit_note" se o documento for uma NOTA DE CRÉDITO do fornecedor
+  (título "Nota de Crédito"/"NC", devolução/estorno, ou valores a crédito/negativos).
+  Caso contrário "invoice" (fatura ou fatura-recibo normal).
+- Todos os valores (subtotal, vat_amount, total) SEMPRE em POSITIVO, mesmo numa
+  nota de crédito. O tipo fica em document_kind, não no sinal.
+- referenced_document_number: só quando document_kind é "credit_note" E o documento
+  indica a fatura de origem a que se refere. Devolve o número dessa fatura. Senão null.`
 
 function getClient(config?: AnthropicConfig): Anthropic {
   const apiKey = config?.apiKey ?? process.env.ANTHROPIC_API_KEY
@@ -369,6 +384,8 @@ function parseExtractionResponse(text: string): InvoiceExtraction {
       description: null,
       category: null,
       line_items: [],
+      document_kind: "invoice",
+      referenced_document_number: null,
       confidence: 0,
       needs_review: true,
       notes: "Parsing JSON da resposta Claude falhou",
@@ -400,6 +417,8 @@ function parseExtractionResponse(text: string): InvoiceExtraction {
     line_items: Array.isArray(parsed.line_items)
       ? (parsed.line_items as InvoiceExtraction["line_items"])
       : [],
+    document_kind: parsed.document_kind === "credit_note" ? "credit_note" : "invoice",
+    referenced_document_number: stringOrNull(parsed.referenced_document_number),
     confidence,
     needs_review:
       typeof parsed.needs_review === "boolean"

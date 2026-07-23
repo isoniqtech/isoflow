@@ -117,7 +117,7 @@ export async function getDashboardData(
     // Period invoices (for KPIs)
     supabase
       .from("invoices")
-      .select("id, total, subtotal, vat_amount, status, invoice_date, created_at, type")
+      .select("id, total, subtotal, vat_amount, status, invoice_date, created_at, type, document_kind")
       .eq("tenant_id", tenantId)
       .gte("invoice_date", startDate)
       .lte("invoice_date", endDate)
@@ -139,7 +139,7 @@ export async function getDashboardData(
     // Annual rows for chart
     supabase
       .from("invoices")
-      .select("invoice_date, total, subtotal, type")
+      .select("invoice_date, total, subtotal, type, document_kind")
       .eq("tenant_id", tenantId)
       .gte("invoice_date", `${year}-01-01`)
       .lte("invoice_date", `${year}-12-31`)
@@ -169,10 +169,19 @@ export async function getDashboardData(
   const periodList = periodInvoices ?? []
   const invoicesThisPeriod = periodList.length
 
+  // Gasto liquido de uma fatura de compra: a nota de credito (NCF) SUBTRAI.
+  // gasto = soma(FC) - soma(NCF). Ver migration 047 / handoff das notas de credito.
+  const incomingNet = (i: {
+    document_kind?: string | null
+    subtotal?: number | string | null
+    total?: number | string | null
+  }) =>
+    (i.document_kind === "credit_note" ? -1 : 1) * Number(i.subtotal ?? i.total ?? 0)
+
   // Expenses without VAT: use subtotal for incoming (fallback quando nao ha snapshot)
   const expensesFromInvoices = periodList
     .filter((i) => i.type === "incoming")
-    .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+    .reduce((s, i) => s + incomingNet(i), 0)
 
   // Revenue without VAT
   const cachedRevenue = tenantCache
@@ -199,7 +208,7 @@ export async function getDashboardData(
       expensesRaw += (snapshotExpenses.get(m) ?? 0)
       expensesRaw += periodList
         .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-        .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+        .reduce((s, i) => s + incomingNet(i), 0)
     }
   } else {
     // Acumulado
@@ -208,7 +217,7 @@ export async function getDashboardData(
       expensesRaw += (snapshotExpenses.get(m) ?? 0)
       expensesRaw += periodList
         .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-        .reduce((s, i) => s + Number(i.subtotal ?? i.total ?? 0), 0)
+        .reduce((s, i) => s + incomingNet(i), 0)
     }
   }
 
@@ -435,7 +444,10 @@ function buildAnnualChart(
     if (m < 1 || m > 12) continue
     const amount = Number(row.subtotal ?? row.total ?? 0)
     if (row.type === "incoming") {
-      result[m - 1].expenses += amount
+      // Nota de credito (NCF) subtrai: gasto = soma(FC) - soma(NCF).
+      const sign =
+        (row as { document_kind?: string | null }).document_kind === "credit_note" ? -1 : 1
+      result[m - 1].expenses += sign * amount
     } else if (row.type === "outgoing") {
       if (displayYear !== currentYear) {
         // Anos anteriores sem snapshot: fallback para faturas (evita dupla contagem com snapshots)

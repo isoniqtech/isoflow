@@ -20,6 +20,11 @@ import {
 import { matchProjectFromTextWithAI } from "@/lib/utils/projects"
 import { log as auditLog } from "@/lib/utils/audit"
 import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
+import {
+  matchCreditNoteToInvoice,
+  matchPendingCreditNotesToInvoice,
+} from "@/lib/utils/credit-note-match"
+import { sendCreditNoteToERP } from "@/lib/toconline/send-ncf"
 
 type Client = SupabaseClient<Database>
 
@@ -294,6 +299,8 @@ export async function processEmailInvoice(
           description: subject,
           category: null,
           line_items: [],
+          document_kind: "invoice",
+          referenced_document_number: null,
           confidence: 0,
           needs_review: true,
           notes: `AI failed: ${msg}`,
@@ -350,6 +357,8 @@ export async function processEmailInvoice(
           currency: extraction.currency,
           description: extraction.description,
           category: extraction.category,
+          document_kind: extraction.document_kind,
+          referenced_document_number: extraction.referenced_document_number,
           sent_by: sender.name,
           sender_email: sender.email,
           file_path: filePath,
@@ -366,7 +375,7 @@ export async function processEmailInvoice(
             extraction.needs_review || extraction.confidence < 0.7,
           notes: extraction.notes,
         })
-        .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, total, currency, description, category, source, file_path")
+        .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, total, currency, description, category, source, file_path, document_kind, referenced_document_number")
         .single()
 
       if (insertErr || !inserted) {
@@ -389,14 +398,42 @@ export async function processEmailInvoice(
         continue
       }
 
-      // n8n forwarder — só envia se auto_erp_send estiver ativo e fatura não precisa revisão
+      // Matching FC<->NCF dentro da app (best-effort, nao bloqueia a ingestao)
+      try {
+        const matchable = {
+          id: inserted.id,
+          tenant_id: tenantId,
+          document_kind: inserted.document_kind,
+          referenced_document_number: inserted.referenced_document_number,
+          invoice_number: inserted.invoice_number,
+          supplier_nif: inserted.supplier_nif,
+        }
+        if (inserted.document_kind === "credit_note") {
+          await matchCreditNoteToInvoice(supabase, matchable)
+        } else {
+          await matchPendingCreditNotesToInvoice(supabase, matchable)
+        }
+      } catch (e) {
+        console.warn("credit-note match (email) failed:", e)
+      }
+
+      // Auto-send ao ERP se auto_erp_send ativo e fatura não precisa revisão.
+      // Notas de credito seguem o caminho NCF isolado; as faturas o caminho FC.
       let n8nForward: Awaited<ReturnType<typeof forwardInvoiceToN8N>> | null = null
       const needsReview = extraction.needs_review || extraction.confidence < 0.7
       if (tenant.auto_erp_send && !needsReview) {
-        try {
-          n8nForward = await forwardInvoiceToN8N(supabase, inserted.id, tenantId)
-        } catch (e) {
-          console.warn("n8n forward failed:", e)
+        if (inserted.document_kind === "credit_note") {
+          try {
+            await sendCreditNoteToERP(tenantId, inserted.id)
+          } catch (e) {
+            console.warn("NCF send (email) failed:", e)
+          }
+        } else {
+          try {
+            n8nForward = await forwardInvoiceToN8N(supabase, inserted.id, tenantId)
+          } catch (e) {
+            console.warn("n8n forward failed:", e)
+          }
         }
       }
 

@@ -165,7 +165,7 @@ export async function forwardInvoiceToN8N(
   const { data: invoice, error: invErr } = await admin
     .from("invoices")
     .select(
-      "id, tenant_id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, subtotal, vat_rate, vat_amount, total, currency, description, category, source, file_path, sent_by, sender_email, project_id, bank_transaction_id",
+      "id, tenant_id, document_kind, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, subtotal, vat_rate, vat_amount, total, currency, description, category, source, file_path, sent_by, sender_email, project_id, bank_transaction_id",
     )
     .eq("id", invoiceId)
     .eq("tenant_id", tenantId)
@@ -173,6 +173,12 @@ export async function forwardInvoiceToN8N(
 
   if (invErr || !invoice) {
     return { ok: false, error: invErr?.message ?? "Fatura não encontrada" }
+  }
+
+  // Notas de credito (NCF) nao seguem o caminho FC do n8n - tem workflow proprio.
+  // Saltar aqui garante que nenhum call site as empurra para o workflow FC (FINMED).
+  if ((invoice as { document_kind?: string | null }).document_kind === "credit_note") {
+    return { skipped: true, ok: true }
   }
 
   // Nota do movimento bancario conciliado (se houver)

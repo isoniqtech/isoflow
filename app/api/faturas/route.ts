@@ -5,6 +5,11 @@ import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { log } from "@/lib/utils/audit"
 import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
+import {
+  matchCreditNoteToInvoice,
+  matchPendingCreditNotesToInvoice,
+} from "@/lib/utils/credit-note-match"
+import { autoSendCreditNoteIfEnabled } from "@/lib/toconline/send-ncf"
 
 async function autoSendToERP(invoiceId: string, tenantId: string) {
   try {
@@ -108,6 +113,10 @@ const invoiceInputSchema = z.object({
     .nullable(),
   notes: z.string().trim().max(2000).optional().nullable(),
   needs_review: z.boolean().default(false),
+  // Tipo de documento: fatura (FC) ou nota de credito de fornecedor (NCF). Ver migration 047.
+  document_kind: z.enum(["invoice", "credit_note"]).default("invoice"),
+  // So relevante em notas de credito: numero da fatura original que a NCF credita.
+  referenced_document_number: z.string().trim().max(100).optional().nullable(),
 })
 
 export async function GET() {
@@ -192,6 +201,8 @@ export async function POST(req: Request) {
       category: input.category ?? null,
       notes: input.notes ?? null,
       needs_review: input.needs_review,
+      document_kind: input.document_kind,
+      referenced_document_number: input.referenced_document_number ?? null,
       created_by: ctx.userId,
     })
     .select("*")
@@ -214,7 +225,19 @@ export async function POST(req: Request) {
     },
   })
 
-  // n8n forwarder (fire-and-forget — não bloqueia a resposta da API)
+  // Matching FC<->NCF dentro da app (nao bloqueia a criacao)
+  try {
+    if (invoice.document_kind === "credit_note") {
+      await matchCreditNoteToInvoice(supabase, invoice)
+    } else {
+      await matchPendingCreditNotesToInvoice(supabase, invoice)
+    }
+  } catch (e) {
+    console.warn("credit-note match (manual upload) failed:", e)
+  }
+
+  // n8n forwarder (fire-and-forget — não bloqueia a resposta da API).
+  // forwardInvoiceToN8N salta notas de credito (vao pelo caminho NCF dedicado).
   try {
     const admin = createAdminClient()
     void forwardInvoiceToN8N(admin, invoice.id, ctx.tenantId)
@@ -222,9 +245,14 @@ export async function POST(req: Request) {
     console.warn("n8n forward (manual upload) failed:", e)
   }
 
-  // Auto-send ao ERP se tenant tiver a opção activada e fatura não precisar revisão
+  // Auto-send ao ERP se tenant tiver a opção activada e fatura não precisar revisão.
   if (!invoice.needs_review && invoice.type === "incoming") {
-    void autoSendToERP(invoice.id, ctx.tenantId)
+    if (invoice.document_kind === "credit_note") {
+      // Caminho NCF isolado (independente do FC - Opcao A).
+      void autoSendCreditNoteIfEnabled(ctx.tenantId, invoice.id)
+    } else {
+      void autoSendToERP(invoice.id, ctx.tenantId)
+    }
   }
 
   return Response.json({ data: invoice }, { status: 201 })

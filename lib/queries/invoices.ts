@@ -21,6 +21,7 @@ export type InvoiceListItem = {
   source: InvoiceSource
   type: "incoming" | "outgoing"
   category: string | null
+  document_kind: "invoice" | "credit_note"
   needs_review: boolean
   at_communicated: boolean
   efatura_at_status: string | null
@@ -58,7 +59,7 @@ export type ProjectOption = {
 }
 
 const SELECT_FIELDS =
-  "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, type, category, needs_review, at_communicated, erp_synced, erp_document_id, toconline_fc_id, bank_transaction_id, project_id, created_at, efatura_documents(at_status)"
+  "id, supplier_name, supplier_nif, invoice_number, invoice_date, due_date, total, currency, status, source, type, category, document_kind, needs_review, at_communicated, erp_synced, erp_document_id, toconline_fc_id, bank_transaction_id, project_id, created_at, efatura_documents(at_status)"
 
 const PAGE_SIZE = 50
 
@@ -80,6 +81,8 @@ function mapRow(
     source: ((r.source as string) ?? "manual") as InvoiceSource,
     type: ((r.type as string) ?? "incoming") as "incoming" | "outgoing",
     category: (r.category as string | null) ?? null,
+    document_kind:
+      (r.document_kind as string | null) === "credit_note" ? "credit_note" : "invoice",
     needs_review: (r.needs_review as boolean) ?? false,
     at_communicated: (r.at_communicated as boolean) ?? false,
     efatura_at_status: (() => {

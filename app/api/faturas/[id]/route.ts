@@ -53,6 +53,10 @@ const invoiceUpdateSchema = z
     notes: z.string().trim().max(2000).nullable(),
     expense_category_code: z.string().trim().max(32).nullable(),
     needs_review: z.boolean(),
+    // Notas de credito (NCF). Reclassificar so antes do envio ao ERP.
+    document_kind: z.enum(["invoice", "credit_note"]),
+    related_invoice_id: z.string().uuid().nullable(),
+    referenced_document_number: z.string().trim().max(100).nullable(),
   })
   .partial()
 
@@ -107,9 +111,10 @@ export async function PATCH(
 
   const supabase = createClient()
 
-  // A categoria de gasto nao pode mudar depois de a fatura ir para o ERP: o
-  // documento ja' esta' lancado na contabilidade e mudar aqui criaria divergencia.
-  if ("expense_category_code" in parsed.data) {
+  // Campos que nao podem mudar depois de a fatura/NCF ir para o ERP: o documento
+  // ja' esta' lancado na contabilidade e mudar aqui criaria divergencia.
+  const locksAfterErp = "expense_category_code" in parsed.data || "document_kind" in parsed.data
+  if (locksAfterErp) {
     const { data: atual } = await supabase
       .from("invoices")
       .select("erp_synced, toconline_fc_id")
@@ -122,10 +127,27 @@ export async function PATCH(
       Boolean((atual as { toconline_fc_id?: string | null } | null)?.toconline_fc_id)
 
     if (jaEnviada) {
+      const campo =
+        "document_kind" in parsed.data
+          ? "o tipo de documento (fatura/nota de credito)"
+          : "a categoria de gasto"
       return jsonError(
-        "Fatura ja enviada para o ERP: a categoria de gasto nao pode ser alterada",
+        `Documento ja enviado para o ERP: ${campo} nao pode ser alterado`,
         409,
       )
+    }
+  }
+
+  // Associar manualmente a uma fatura original: validar que existe e e' do tenant.
+  if (parsed.data.related_invoice_id) {
+    const { data: original } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("id", parsed.data.related_invoice_id)
+      .eq("tenant_id", ctx.tenantId)
+      .maybeSingle()
+    if (!original) {
+      return jsonError("A fatura a associar nao existe neste tenant", 400)
     }
   }
 

@@ -63,6 +63,7 @@ const editSchema = z.object({
     .nullable(),
   notes: z.string().max(2000),
   project_id: z.string().uuid().nullable().or(z.literal("")).nullable(),
+  document_kind: z.enum(["invoice", "credit_note"]),
 })
 
 type EditForm = z.infer<typeof editSchema>
@@ -179,6 +180,7 @@ export function InvoiceDetail({
         category: values.category || null,
         notes: values.notes || null,
         project_id: values.project_id || null,
+        document_kind: values.document_kind,
       }
 
       const res = await fetch(`/api/faturas/${invoice.id}`, {
@@ -288,6 +290,18 @@ export function InvoiceDetail({
 
         {/* Secção de estados */}
         <div className="flex flex-wrap gap-2">
+          {invoice.document_kind === "credit_note" ? (
+            <Badge
+              variant="outline"
+              className="bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/20 dark:text-amber-200 dark:border-amber-900/40"
+            >
+              Nota de crédito
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground">
+              Fatura
+            </Badge>
+          )}
           <StatusBadge status={invoice.status} />
           {invoice.erp_synced ? (
             <Badge
@@ -315,6 +329,8 @@ export function InvoiceDetail({
           )}
         </div>
 
+        {!editing && <CreditNoteSection invoice={invoice} canEdit={canEdit} />}
+
         {editing ? (
           <InvoiceEditForm control={control} errors={errors} projects={projects} projectsLoading={projectsLoading} />
         ) : (
@@ -322,6 +338,219 @@ export function InvoiceDetail({
         )}
       </div>
     </div>
+  )
+}
+
+type Candidate = { id: string; invoice_number: string | null; supplier_name: string | null }
+
+function CreditNoteSection({
+  invoice,
+  canEdit,
+}: {
+  invoice: InvoiceDetailType
+  canEdit: boolean
+}) {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  const [picking, setPicking] = useState(false)
+  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [loadingCandidates, setLoadingCandidates] = useState(false)
+
+  const isCreditNote = invoice.document_kind === "credit_note"
+  const jaEnviada = invoice.erp_synced || invoice.status === "enviada_erp"
+
+  async function patch(payload: Record<string, unknown>, successMsg: string) {
+    setBusy(true)
+    try {
+      const res = await fetch(`/api/faturas/${invoice.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error("Não foi possível guardar", { description: body.error ?? `HTTP ${res.status}` })
+        return
+      }
+      toast.success(successMsg)
+      setPicking(false)
+      router.refresh()
+    } catch (e) {
+      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function sendToErp() {
+    setBusy(true)
+    try {
+      const res = await fetch("/api/faturas/create-ncf", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ invoice_ids: [invoice.id] }),
+      })
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error("Falha ao enviar ao ERP", {
+          description: body.details ?? body.error ?? `HTTP ${res.status}`,
+          duration: 10000,
+        })
+        return
+      }
+      toast.success(
+        body.skipped ? "Nota de crédito já estava no ERP" : "Nota de crédito enviada ao ERP",
+      )
+      router.refresh()
+    } catch (e) {
+      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function openPicker() {
+    setPicking(true)
+    if (candidates.length === 0) {
+      setLoadingCandidates(true)
+      fetch("/api/faturas")
+        .then((r) => r.json())
+        .then((body) => {
+          const list = (body.data ?? []) as Array<Record<string, unknown>>
+          setCandidates(
+            list
+              .filter(
+                (i) =>
+                  (i.document_kind ?? "invoice") === "invoice" && i.id !== invoice.id,
+              )
+              .map((i) => ({
+                id: String(i.id),
+                invoice_number: (i.invoice_number as string | null) ?? null,
+                supplier_name: (i.supplier_name as string | null) ?? null,
+              })),
+          )
+        })
+        .catch(() => {})
+        .finally(() => setLoadingCandidates(false))
+    }
+  }
+
+  // So mostrar a secção quando ha algo a dizer: e' nota de credito, ou e' uma
+  // fatura com notas de credito associadas.
+  if (!isCreditNote && invoice.credit_notes.length === 0) return null
+
+  return (
+    <Card className={isCreditNote ? "border-amber-200 dark:border-amber-900/40" : undefined}>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium">
+          {isCreditNote ? "Nota de crédito" : "Notas de crédito associadas"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {isCreditNote ? (
+          <>
+            {invoice.related_invoice ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-muted-foreground">Fatura original</span>
+                <a
+                  href={`/faturas/${invoice.related_invoice.id}`}
+                  className="font-medium text-primary hover:underline text-right"
+                >
+                  {invoice.related_invoice.invoice_number ?? "ver fatura"}
+                </a>
+              </div>
+            ) : (
+              <div className="rounded-md border border-dashed border-amber-300 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-900/10 px-3 py-2">
+                <p className="font-medium text-amber-900 dark:text-amber-200">Por associar</p>
+                {invoice.referenced_document_number && (
+                  <p className="text-xs text-muted-foreground">
+                    Refere a fatura {invoice.referenced_document_number}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {canEdit && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {invoice.related_invoice ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => patch({ related_invoice_id: null }, "Associação removida")}
+                  >
+                    Desassociar
+                  </Button>
+                ) : (
+                  <Button variant="outline" size="sm" disabled={busy} onClick={openPicker}>
+                    Associar a fatura
+                  </Button>
+                )}
+                {!jaEnviada && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() =>
+                      patch({ document_kind: "invoice" }, "Reclassificado como fatura")
+                    }
+                  >
+                    Reclassificar como fatura
+                  </Button>
+                )}
+                {!jaEnviada && (
+                  <Button size="sm" disabled={busy} onClick={sendToErp}>
+                    {busy && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
+                    Enviar ao ERP
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {picking && (
+              <div className="flex flex-col gap-2 pt-1">
+                <Select
+                  onValueChange={(v) =>
+                    patch({ related_invoice_id: v }, "Nota de crédito associada")
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue
+                      placeholder={loadingCandidates ? "A carregar…" : "Escolher fatura"}
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {candidates.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {(c.invoice_number ?? "sem nº") + " · " + (c.supplier_name ?? "—")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <ul className="space-y-1">
+              {invoice.credit_notes.map((cn) => (
+                <li key={cn.id} className="flex items-center justify-between gap-2">
+                  <a
+                    href={`/faturas/${cn.id}`}
+                    className="text-primary hover:underline truncate"
+                  >
+                    {cn.invoice_number ?? "Nota de crédito"}
+                  </a>
+                  <span className="tabular-nums text-muted-foreground">
+                    {cn.total !== null ? "-" + formatCurrency(cn.total) : "—"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -340,6 +569,7 @@ function toFormValues(invoice: InvoiceDetailType): EditForm {
     category: (invoice.category as EditForm["category"]) ?? null,
     notes: invoice.notes ?? "",
     project_id: invoice.project?.id ?? null,
+    document_kind: invoice.document_kind,
   }
 }
 
@@ -443,6 +673,25 @@ function InvoiceEditForm({
 }) {
   return (
     <div className="space-y-3">
+      <div className="space-y-1">
+        <Label htmlFor="document_kind">Tipo de documento</Label>
+        <Controller
+          control={control}
+          name="document_kind"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger id="document_kind">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="invoice">Fatura</SelectItem>
+                <SelectItem value="credit_note">Nota de crédito</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </div>
+
       <div className="space-y-1">
         <Label htmlFor="project_id">Projeto</Label>
         <Controller

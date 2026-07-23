@@ -71,7 +71,10 @@ export async function POST() {
   for (const doc of allPurchases) {
     const key = doc.date?.slice(0, 7)
     if (!key || key.length !== 7) continue
-    purchasesByMonth.set(key, (purchasesByMonth.get(key) ?? 0) + Number(doc.net_total ?? doc.subtotal ?? 0))
+    // gasto = soma(FC) - soma(NCF): a nota de credito de fornecedor subtrai.
+    const net = Number(doc.net_total ?? doc.subtotal ?? 0)
+    const sign = doc.document_type === "NCF" || doc.document_type === "NLCF" ? -1 : 1
+    purchasesByMonth.set(key, (purchasesByMonth.get(key) ?? 0) + sign * net)
   }
 
   // Todos os meses desde Jan/2025 ate ao mes atual
