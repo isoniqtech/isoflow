@@ -55,7 +55,20 @@ function flat(el: Record<string, unknown>): Record<string, unknown> {
  * Lista os documentos de um segmento num intervalo de datas (via list_for_invoices).
  * Devolve id + document_type + date (o gross_total nao e' fiavel em liquido).
  */
-export async function listDocsByDate(
+// O list_for_invoices limita (~10 docs por resposta, ordenados por data) e IGNORA
+// os parametros de paginacao (page[number]/page[size]). Por isso, em vez de
+// paginar, DIVIDIMOS o intervalo de datas recursivamente: se uma resposta vier no
+// limite, parte-se o intervalo ao meio e repete-se, ate cada troco vir abaixo do
+// limite. Robusto seja qual for o cap real.
+const PAGE_CAP_HINT = 10
+
+function addDaysISO(iso: string, days: number): string {
+  const dt = new Date(`${iso}T00:00:00Z`)
+  dt.setUTCDate(dt.getUTCDate() + days)
+  return dt.toISOString().slice(0, 10)
+}
+
+async function fetchListPage(
   accessToken: string,
   appBase: string,
   segment: Segment,
@@ -63,48 +76,65 @@ export async function listDocsByDate(
   to: string,
 ): Promise<DocByDate[]> {
   const filter = encodeURIComponent(`"date BETWEEN '${from}' AND '${to}'"`)
-  const base = `${appBase.replace(/\/$/, "")}/api/${segment}_list_for_invoices?filter=${filter}`
-
-  // O endpoint pagina/limita (~10 por pagina). Percorrer as paginas com dedup por
-  // id: paramos quando uma pagina nao traz nenhum id novo (robusto tanto se o
-  // servidor respeitar page[number] como se o ignorar).
+  const url = `${appBase.replace(/\/$/, "")}/api/${segment}_list_for_invoices?filter=${filter}`
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+  })
+  if (!res.ok) {
+    throw new Error(
+      `TOConline ${segment}_list_for_invoices ${res.status}: ${(await res.text()).slice(0, 200)}`,
+    )
+  }
+  const rows = toArray(await res.json()).map(flat)
   const seen = new Set<number>()
   const out: DocByDate[] = []
-  const MAX_PAGES = 200
-
-  for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = `${base}&page%5Bnumber%5D=${page}&page%5Bsize%5D=200`
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-    })
-    if (!res.ok) {
-      if (page === 1) {
-        throw new Error(
-          `TOConline ${segment}_list_for_invoices ${res.status}: ${(await res.text()).slice(0, 200)}`,
-        )
-      }
-      break // paginas seguintes: parar no primeiro erro
+  for (const r of rows) {
+    const id = Number(r.document_id ?? r.id ?? 0)
+    if (id > 0 && !seen.has(id)) {
+      seen.add(id)
+      out.push({
+        id,
+        document_type: String(r.document_type ?? ""),
+        date: (r.date as string | null) ?? null,
+      })
     }
-    const rows = toArray(await res.json()).map(flat)
-    if (rows.length === 0) break
+  }
+  return out
+}
 
-    let added = 0
-    for (const r of rows) {
-      const id = Number(r.document_id ?? r.id ?? 0)
-      if (id > 0 && !seen.has(id)) {
-        seen.add(id)
-        out.push({
-          id,
-          document_type: String(r.document_type ?? ""),
-          date: (r.date as string | null) ?? null,
-        })
-        added++
+export async function listDocsByDate(
+  accessToken: string,
+  appBase: string,
+  segment: Segment,
+  from: string,
+  to: string,
+): Promise<DocByDate[]> {
+  const page = await fetchListPage(accessToken, appBase, segment, from, to)
+
+  // Resposta no limite + intervalo com mais de 1 dia -> pode estar truncada: dividir.
+  if (page.length >= PAGE_CAP_HINT && from < to) {
+    const midTime = (Date.parse(`${from}T00:00:00Z`) + Date.parse(`${to}T00:00:00Z`)) / 2
+    let left = new Date(midTime).toISOString().slice(0, 10)
+    if (left < from) left = from
+    if (left >= to) left = addDaysISO(to, -1)
+    const rightStart = addDaysISO(left, 1)
+
+    const [a, b] = await Promise.all([
+      listDocsByDate(accessToken, appBase, segment, from, left),
+      listDocsByDate(accessToken, appBase, segment, rightStart, to),
+    ])
+    const seen = new Set<number>()
+    const merged: DocByDate[] = []
+    for (const d of [...a, ...b]) {
+      if (!seen.has(d.id)) {
+        seen.add(d.id)
+        merged.push(d)
       }
     }
-    if (added === 0) break // sem ids novos -> fim (ou servidor ignora paginacao)
+    return merged
   }
 
-  return out
+  return page
 }
 
 /** Vai buscar o net_total (e gross_total) de um documento ao v1 por id. */
