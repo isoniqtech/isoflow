@@ -2,7 +2,12 @@ import { timingSafeEqual } from "crypto"
 import { createClient } from "@/lib/supabase/server"
 import { decryptOptional } from "@/lib/utils/encryption"
 import { fetchSalesDocuments, sumSalesRevenue } from "@/lib/integrations/toconline"
+import { fetchDocsNetByDate } from "@/lib/integrations/toconline-daterange"
 import { getValidToken } from "@/lib/toconline/token"
+
+// Tipos de venda que contam para a receita (a somar/subtrair). Os restantes
+// (NLD/NLC/SHI) sao ignorados; filtrar aqui reduz as chamadas ao v1 por id.
+const REVENUE_TYPES = new Set(["FR", "FT", "FS", "NC"])
 
 function verifySecret(header: string | null): boolean {
   const secret = process.env.CRON_SECRET
@@ -72,12 +77,14 @@ export async function POST(req: Request) {
 
       let accessToken: string
       let baseUrl: string
+      let appBase = ""
 
       if (mode === "toconline_direct") {
         // Modo direto: refresh OAuth automático
         const tokenConfig = await getValidToken(integration.tenant_id)
         accessToken = tokenConfig.accessToken
         baseUrl = tokenConfig.apiBase
+        appBase = tokenConfig.appBase
       } else {
         // Modo n8n: usa token armazenado diretamente
         const stored = decryptOptional(integration.api_key_encrypted)
@@ -89,13 +96,27 @@ export async function POST(req: Request) {
         baseUrl = config.base_url ?? "https://app.toconline.pt"
       }
 
+      // Leitura de vendas por data. No modo direto o v1 rejeita date_from/date_to,
+      // por isso usa-se o leitor list_for_invoices + net_total do v1 (por id).
+      const salesTotalForRange = async (from: string, to: string): Promise<number> => {
+        const docs =
+          mode === "toconline_direct"
+            ? await fetchDocsNetByDate(
+                accessToken,
+                appBase,
+                baseUrl,
+                "commercial_sales_documents",
+                from,
+                to,
+                REVENUE_TYPES,
+              )
+            : await fetchSalesDocuments(accessToken, baseUrl, { dateFrom: from, dateTo: to })
+        // receita = soma(FR+FT+FS) - soma(NC); NLD/NLC/SHI ignorados.
+        return Math.round(sumSalesRevenue(docs) * 100) / 100
+      }
+
       // Mês corrente
-      const currentDocs = await fetchSalesDocuments(accessToken, baseUrl, {
-        dateFrom: currentDateFrom,
-        dateTo: currentDateTo,
-      })
-      // receita = soma(FR+FT+FS) - soma(NC); NLD/NLC/SHI ignorados.
-      const currentTotal = Math.round(sumSalesRevenue(currentDocs) * 100) / 100
+      const currentTotal = await salesTotalForRange(currentDateFrom, currentDateTo)
 
       await Promise.all([
         supabase
@@ -121,11 +142,7 @@ export async function POST(req: Request) {
 
       if (isFirstOfMonth) {
         // Dia 1: buscar mês anterior completo para snapshot definitivo
-        const prevDocs = await fetchSalesDocuments(accessToken, baseUrl, {
-          dateFrom: prevDateFrom,
-          dateTo: prevDateTo,
-        })
-        prevTotal = Math.round(sumSalesRevenue(prevDocs) * 100) / 100
+        prevTotal = await salesTotalForRange(prevDateFrom, prevDateTo)
 
         await supabase
           .from("monthly_snapshots")

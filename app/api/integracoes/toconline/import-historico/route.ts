@@ -5,10 +5,12 @@ import { createServiceClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
 import { getValidToken } from "@/lib/toconline/token"
 import {
-  fetchSalesDocuments,
-  fetchPurchaseDocuments,
   salesRevenueSign,
+  purchaseExpenseSign,
+  REVENUE_DOC_TYPES,
+  EXPENSE_DOC_TYPES_ALL,
 } from "@/lib/integrations/toconline"
+import { fetchDocsNetByDate, type DocNet } from "@/lib/integrations/toconline-daterange"
 
 export const maxDuration = 120
 
@@ -42,18 +44,20 @@ export async function POST() {
     )
   }
 
-  const { accessToken, apiBase } = tokenConfig
+  const { accessToken, apiBase, appBase } = tokenConfig
   const now = new Date()
 
-  // Buscar todos os documentos de uma vez (sem filtro de data - API nao suporta date_from/date_to)
-  // apiBase = https://api13.toconline.pt (confirmar com workflow n8n)
-  let allSales: Awaited<ReturnType<typeof fetchSalesDocuments>> = []
-  let allPurchases: Awaited<ReturnType<typeof fetchPurchaseDocuments>> = []
+  // Leitura por data: o v1 rejeita date_from/date_to, por isso lista-se por data
+  // via list_for_invoices e vai-se buscar o net_total de cada doc ao v1 (por id).
+  const rangeFrom = "2025-01-01"
+  const rangeTo = now.toISOString().slice(0, 10)
+  let allSales: DocNet[] = []
+  let allPurchases: DocNet[] = []
 
   try {
     ;[allSales, allPurchases] = await Promise.all([
-      fetchSalesDocuments(accessToken, apiBase),
-      fetchPurchaseDocuments(accessToken, apiBase),
+      fetchDocsNetByDate(accessToken, appBase, apiBase, "commercial_sales_documents", rangeFrom, rangeTo, REVENUE_DOC_TYPES),
+      fetchDocsNetByDate(accessToken, appBase, apiBase, "commercial_purchases_documents", rangeFrom, rangeTo, EXPENSE_DOC_TYPES_ALL),
     ])
   } catch (e) {
     return NextResponse.json(
@@ -71,16 +75,19 @@ export async function POST() {
     const key = doc.date?.slice(0, 7) // "YYYY-MM"
     if (!key || key.length !== 7) continue
     // receita = soma(FR+FT+FS) - soma(NC); NLD/NLC/SHI ignorados.
-    const net = Number(doc.net_total ?? doc.subtotal ?? 0)
-    salesByMonth.set(key, (salesByMonth.get(key) ?? 0) + salesRevenueSign(doc.document_type) * net)
+    salesByMonth.set(
+      key,
+      (salesByMonth.get(key) ?? 0) + salesRevenueSign(doc.document_type) * doc.net_total,
+    )
   }
   for (const doc of allPurchases) {
     const key = doc.date?.slice(0, 7)
     if (!key || key.length !== 7) continue
-    // gasto = soma(FC) - soma(NCF): a nota de credito de fornecedor subtrai.
-    const net = Number(doc.net_total ?? doc.subtotal ?? 0)
-    const sign = doc.document_type === "NCF" || doc.document_type === "NLCF" ? -1 : 1
-    purchasesByMonth.set(key, (purchasesByMonth.get(key) ?? 0) + sign * net)
+    // gasto = soma(FC/DSP) - soma(NCF); NLDF/NLCF ignorados.
+    purchasesByMonth.set(
+      key,
+      (purchasesByMonth.get(key) ?? 0) + purchaseExpenseSign(doc.document_type) * doc.net_total,
+    )
   }
 
   // Todos os meses desde Jan/2025 ate ao mes atual
