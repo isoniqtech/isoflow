@@ -4,7 +4,11 @@ import { createClient } from "@/lib/supabase/server"
 import { createServiceClient } from "@/lib/supabase/server"
 import { hasPermission } from "@/lib/utils/permissions"
 import { getValidToken } from "@/lib/toconline/token"
-import { fetchSalesDocuments, fetchPurchaseDocuments } from "@/lib/integrations/toconline"
+import {
+  fetchSalesDocuments,
+  fetchPurchaseDocuments,
+  salesRevenueSign,
+} from "@/lib/integrations/toconline"
 
 export const maxDuration = 120
 
@@ -66,7 +70,9 @@ export async function POST() {
   for (const doc of allSales) {
     const key = doc.date?.slice(0, 7) // "YYYY-MM"
     if (!key || key.length !== 7) continue
-    salesByMonth.set(key, (salesByMonth.get(key) ?? 0) + Number(doc.net_total ?? doc.subtotal ?? 0))
+    // receita = soma(FR+FT+FS) - soma(NC); NLD/NLC/SHI ignorados.
+    const net = Number(doc.net_total ?? doc.subtotal ?? 0)
+    salesByMonth.set(key, (salesByMonth.get(key) ?? 0) + salesRevenueSign(doc.document_type) * net)
   }
   for (const doc of allPurchases) {
     const key = doc.date?.slice(0, 7)

@@ -1,7 +1,7 @@
 import { timingSafeEqual } from "crypto"
 import { createClient } from "@/lib/supabase/server"
 import { decryptOptional } from "@/lib/utils/encryption"
-import { fetchSalesDocuments } from "@/lib/integrations/toconline"
+import { fetchSalesDocuments, sumSalesRevenue } from "@/lib/integrations/toconline"
 import { getValidToken } from "@/lib/toconline/token"
 
 function verifySecret(header: string | null): boolean {
@@ -94,8 +94,8 @@ export async function POST(req: Request) {
         dateFrom: currentDateFrom,
         dateTo: currentDateTo,
       })
-      const currentTotal =
-        Math.round(currentDocs.reduce((sum, doc) => sum + Number(doc.net_total ?? doc.subtotal ?? 0), 0) * 100) / 100
+      // receita = soma(FR+FT+FS) - soma(NC); NLD/NLC/SHI ignorados.
+      const currentTotal = Math.round(sumSalesRevenue(currentDocs) * 100) / 100
 
       await Promise.all([
         supabase
@@ -125,8 +125,7 @@ export async function POST(req: Request) {
           dateFrom: prevDateFrom,
           dateTo: prevDateTo,
         })
-        prevTotal =
-          Math.round(prevDocs.reduce((sum, doc) => sum + Number(doc.net_total ?? doc.subtotal ?? 0), 0) * 100) / 100
+        prevTotal = Math.round(sumSalesRevenue(prevDocs) * 100) / 100
 
         await supabase
           .from("monthly_snapshots")
