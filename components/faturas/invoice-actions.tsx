@@ -30,12 +30,15 @@ export function InvoiceActions({
   canEdit,
   canDelete,
   erpSynced,
+  needsReview: needsReviewFlag,
 }: {
   invoiceId: string
   status: InvoiceStatus
   canEdit: boolean
   canDelete: boolean
   erpSynced?: boolean
+  /** Flag booleana needs_review (pode divergir do status). */
+  needsReview?: boolean
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
@@ -128,10 +131,16 @@ export function InvoiceActions({
 
   async function handleReviewOk() {
     setBusy(true)
+    // So repor "em_sistema" quando o estado e' mesmo de revisao; caso contrario
+    // apenas limpar a flag, sem pisar o estado atual.
+    const payload =
+      status === "necessita_revisao"
+        ? { status: "em_sistema", needs_review: false }
+        : { needs_review: false }
     const res = await fetch(`/api/faturas/${invoiceId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "em_sistema", needs_review: false }),
+      body: JSON.stringify(payload),
     })
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}))
@@ -146,7 +155,10 @@ export function InvoiceActions({
 
   if (!canEdit && !canDelete) return null
 
-  const needsReview = status === "necessita_revisao"
+  // Mostrar "Fatura corrigida" quando ha revisao por resolver - seja pelo estado
+  // (necessita_revisao) seja pela flag booleana needs_review (podem divergir: o
+  // banner do detalhe usa a flag, por isso o botao tem de a respeitar tambem).
+  const needsReview = status === "necessita_revisao" || needsReviewFlag === true
   const canMarkRejected = canEdit && status !== "rejected"
 
   return (

@@ -74,6 +74,7 @@ export default async function FaturaDetailPage({
           canEdit={canEdit}
           canDelete={canDelete}
           erpSynced={Boolean(invoice.erp_synced)}
+          needsReview={invoice.needs_review}
         />
       </div>
 
