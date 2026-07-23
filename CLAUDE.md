@@ -95,6 +95,8 @@ app/
 │   ├── dashboard/                 KPIs, gráficos receita vs gastos
 │   ├── faturas/  [id]  nova/      lista + tab e-Fatura, detalhe, upload
 │   ├── projetos/ [id]  [id]/editar  novo/
+│   │                              [id] tem 3 tabs por ?tab=:
+│   │                              dashboard · documentacao · planeamento
 │   ├── investidores/ [id]  novo/
 │   ├── banco/                     movimentos + import de extratos
 │   ├── conciliacao/               split view
@@ -114,9 +116,10 @@ lib/
 ├── banco/             statement-parser.ts (Excel/CSV/PDF + parser BPI)
 ├── banking/           tink.ts, salt-edge.ts (legado), reconciliation.ts
 ├── claude/            extract-invoice.ts, pick-expense-category.ts,
-│                      reprocess-invoice.ts, models.ts
+│                      reprocess-invoice.ts, generate-plan.ts, models.ts
 ├── efatura/           reconcile.ts
 ├── email/             gmail-imap.ts, process-email.ts, extract-attachments.ts, sync.ts
+├── google/            drive.ts (OAuth + pastas + upload, por tenant)
 ├── integrations/      toconline.ts (API TOConline)
 ├── toconline/         token.ts, fc.ts, expense-categories.ts,
 │                      assign-expense-category.ts   ← EXCLUSIVOS do modo direto
@@ -125,7 +128,7 @@ lib/
 └── utils/             audit, credits, encryption, permissions, portugal,
                        projects, invoice-status
 
-supabase/migrations/   001 → 040
+supabase/migrations/   001 → 046
 ```
 
 ---
@@ -138,7 +141,8 @@ supabase/migrations/   001 → 040
 `efatura_documents`, `toconline_expense_categories`, `monthly_snapshots`,
 `investidores`, `projeto_investidores`, `subscriptions`, `credit_transactions`,
 `support_tickets`, `support_messages`, `audit_logs`, `role_permissions`,
-`email_processing_log`, `unmatched_emails`
+`email_processing_log`, `unmatched_emails`, `google_drive_integrations`,
+`project_documents`, `project_tasks`
 
 ### Isolamento multi-tenant
 RLS em todas as tabelas de dados, via helpers `SECURITY DEFINER`:
@@ -157,7 +161,7 @@ Transição para `enviada_erp` só a partir de `PRE_ERP_STATUSES`
 (`pending`, `processing`, `em_sistema`, `necessita_revisao`) - ver
 `lib/utils/invoice-status.ts`. Nunca pisar `rejected`/`paid`/`reconciled`.
 
-### Histórico de migrações (001 → 040)
+### Histórico de migrações (001 → 046)
 | Bloco | Conteúdo |
 |---|---|
 | 001-013 | Schema base: tenants, users, integrações, projetos, faturas, banco, conciliações, créditos, suporte, audit, permissões, RLS |
@@ -174,6 +178,12 @@ Transição para `enviada_erp` só a partir de `PRE_ERP_STATUSES`
 | 038 | Snapshots de gastos + `tenant_memberships` (multi-tenant) |
 | 039 | Notas por movimento bancário |
 | 040 | **Categorias de gasto** (`toconline_expense_categories` + `invoices.expense_category_code`) |
+| 041-043 | **Google Drive por tenant** + documentos de projeto. `projects.drive_folder_id` e índice **único** em `projects(tenant_id, name)` |
+| 044-046 | **Planeamento**: `project_tasks`, fase (`phase`/`phase_order`), hierarquia (`parent_id`) e `progress` |
+
+**Produção está na 046** (aplicadas 2026-07-22). Antes de qualquer deploy que
+leia colunas novas, confirmar o schema de prod por `information_schema` - não
+assumir pelo repositório.
 
 ---
 
@@ -215,6 +225,9 @@ Verificação sempre via `hasPermission(role, recurso, acao)` (`lib/utils/permis
 ### 3. Projetos e obras
 - CRUD, orçamento com alerta de limiar, membros, relatórios
 - **Matching automático** de fatura → projeto por nome e `name_aliases`
+- Lista em **grelha ou lista** (`?vista=lista`), com os filtros preservados
+- O detalhe tem **3 tabs** por `?tab=`: Dashboard (o conteúdo original),
+  Documentação e Planeamento - ver 12 e 13
 
 ### 4. Banco
 - **Tink (Open Banking)**: ligação, sync de movimentos, callback
@@ -267,6 +280,32 @@ estado para `enviada_erp`. Faturas já lançadas são ignoradas (sem duplicados)
 
 ### 11. Admin (ISONIQ TECH)
 - Clientes, criação de tenants, créditos, tickets, receita
+
+### 12. Documentação de projeto (Google Drive)
+- **Um Drive por tenant**, não da plataforma: cada empresa liga o **seu** Google
+  por OAuth em Definições → Integrações. Tokens cifrados em
+  `google_drive_integrations`, um registo por tenant, e **todas** as chamadas ao
+  Drive são server-side
+- Scope mínimo `drive.file`: a app só vê ficheiros que ela própria criou
+- Pasta raiz `Projetos Flow` → subpasta por projeto (`projects.drive_folder_id`),
+  criada de forma **lazy** no primeiro upload
+- `project_documents` guarda só metadados; os bytes ficam no Drive. Visibilidade
+  `interna` vs `investidores` (rótulo na UI: "Documentos partilhados")
+- O `redirect_uri` deriva do host do pedido - senão test e prod colidiam
+
+### 13. Planeamento de projeto (Gantt)
+- `project_tasks` com **três níveis**: fase (`phase`, texto + `phase_order`) >
+  tarefa macro > subtarefa (`parent_id`). A fase **não é uma linha na DB**: é
+  agrupamento por nome, e a barra dela é agregada das tarefas
+- Gantt próprio (`components/projetos/project-gantt.tsx`): escala em **px por
+  dia** (não percentagem), zoom Dia/Semana/Mês, grelha com fins de semana,
+  linha do dia atual, `progress` 0-100 desenhado dentro da barra
+- **Geração com IA** (`lib/claude/generate-plan.ts`), por voz (Web Speech API,
+  pt-PT) ou texto, com a chave/modelo do tenant
+- A geração **só acrescenta, nunca substitui** - não há caminho, nem por API,
+  que apague um cronograma inteiro. A IA recebe as fases e títulos existentes
+  para não repetir, e as fases novas entram **a seguir** à maior `phase_order`
+- Investidor: leitura, e só tarefas `visibility='todos'`
 
 ---
 
@@ -421,6 +460,21 @@ Vários bugs vieram de código escrito **só a pensar no FINMED** e exposto depo
 Revive: fornecedor inexistente, `tax_code` fixo, `item_code` fixo, `resend-erp` só
 para n8n. Ao tocar em qualquer caminho ERP, perguntar sempre: **funciona nos dois modos?**
 
+### Trabalhar com a IA (Claude API)
+- **Dar sempre a data de hoje no prompt.** Sem ela o modelo data pelo ano do
+  treino: um cronograma gerado em 2026 saiu todo em 2025.
+- **Não confiar no formato.** Parse defensivo (limpar fences, apanhar o array) e
+  normalizar campo a campo, descartando o que não presta.
+- **Contar com a saída maior do que se pensa.** Ao acrescentar subtarefas, os
+  4000 `max_tokens` truncavam o JSON a meio.
+- **Ao acrescentar, dizer-lhe o que já existe**, senão repete o que lá está.
+
+### Ações destrutivas
+Não expor botões que apagam em bloco quando o utilizador pode ter trabalho
+manual investido. O "voltar a gerar / substituir todas" do planeamento foi
+removido, e o campo saiu **também do schema da rota** - esconder na UI não
+chega. Apagar continua possível, item a item e com confirmação.
+
 ### Segurança
 1. NUNCA query sem filtro `tenant_id`
 2. SEMPRE validar assinatura de webhooks
@@ -449,6 +503,9 @@ para n8n. Ao tocar em qualquer caminho ERP, perguntar sempre: **funciona nos doi
 15. Instrumentar erros: guardar a mensagem **real** do serviço externo
     (ex.: `audit_logs.metadata.detail`), nunca só uma mensagem genérica.
 16. Não assumir a causa. Confirmar com dados antes de corrigir.
+17. `jsonError(msg, status, details)` põe o erro real em **`details`**. O cliente
+    tem de mostrar os dois - mostrar só `error` dá "Database error" e não diz nada.
+    É o mesmo princípio do ponto 15, do lado da UI.
 
 ### Compliance e performance
 17. Dados apenas em região europeia (RGPD)
@@ -494,6 +551,11 @@ TINK_WEBHOOK_SECRET=
 # Gmail (inbound por tenant)
 GMAIL_CLIENT_ID=
 GMAIL_CLIENT_SECRET=
+
+# Google Drive (documentos de projeto). App OAuth da plataforma; cada tenant
+# liga a SUA conta Google e os ficheiros ficam no Drive dele.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 
 # n8n
 N8N_WEBHOOK_URL=
