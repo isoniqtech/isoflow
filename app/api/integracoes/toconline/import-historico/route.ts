@@ -44,7 +44,7 @@ export async function POST() {
     )
   }
 
-  const { accessToken, apiBase, appBase } = tokenConfig
+  const { accessToken, apiBase } = tokenConfig
   const now = new Date()
 
   // Leitura por data: o v1 rejeita date_from/date_to, por isso lista-se por data
@@ -56,8 +56,8 @@ export async function POST() {
 
   try {
     ;[allSales, allPurchases] = await Promise.all([
-      fetchDocsNetByDate(accessToken, appBase, apiBase, "commercial_sales_documents", rangeFrom, rangeTo, REVENUE_DOC_TYPES),
-      fetchDocsNetByDate(accessToken, appBase, apiBase, "commercial_purchases_documents", rangeFrom, rangeTo, EXPENSE_DOC_TYPES_ALL),
+      fetchDocsNetByDate(accessToken, apiBase, "commercial_sales_documents", rangeFrom, rangeTo, REVENUE_DOC_TYPES),
+      fetchDocsNetByDate(accessToken, apiBase, "commercial_purchases_documents", rangeFrom, rangeTo, EXPENSE_DOC_TYPES_ALL),
     ])
   } catch (e) {
     return NextResponse.json(

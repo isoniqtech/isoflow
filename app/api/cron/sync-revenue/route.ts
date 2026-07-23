@@ -77,14 +77,12 @@ export async function POST(req: Request) {
 
       let accessToken: string
       let baseUrl: string
-      let appBase = ""
 
       if (mode === "toconline_direct") {
         // Modo direto: refresh OAuth automático
         const tokenConfig = await getValidToken(integration.tenant_id)
         accessToken = tokenConfig.accessToken
         baseUrl = tokenConfig.apiBase
-        appBase = tokenConfig.appBase
       } else {
         // Modo n8n: usa token armazenado diretamente
         const stored = decryptOptional(integration.api_key_encrypted)
@@ -103,7 +101,6 @@ export async function POST(req: Request) {
           mode === "toconline_direct"
             ? await fetchDocsNetByDate(
                 accessToken,
-                appBase,
                 baseUrl,
                 "commercial_sales_documents",
                 from,
