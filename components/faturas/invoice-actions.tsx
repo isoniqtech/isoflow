@@ -115,7 +115,8 @@ export function InvoiceActions({
     if (!res.ok) {
       const errBody = await res.json().catch(() => ({}))
       toast.error("Falha ao apagar fatura", {
-        description: errBody.error ?? `HTTP ${res.status}`,
+        description: errBody.details ?? errBody.error ?? `HTTP ${res.status}`,
+        duration: 10000,
       })
       setBusy(false)
       return

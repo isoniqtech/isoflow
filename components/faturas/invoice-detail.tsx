@@ -522,7 +522,7 @@ function CreditNoteSection({
                   <SelectContent>
                     {candidates.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
-                        {(c.invoice_number ?? "sem nº") + " · " + (c.supplier_name ?? "—")}
+                        {(c.invoice_number ?? "sem nº") + " · " + (c.supplier_name ?? "-")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -542,7 +542,7 @@ function CreditNoteSection({
                     {cn.invoice_number ?? "Nota de crédito"}
                   </a>
                   <span className="tabular-nums text-muted-foreground">
-                    {cn.total !== null ? "-" + formatCurrency(cn.total) : "—"}
+                    {cn.total !== null ? "-" + formatCurrency(cn.total) : "-"}
                   </span>
                 </li>
               ))}
