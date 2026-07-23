@@ -179,6 +179,10 @@ export async function POST(request: Request) {
           body: JSON.stringify({
             tenant_id: tenantId,
             callback_secret: cronSecret,
+            // Discriminador para o workflow n8n diferenciar FC de NC (aditivo:
+            // o workflow antigo ignora-o ate' ter o if). A NC vem no mesmo shape,
+            // pelo mesmo webhook, com document_type: "NC".
+            document_type: "FC",
             invoice: {
               id: inv.id,
               supplier_name: inv.supplier_name,
