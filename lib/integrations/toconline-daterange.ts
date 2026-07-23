@@ -63,21 +63,48 @@ export async function listDocsByDate(
   to: string,
 ): Promise<DocByDate[]> {
   const filter = encodeURIComponent(`"date BETWEEN '${from}' AND '${to}'"`)
-  const url = `${appBase.replace(/\/$/, "")}/api/${segment}_list_for_invoices?filter=${filter}`
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
-  })
-  if (!res.ok) {
-    throw new Error(`TOConline ${segment}_list_for_invoices ${res.status}: ${(await res.text()).slice(0, 200)}`)
+  const base = `${appBase.replace(/\/$/, "")}/api/${segment}_list_for_invoices?filter=${filter}`
+
+  // O endpoint pagina/limita (~10 por pagina). Percorrer as paginas com dedup por
+  // id: paramos quando uma pagina nao traz nenhum id novo (robusto tanto se o
+  // servidor respeitar page[number] como se o ignorar).
+  const seen = new Set<number>()
+  const out: DocByDate[] = []
+  const MAX_PAGES = 200
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `${base}&page%5Bnumber%5D=${page}&page%5Bsize%5D=200`
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    })
+    if (!res.ok) {
+      if (page === 1) {
+        throw new Error(
+          `TOConline ${segment}_list_for_invoices ${res.status}: ${(await res.text()).slice(0, 200)}`,
+        )
+      }
+      break // paginas seguintes: parar no primeiro erro
+    }
+    const rows = toArray(await res.json()).map(flat)
+    if (rows.length === 0) break
+
+    let added = 0
+    for (const r of rows) {
+      const id = Number(r.document_id ?? r.id ?? 0)
+      if (id > 0 && !seen.has(id)) {
+        seen.add(id)
+        out.push({
+          id,
+          document_type: String(r.document_type ?? ""),
+          date: (r.date as string | null) ?? null,
+        })
+        added++
+      }
+    }
+    if (added === 0) break // sem ids novos -> fim (ou servidor ignora paginacao)
   }
-  const rows = toArray(await res.json()).map(flat)
-  return rows
-    .map((r) => ({
-      id: Number(r.document_id ?? r.id ?? 0),
-      document_type: String(r.document_type ?? ""),
-      date: (r.date as string | null) ?? null,
-    }))
-    .filter((d) => d.id > 0)
+
+  return out
 }
 
 /** Vai buscar o net_total (e gross_total) de um documento ao v1 por id. */
