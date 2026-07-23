@@ -211,6 +211,87 @@ export type Database = {
           },
         ]
       }
+      efatura_documents: {
+        Row: {
+          at_document_id: string | null
+          at_status: string | null
+          created_at: string | null
+          currency: string | null
+          document_date: string | null
+          document_number: string | null
+          id: string
+          invoice_id: string | null
+          matched_at: string | null
+          matched_by: string | null
+          raw_data: Json | null
+          subtotal: number | null
+          supplier_name: string | null
+          supplier_nif: string | null
+          tenant_id: string
+          toconline_id: string | null
+          total: number | null
+          updated_at: string | null
+          vat_amount: number | null
+        }
+        Insert: {
+          at_document_id?: string | null
+          at_status?: string | null
+          created_at?: string | null
+          currency?: string | null
+          document_date?: string | null
+          document_number?: string | null
+          id?: string
+          invoice_id?: string | null
+          matched_at?: string | null
+          matched_by?: string | null
+          raw_data?: Json | null
+          subtotal?: number | null
+          supplier_name?: string | null
+          supplier_nif?: string | null
+          tenant_id: string
+          toconline_id?: string | null
+          total?: number | null
+          updated_at?: string | null
+          vat_amount?: number | null
+        }
+        Update: {
+          at_document_id?: string | null
+          at_status?: string | null
+          created_at?: string | null
+          currency?: string | null
+          document_date?: string | null
+          document_number?: string | null
+          id?: string
+          invoice_id?: string | null
+          matched_at?: string | null
+          matched_by?: string | null
+          raw_data?: Json | null
+          subtotal?: number | null
+          supplier_name?: string | null
+          supplier_nif?: string | null
+          tenant_id?: string
+          toconline_id?: string | null
+          total?: number | null
+          updated_at?: string | null
+          vat_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "efatura_documents_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "efatura_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_processing_log: {
         Row: {
           attachments_found: number | null
@@ -267,6 +348,123 @@ export type Database = {
           },
         ]
       }
+      google_drive_integrations: {
+        Row: {
+          access_token_encrypted: string | null
+          connected_at: string | null
+          connected_by: string | null
+          created_at: string
+          id: string
+          refresh_token_encrypted: string | null
+          root_folder_id: string | null
+          scope: string | null
+          sync_error: string | null
+          tenant_id: string
+          token_expiry: string | null
+          updated_at: string
+        }
+        Insert: {
+          access_token_encrypted?: string | null
+          connected_at?: string | null
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          refresh_token_encrypted?: string | null
+          root_folder_id?: string | null
+          scope?: string | null
+          sync_error?: string | null
+          tenant_id: string
+          token_expiry?: string | null
+          updated_at?: string
+        }
+        Update: {
+          access_token_encrypted?: string | null
+          connected_at?: string | null
+          connected_by?: string | null
+          created_at?: string
+          id?: string
+          refresh_token_encrypted?: string | null
+          root_folder_id?: string | null
+          scope?: string | null
+          sync_error?: string | null
+          tenant_id?: string
+          token_expiry?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_drive_integrations_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "google_drive_integrations_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: true
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investidores: {
+        Row: {
+          capital_disponivel: number
+          created_at: string
+          email: string
+          estado: string
+          id: string
+          nome: string
+          notas: string | null
+          tenant_id: string
+          tipo_negocio: string[]
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          capital_disponivel?: number
+          created_at?: string
+          email: string
+          estado?: string
+          id?: string
+          nome: string
+          notas?: string | null
+          tenant_id: string
+          tipo_negocio?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          capital_disponivel?: number
+          created_at?: string
+          email?: string
+          estado?: string
+          id?: string
+          nome?: string
+          notas?: string | null
+          tenant_id?: string
+          tipo_negocio?: string[]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investidores_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investidores_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           ai_attempts: number
@@ -282,13 +480,14 @@ export type Database = {
           created_by: string | null
           currency: string | null
           description: string | null
+          document_kind: string
           due_date: string | null
           email_message_id: string | null
           email_subject: string | null
           erp_document_id: string | null
           erp_synced: boolean | null
           erp_synced_at: string | null
-          toconline_fc_id: string | null
+          expense_category_code: string | null
           external_id: string | null
           file_hash: string | null
           file_name: string | null
@@ -304,6 +503,8 @@ export type Database = {
           needs_review: boolean | null
           notes: string | null
           project_id: string | null
+          referenced_document_number: string | null
+          related_invoice_id: string | null
           sender_email: string | null
           sender_phone: string | null
           sent_by: string | null
@@ -316,15 +517,12 @@ export type Database = {
           supplier_nif: string | null
           tags: string[] | null
           tenant_id: string
+          toconline_fc_id: string | null
           total: number | null
           type: string
           updated_at: string | null
           vat_amount: number | null
           vat_rate: number | null
-          document_kind: string
-          expense_category_code: string | null
-          referenced_document_number: string | null
-          related_invoice_id: string | null
         }
         Insert: {
           ai_attempts?: number
@@ -340,13 +538,14 @@ export type Database = {
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          document_kind?: string
           due_date?: string | null
           email_message_id?: string | null
           email_subject?: string | null
           erp_document_id?: string | null
           erp_synced?: boolean | null
           erp_synced_at?: string | null
-          toconline_fc_id?: string | null
+          expense_category_code?: string | null
           external_id?: string | null
           file_hash?: string | null
           file_name?: string | null
@@ -362,6 +561,8 @@ export type Database = {
           needs_review?: boolean | null
           notes?: string | null
           project_id?: string | null
+          referenced_document_number?: string | null
+          related_invoice_id?: string | null
           sender_email?: string | null
           sender_phone?: string | null
           sent_by?: string | null
@@ -374,15 +575,12 @@ export type Database = {
           supplier_nif?: string | null
           tags?: string[] | null
           tenant_id: string
+          toconline_fc_id?: string | null
           total?: number | null
           type?: string
           updated_at?: string | null
           vat_amount?: number | null
           vat_rate?: number | null
-          document_kind?: string
-          expense_category_code?: string | null
-          referenced_document_number?: string | null
-          related_invoice_id?: string | null
         }
         Update: {
           ai_attempts?: number
@@ -398,13 +596,14 @@ export type Database = {
           created_by?: string | null
           currency?: string | null
           description?: string | null
+          document_kind?: string
           due_date?: string | null
           email_message_id?: string | null
           email_subject?: string | null
           erp_document_id?: string | null
           erp_synced?: boolean | null
           erp_synced_at?: string | null
-          toconline_fc_id?: string | null
+          expense_category_code?: string | null
           external_id?: string | null
           file_hash?: string | null
           file_name?: string | null
@@ -420,6 +619,8 @@ export type Database = {
           needs_review?: boolean | null
           notes?: string | null
           project_id?: string | null
+          referenced_document_number?: string | null
+          related_invoice_id?: string | null
           sender_email?: string | null
           sender_phone?: string | null
           sent_by?: string | null
@@ -432,15 +633,12 @@ export type Database = {
           supplier_nif?: string | null
           tags?: string[] | null
           tenant_id?: string
+          toconline_fc_id?: string | null
           total?: number | null
           type?: string
           updated_at?: string | null
           vat_amount?: number | null
           vat_rate?: number | null
-          document_kind?: string
-          expense_category_code?: string | null
-          referenced_document_number?: string | null
-          related_invoice_id?: string | null
         }
         Relationships: [
           {
@@ -458,10 +656,119 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_related_invoice_id_fkey"
+            columns: ["related_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "invoices_tenant_id_fkey"
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monthly_snapshots: {
+        Row: {
+          expenses: number | null
+          id: string
+          month: number
+          revenue: number | null
+          saved_at: string | null
+          tenant_id: string
+          year: number
+        }
+        Insert: {
+          expenses?: number | null
+          id?: string
+          month: number
+          revenue?: number | null
+          saved_at?: string | null
+          tenant_id: string
+          year: number
+        }
+        Update: {
+          expenses?: number | null
+          id?: string
+          month?: number
+          revenue?: number | null
+          saved_at?: string | null
+          tenant_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_documents: {
+        Row: {
+          created_at: string
+          drive_file_id: string
+          id: string
+          mime_type: string | null
+          name: string
+          project_id: string
+          size_bytes: number | null
+          tenant_id: string
+          uploaded_by: string | null
+          visibility: string
+          web_view_link: string | null
+        }
+        Insert: {
+          created_at?: string
+          drive_file_id: string
+          id?: string
+          mime_type?: string | null
+          name: string
+          project_id: string
+          size_bytes?: number | null
+          tenant_id: string
+          uploaded_by?: string | null
+          visibility?: string
+          web_view_link?: string | null
+        }
+        Update: {
+          created_at?: string
+          drive_file_id?: string
+          id?: string
+          mime_type?: string | null
+          name?: string
+          project_id?: string
+          size_bytes?: number | null
+          tenant_id?: string
+          uploaded_by?: string | null
+          visibility?: string
+          web_view_link?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_documents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -512,6 +819,95 @@ export type Database = {
           },
         ]
       }
+      project_tasks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          end_date: string | null
+          id: string
+          parent_id: string | null
+          phase: string | null
+          phase_order: number | null
+          progress: number
+          project_id: string
+          sort_order: number
+          start_date: string | null
+          status: string
+          tenant_id: string
+          title: string
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          parent_id?: string | null
+          phase?: string | null
+          phase_order?: number | null
+          progress?: number
+          project_id: string
+          sort_order?: number
+          start_date?: string | null
+          status?: string
+          tenant_id: string
+          title: string
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          end_date?: string | null
+          id?: string
+          parent_id?: string | null
+          phase?: string | null
+          phase_order?: number | null
+          progress?: number
+          project_id?: string
+          sort_order?: number
+          start_date?: string | null
+          status?: string
+          tenant_id?: string
+          title?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "project_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_tasks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           budget: number | null
@@ -522,6 +918,7 @@ export type Database = {
           created_at: string | null
           created_by: string | null
           description: string | null
+          drive_folder_id: string | null
           end_date: string | null
           id: string
           location: string | null
@@ -543,6 +940,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          drive_folder_id?: string | null
           end_date?: string | null
           id?: string
           location?: string | null
@@ -564,6 +962,7 @@ export type Database = {
           created_at?: string | null
           created_by?: string | null
           description?: string | null
+          drive_folder_id?: string | null
           end_date?: string | null
           id?: string
           location?: string | null
@@ -589,6 +988,48 @@ export type Database = {
             columns: ["tenant_id"]
             isOneToOne: false
             referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projeto_investidores: {
+        Row: {
+          created_at: string
+          id: string
+          investidor_id: string
+          percentagem: number
+          projeto_id: string
+          valor_alocado: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          investidor_id: string
+          percentagem: number
+          projeto_id: string
+          valor_alocado?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          investidor_id?: string
+          percentagem?: number
+          projeto_id?: string
+          valor_alocado?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projeto_investidores_investidor_id_fkey"
+            columns: ["investidor_id"]
+            isOneToOne: false
+            referencedRelation: "investidores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projeto_investidores_projeto_id_fkey"
+            columns: ["projeto_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
             referencedColumns: ["id"]
           },
         ]
@@ -895,47 +1336,6 @@ export type Database = {
           },
         ]
       }
-      tenant_memberships: {
-        Row: {
-          id: string
-          user_id: string
-          tenant_id: string
-          role: string
-          invited_by: string | null
-          invited_at: string | null
-          joined_at: string | null
-          status: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          tenant_id: string
-          role?: string
-          invited_by?: string | null
-          invited_at?: string | null
-          joined_at?: string | null
-          status?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          tenant_id?: string
-          role?: string
-          invited_by?: string | null
-          invited_at?: string | null
-          joined_at?: string | null
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tenant_memberships_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       tenant_integrations: {
         Row: {
           api_key_encrypted: string | null
@@ -1001,11 +1401,52 @@ export type Database = {
           },
         ]
       }
+      tenant_memberships: {
+        Row: {
+          id: string
+          invited_at: string | null
+          invited_by: string | null
+          joined_at: string | null
+          role: string
+          status: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          joined_at?: string | null
+          role?: string
+          status?: string | null
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          invited_at?: string | null
+          invited_by?: string | null
+          joined_at?: string | null
+          role?: string
+          status?: string | null
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_memberships_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           address: string | null
           app_name: string | null
-          auto_erp_send: boolean
+          auto_erp_send: boolean | null
           billing_cycle: string | null
           created_at: string | null
           credits_balance: number | null
@@ -1013,7 +1454,7 @@ export type Database = {
           email: string | null
           favicon_path: string | null
           id: string
-          integration_mode: string
+          integration_mode: string | null
           internal_notes: string | null
           logo_path: string | null
           logo_url: string | null
@@ -1027,6 +1468,10 @@ export type Database = {
           status: string | null
           stripe_customer_id: string | null
           stripe_subscription_id: string | null
+          toconline_revenue_cached_at: string | null
+          toconline_revenue_month: number | null
+          toconline_revenue_total: number | null
+          toconline_revenue_year: number | null
           trial_ends_at: string | null
           updated_at: string | null
           vat_regime: string | null
@@ -1034,7 +1479,7 @@ export type Database = {
         Insert: {
           address?: string | null
           app_name?: string | null
-          auto_erp_send?: boolean
+          auto_erp_send?: boolean | null
           billing_cycle?: string | null
           created_at?: string | null
           credits_balance?: number | null
@@ -1042,7 +1487,7 @@ export type Database = {
           email?: string | null
           favicon_path?: string | null
           id?: string
-          integration_mode?: string
+          integration_mode?: string | null
           internal_notes?: string | null
           logo_path?: string | null
           logo_url?: string | null
@@ -1056,6 +1501,10 @@ export type Database = {
           status?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          toconline_revenue_cached_at?: string | null
+          toconline_revenue_month?: number | null
+          toconline_revenue_total?: number | null
+          toconline_revenue_year?: number | null
           trial_ends_at?: string | null
           updated_at?: string | null
           vat_regime?: string | null
@@ -1063,7 +1512,7 @@ export type Database = {
         Update: {
           address?: string | null
           app_name?: string | null
-          auto_erp_send?: boolean
+          auto_erp_send?: boolean | null
           billing_cycle?: string | null
           created_at?: string | null
           credits_balance?: number | null
@@ -1071,14 +1520,13 @@ export type Database = {
           email?: string | null
           favicon_path?: string | null
           id?: string
-          integration_mode?: string
+          integration_mode?: string | null
           internal_notes?: string | null
           logo_path?: string | null
           logo_url?: string | null
           name?: string
           next_billing_date?: string | null
           nif?: string | null
-          vat_regime?: string | null
           onboarding_completed?: boolean | null
           phone?: string | null
           plan?: string | null
@@ -1086,10 +1534,56 @@ export type Database = {
           status?: string | null
           stripe_customer_id?: string | null
           stripe_subscription_id?: string | null
+          toconline_revenue_cached_at?: string | null
+          toconline_revenue_month?: number | null
+          toconline_revenue_total?: number | null
+          toconline_revenue_year?: number | null
           trial_ends_at?: string | null
           updated_at?: string | null
+          vat_regime?: string | null
         }
         Relationships: []
+      }
+      toconline_expense_categories: {
+        Row: {
+          code: string
+          id: string
+          is_main: boolean | null
+          name: string
+          synced_at: string | null
+          tax_code: string | null
+          tax_deductibility: number | null
+          tenant_id: string
+        }
+        Insert: {
+          code: string
+          id?: string
+          is_main?: boolean | null
+          name: string
+          synced_at?: string | null
+          tax_code?: string | null
+          tax_deductibility?: number | null
+          tenant_id: string
+        }
+        Update: {
+          code?: string
+          id?: string
+          is_main?: boolean | null
+          name?: string
+          synced_at?: string | null
+          tax_code?: string | null
+          tax_deductibility?: number | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "toconline_expense_categories_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       unmatched_emails: {
         Row: {
@@ -1187,6 +1681,30 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acquire_email_sync_lock: {
+        Args: { p_integration_id: string; p_lock_until: string }
+        Returns: boolean
+      }
+      get_investidor_id: { Args: never; Returns: string }
+      get_invoices_with_efatura: {
+        Args: { p_tenant_id: string; p_user_id?: string }
+        Returns: {
+          at_communicated: boolean
+          currency: string
+          efatura_at_status: string
+          efatura_doc_id: string
+          efatura_doc_number: string
+          id: string
+          invoice_date: string
+          invoice_number: string
+          source: string
+          status: string
+          supplier_name: string
+          supplier_nif: string
+          toconline_fc_id: string
+          total: number
+        }[]
+      }
       get_user_role: { Args: never; Returns: string }
       get_user_tenant_id: { Args: never; Returns: string }
     }
