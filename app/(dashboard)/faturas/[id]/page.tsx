@@ -74,6 +74,7 @@ export default async function FaturaDetailPage({
           canEdit={canEdit}
           canDelete={canDelete}
           erpSynced={Boolean(invoice.erp_synced)}
+          needsReview={invoice.needs_review}
         />
       </div>
 
@@ -81,7 +82,7 @@ export default async function FaturaDetailPage({
       {invoice.needs_review && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-900/10 dark:text-amber-200">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          Esta fatura foi marcada para revisão — verifique os dados extraídos pela IA antes de confirmar.
+          Esta fatura foi marcada para revisão. Verifique os dados extraídos pela IA antes de confirmar.
         </div>
       )}
 

@@ -193,6 +193,22 @@ export async function DELETE(
     .eq("tenant_id", ctx.tenantId)
     .single()
 
+  // Limpar referencias que bloqueiam o delete (FKs NO ACTION, migracoes 007/008):
+  //  - reconciliations.invoice_id e' NOT NULL -> apagar a conciliacao
+  //  - bank_transactions.invoice_id -> desassociar (SET NULL manual)
+  // (efatura_documents.invoice_id e invoices.related_invoice_id sao ON DELETE
+  //  SET NULL, tratados automaticamente pela BD.)
+  await supabase
+    .from("reconciliations")
+    .delete()
+    .eq("invoice_id", params.id)
+    .eq("tenant_id", ctx.tenantId)
+  await supabase
+    .from("bank_transactions")
+    .update({ invoice_id: null })
+    .eq("invoice_id", params.id)
+    .eq("tenant_id", ctx.tenantId)
+
   const { error } = await supabase
     .from("invoices")
     .delete()
