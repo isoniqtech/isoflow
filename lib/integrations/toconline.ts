@@ -129,6 +129,21 @@ export function sumSalesRevenue(
   )
 }
 
+// Gastos (compras): gasto = soma(FC/DSP...) - soma(NCF). Os lancamentos internos
+// NLDF/NLCF sao ignorados (a par do NLD/NLC nas vendas).
+const EXPENSE_DOC_TYPES = new Set(["FC", "DSP", "FCA", "SIF", "NDF"])
+
+export function purchaseExpenseSign(documentType: string | null | undefined): number {
+  const t = (documentType ?? "").toUpperCase()
+  if (t === "NCF") return -1
+  if (EXPENSE_DOC_TYPES.has(t)) return 1
+  return 0
+}
+
+// Conjunto de tipos relevantes para cada lado (para limitar chamadas ao v1 por id).
+export const REVENUE_DOC_TYPES = new Set(["FR", "FT", "FS", "NC"])
+export const EXPENSE_DOC_TYPES_ALL = new Set([...EXPENSE_DOC_TYPES, "NCF"])
+
 // ---------------------------------------------------------------------------
 // e-Fatura list - endpoint especifico com filtros encodeados em duplas aspas.
 // Resposta vem como string JSON aninhada em .data que precisa de JSON.parse.
