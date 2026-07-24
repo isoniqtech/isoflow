@@ -2,15 +2,13 @@
 
 import { useState, useTransition, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { FileSpreadsheet, FileText, Loader2, RefreshCw, ChevronDown, Download, Sheet, History, CalendarDays } from "lucide-react"
+import { FileText, Loader2, RefreshCw, History, CalendarDays, SlidersHorizontal } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { ExportDropdown } from "@/components/faturas/export-dropdown"
 import {
   TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -25,73 +23,6 @@ const AT_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "nao_considerado",   label: "Não Considerado" },
 ]
 
-function MultiSelectFilter<T extends string>({
-  options,
-  selected,
-  onChange,
-  placeholder,
-}: {
-  options: { value: T; label: string }[]
-  selected: T[]
-  onChange: (next: T[]) => void
-  placeholder: string
-}) {
-  function toggle(value: T) {
-    onChange(
-      selected.includes(value)
-        ? selected.filter(v => v !== value)
-        : [...selected, value]
-    )
-  }
-
-  const label = selected.length === 0
-    ? placeholder
-    : selected.length === 1
-    ? options.find(o => o.value === selected[0])?.label ?? placeholder
-    : `${selected.length} estados`
-
-  return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <button className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-medium bg-background hover:bg-muted transition-colors">
-          {selected.length > 0 && (
-            <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-primary text-primary-foreground text-[10px] px-1">
-              {selected.length}
-            </span>
-          )}
-          <span className="max-w-32 truncate">{label}</span>
-          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-52 p-1" align="end">
-        {selected.length > 0 && (
-          <>
-            <button
-              onClick={() => onChange([])}
-              className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded transition-colors"
-            >
-              Limpar filtros
-            </button>
-            <div className="my-1 border-t" />
-          </>
-        )}
-        {options.map(o => (
-          <label
-            key={o.value}
-            className="flex items-center gap-2.5 px-3 py-1.5 text-xs rounded hover:bg-muted cursor-pointer"
-          >
-            <Checkbox
-              checked={selected.includes(o.value)}
-              onCheckedChange={() => toggle(o.value)}
-              className="h-3.5 w-3.5"
-            />
-            {o.label}
-          </label>
-        ))}
-      </PopoverContent>
-    </Popover>
-  )
-}
 
 function ATStatusBadge({ status }: { status: string | null }) {
   if (status === "compra_registada" || status === "Associada")
@@ -142,8 +73,6 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
       return true
     })
   }, [efatura_docs, atFilters, dateFrom, dateTo])
-
-  const pendingCount = efatura_docs.filter(d => !d.invoice_id).length
 
   function handleRefresh() {
     startRefresh(async () => {
@@ -229,11 +158,7 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
     })
   }
 
-  function exportUrl(format: "csv" | "xlsx" | "pdf") {
-    const params = new URLSearchParams({ format })
-    if (atFilters.length > 0) params.set("at_status", atFilters.join(","))
-    return `/api/efatura/export?${params.toString()}`
-  }
+  const exportBaseUrl = `/api/efatura/export${atFilters.length > 0 ? `?at_status=${encodeURIComponent(atFilters.join(","))}` : ""}`
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-3">
@@ -260,13 +185,51 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
         </div>
       )}
 
-      {/* ── Toolbar — estática ───────────────────────────────── */}
-      <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {filteredDocs.length} documento{filteredDocs.length !== 1 ? "s" : ""}
-          {pendingCount > 0 && ` · ${pendingCount} por conciliar`}
-        </p>
-        <div className="flex items-center gap-2 flex-wrap">
+      {/* ── Toolbar — filtros a' esquerda, acoes a' direita (padrao da tab Todas) */}
+      <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Filtrar — Estado AT */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 bg-card border-border/60 shadow-sm">
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                Filtrar
+                {atFilters.length > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-primary text-primary-foreground text-[10px] px-1">
+                    {atFilters.length}
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-60 p-3 space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Estado AT</label>
+              {AT_STATUS_OPTIONS.map((o) => (
+                <label key={o.value} className="flex items-center gap-2.5 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={atFilters.includes(o.value)}
+                    onCheckedChange={() =>
+                      setAtFilters(
+                        atFilters.includes(o.value)
+                          ? atFilters.filter((v) => v !== o.value)
+                          : [...atFilters, o.value],
+                      )
+                    }
+                    className="h-3.5 w-3.5"
+                  />
+                  {o.label}
+                </label>
+              ))}
+              {atFilters.length > 0 && (
+                <button
+                  onClick={() => setAtFilters([])}
+                  className="w-full text-left text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </PopoverContent>
+          </Popover>
+
           {/* Periodo — datas agrupadas (mes atual por defeito) */}
           <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
             <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -286,54 +249,24 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
               aria-label="Data fim"
             />
           </div>
-          <MultiSelectFilter
-            options={AT_STATUS_OPTIONS}
-            selected={atFilters}
-            onChange={setAtFilters}
-            placeholder="Estado AT"
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" variant="outline">
-                <Download className="mr-2 h-4 w-4" />
-                Exportar
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <a href={exportUrl("csv")} download>
-                  <Sheet className="mr-2 h-4 w-4" />
-                  CSV
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href={exportUrl("xlsx")} download>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />
-                  Excel (.xlsx)
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href={exportUrl("pdf")} download>
-                  <FileText className="mr-2 h-4 w-4" />
-                  PDF
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button size="sm" variant="outline" onClick={handleImportHistory} disabled={isPendingHistory || isPendingRefresh}>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <Button size="sm" variant="outline" className="h-9" onClick={handleImportHistory} disabled={isPendingHistory || isPendingRefresh}>
             {isPendingHistory
               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               : <History className="mr-2 h-4 w-4" />
             }
             Importar histórico
           </Button>
-          <Button size="sm" onClick={handleRefresh} disabled={isPendingRefresh || isPendingHistory}>
+          <Button size="sm" className="h-9" onClick={handleRefresh} disabled={isPendingRefresh || isPendingHistory}>
             {isPendingRefresh
               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               : <RefreshCw className="mr-2 h-4 w-4" />
             }
             Atualizar
           </Button>
+          <ExportDropdown exportUrl={exportBaseUrl} compact />
         </div>
       </div>
 
@@ -347,42 +280,37 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
-                  {HEADERS.map((h, i) => (
-                    <TableHead
-                      key={h.label}
-                      className={[
-                        "cursor-default select-none",
-                        i === 1 || i === 2 ? "hidden md:table-cell" : "",
-                        i === 3 ? "text-right" : "",
-                      ].filter(Boolean).join(" ")}
-                      onMouseEnter={(e) => showTip(e, h.tip)}
-                      onMouseLeave={hideTip}
-                    >
-                      {h.label}
-                    </TableHead>
-                  ))}
+                  <TableHead className="w-10 text-center" />
+                  <TableHead className="cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[0].tip)} onMouseLeave={hideTip}>Fornecedor</TableHead>
+                  <TableHead className="hidden md:table-cell cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[2].tip)} onMouseLeave={hideTip}>Data</TableHead>
+                  <TableHead className="cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[3].tip)} onMouseLeave={hideTip}>Valor</TableHead>
+                  <TableHead className="cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[4].tip)} onMouseLeave={hideTip}>Estado AT</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredDocs.map((doc) => (
                   <TableRow key={doc.id}>
+                    <TableCell className="px-3 text-center">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                      </span>
+                    </TableCell>
                     <TableCell>
                       <p className="font-medium truncate">{doc.supplier_name ?? "Fornecedor desconhecido"}</p>
-                      {doc.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{doc.supplier_nif}</p>}
+                      <p className="text-xs text-muted-foreground font-mono">{doc.document_number ?? "—"}</p>
                     </TableCell>
-                    <TableCell className="hidden md:table-cell font-mono text-sm">{doc.document_number ?? "—"}</TableCell>
                     <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
-                    <TableCell className="text-right tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
+                    <TableCell className="tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
                     <TableCell>
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <ATStatusBadge status={doc.at_status} />
-                      {doc.invoice_id && (
-                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-                          Conciliada
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <ATStatusBadge status={doc.at_status} />
+                        {doc.invoice_id && (
+                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
+                            Conciliada
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
