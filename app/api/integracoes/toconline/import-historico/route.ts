@@ -12,17 +12,30 @@ export const maxDuration = 120
  * e' resolvido pelo tocRequest dentro do runSnapshotSync. Substitui os
  * workflows n8n manuais de receita/gastos.
  */
-export async function POST() {
+export async function POST(req: Request) {
   const session = await getCurrentSession()
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   if (!hasPermission(session.role, "configuracoes", "view_all"))
     return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
+  // scope "current" = so' o mes corrente (botao "Atualizar"); default "full" =
+  // backfill de jan/2025 -> hoje (botao "Importar historico").
+  let scope: "current" | "full" = "full"
+  try {
+    const body = (await req.json()) as { scope?: string } | null
+    if (body?.scope === "current") scope = "current"
+  } catch {
+    // sem body -> full
+  }
+
   const svc = createServiceClient()
   const tenantId = session.tenant.id
   const now = new Date()
 
-  const rangeFrom = "2025-01-01"
+  const rangeFrom =
+    scope === "current"
+      ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+      : "2025-01-01"
   const rangeTo = now.toISOString().slice(0, 10)
 
   let result: Awaited<ReturnType<typeof runSnapshotSync>>
@@ -35,23 +48,26 @@ export async function POST() {
     )
   }
 
-  // Registar data de importacao na integracao ERP ativa (n8n ou toconline).
+  // So' o backfill completo marca a data de "historico importado". O "Atualizar"
+  // (scope current) nao mexe nesse carimbo.
   const importedAt = now.toISOString()
-  const { data: integration } = await svc
-    .from("tenant_integrations")
-    .select("id, config")
-    .eq("tenant_id", tenantId)
-    .eq("type", "erp")
-    .eq("is_active", true)
-    .in("provider", ["toconline", "n8n"])
-    .maybeSingle()
-
-  if (integration) {
-    const currentConfig = (integration.config as Record<string, unknown>) ?? {}
-    await svc
+  if (scope === "full") {
+    const { data: integration } = await svc
       .from("tenant_integrations")
-      .update({ config: { ...currentConfig, historico_importado_at: importedAt } })
-      .eq("id", integration.id)
+      .select("id, config")
+      .eq("tenant_id", tenantId)
+      .eq("type", "erp")
+      .eq("is_active", true)
+      .in("provider", ["toconline", "n8n"])
+      .maybeSingle()
+
+    if (integration) {
+      const currentConfig = (integration.config as Record<string, unknown>) ?? {}
+      await svc
+        .from("tenant_integrations")
+        .update({ config: { ...currentConfig, historico_importado_at: importedAt } })
+        .eq("id", integration.id)
+    }
   }
 
   return NextResponse.json({
