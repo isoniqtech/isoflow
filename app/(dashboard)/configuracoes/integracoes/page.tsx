@@ -3,10 +3,9 @@ import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
 import { EmailIntegrationCard } from "@/components/configuracoes/email-integration-card"
-import { ErpIntegrationCard } from "@/components/configuracoes/erp-integration-card"
+import { ErpCard } from "@/components/configuracoes/erp-card"
 import { WhatsAppIntegrationCard } from "@/components/configuracoes/whatsapp-integration-card"
 import { BankAccountsCard } from "@/components/configuracoes/bank-accounts-card"
-import { ToconlineDirectCard } from "@/components/configuracoes/toconline-direct-card"
 import { AiIntegrationCard } from "@/components/configuracoes/ai-integration-card"
 import { GoogleDriveCard } from "@/components/configuracoes/google-drive-card"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
@@ -272,18 +271,15 @@ export default async function IntegracoesPage() {
         </p>
       </div>
 
-      {/* Grid de integracoes — 2 a 2. O ERP e' um so' quadrado (n8n + TOConline
-          direto, com o seletor de modo dentro). */}
+      {/* Grid de integracoes - 2 a 2. O ERP e' um so' quadrado: dois icones
+          (n8n / TOConline) escolhem o modo e revelam o detalhe de cada um. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <div className="space-y-3">
-          {/* ERP - n8n (webhook) + TOConline direto (seletor de modo) */}
-          <ErpIntegrationCard initial={erpInitial} canEdit={canEditErp} />
-          <ToconlineDirectCard
-            initial={tcDirectConfig}
-            integrationMode={integrationMode}
-            canEdit={canEditErp}
-          />
-        </div>
+        <ErpCard
+          erpInitial={erpInitial}
+          tcDirectConfig={tcDirectConfig}
+          integrationMode={integrationMode}
+          canEdit={canEditErp}
+        />
 
         <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
 

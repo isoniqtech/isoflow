@@ -48,10 +48,13 @@ export function ToconlineDirectCard({
   initial,
   integrationMode,
   canEdit,
+  hideModeSelector = false,
 }: {
   initial: DirectConfig | null
   integrationMode: IntegrationMode
   canEdit: boolean
+  /** Esconde o seletor de modo interno (usado quando o ErpCard ja' o fornece). */
+  hideModeSelector?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -304,7 +307,7 @@ export function ToconlineDirectCard({
         </div>
 
         {/* Seletor de modo */}
-        {canEdit && (
+        {canEdit && !hideModeSelector && (
           <div className="space-y-1.5">
             <Label htmlFor="integration-mode">Modo de integracao ERP</Label>
             <div className="flex items-center gap-2">
