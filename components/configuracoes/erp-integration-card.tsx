@@ -14,6 +14,12 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { cn } from "@/lib/utils"
@@ -42,7 +48,7 @@ export function ErpIntegrationCard({
   const [testing, setTesting] = useState(false)
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
-  const [syncing, setSyncing] = useState(false)
+  const [updating, setUpdating] = useState(false)
   const [importingHistory, setImportingHistory] = useState(false)
 
   async function handleTest() {
@@ -119,27 +125,22 @@ export function ErpIntegrationCard({
     }
   }
 
-  async function handleSyncToconline() {
-    setSyncing(true)
+  async function handleUpdateCurrent() {
+    setUpdating(true)
     try {
-      const now = new Date()
-      const res = await fetch("/api/faturas/sync-toconline", {
+      const res = await fetch("/api/integracoes/toconline/import-historico", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          month: now.getMonth() + 1,
-          year: now.getFullYear(),
-          type: "both",
-        }),
+        body: JSON.stringify({ scope: "current" }),
       })
       const body = await res.json()
-      if (res.ok) {
-        toast.success(`Sync TOCONLINE concluído`, {
-          description: `${body.created ?? 0} criadas · ${body.updated ?? 0} actualizadas${body.errors?.length ? ` · ${body.errors.length} erros` : ""}`,
+      if (res.ok && body.ok) {
+        toast.success("Mês atual atualizado", {
+          description: "Receita e gastos do mês recalculados a partir do TOConline.",
         })
         router.refresh()
       } else {
-        toast.error("Sync falhou", {
+        toast.error("Falha ao atualizar", {
           description: body.error ?? `HTTP ${res.status}`,
         })
       }
@@ -148,7 +149,7 @@ export function ErpIntegrationCard({
         description: e instanceof Error ? e.message : String(e),
       })
     } finally {
-      setSyncing(false)
+      setUpdating(false)
     }
   }
 
@@ -334,58 +335,90 @@ export function ErpIntegrationCard({
         )}
 
         {!showForm && canEdit && (
-          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleRemove}
-              disabled={removing}
-            >
-              {removing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="mr-2 h-4 w-4" />
+          <TooltipProvider delayDuration={200}>
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemove}
+                    disabled={removing}
+                  >
+                    {removing ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    Desligar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  Desliga a integração ERP. As faturas novas deixam de ser enviadas
+                  automaticamente ao n8n.
+                </TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={() => setShowForm(true)}>
+                    Editar
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs">
+                  Alterar o URL do webhook n8n ou o secret HMAC da integração.
+                </TooltipContent>
+              </Tooltip>
+
+              {initial?.is_active && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleUpdateCurrent}
+                      disabled={updating}
+                    >
+                      {updating ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                      )}
+                      Atualizar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Recalcula a receita e os gastos do mês atual a partir do TOConline.
+                    Só o total mensal - não importa faturas.
+                  </TooltipContent>
+                </Tooltip>
               )}
-              Desligar
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowForm(true)}
-            >
-              Editar
-            </Button>
-            {initial?.is_active && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSyncToconline}
-                disabled={syncing}
-              >
-                {syncing ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                Sincronizar TOCONLINE
-              </Button>
-            )}
-            {initial?.is_active && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleImportHistory}
-                disabled={importingHistory}
-              >
-                {importingHistory ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Importar histórico
-              </Button>
-            )}
-          </div>
+
+              {initial?.is_active && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleImportHistory}
+                      disabled={importingHistory}
+                    >
+                      {importingHistory ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-2 h-4 w-4" />
+                      )}
+                      Importar histórico
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Recalcula a receita e os gastos de todos os meses desde jan/2025
+                    (backfill completo). Pode demorar até um minuto.
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </TooltipProvider>
         )}
       </CardContent>
     </Card>
