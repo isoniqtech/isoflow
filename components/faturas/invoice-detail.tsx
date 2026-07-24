@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react"
 import { toast } from "sonner"
+import { PRE_ERP_STATUSES } from "@/lib/utils/invoice-status"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -357,7 +358,11 @@ function CreditNoteSection({
   const [loadingCandidates, setLoadingCandidates] = useState(false)
 
   const isCreditNote = invoice.document_kind === "credit_note"
-  const jaEnviada = invoice.erp_synced || invoice.status === "enviada_erp"
+  // "Ja no ERP" = a FC existe mesmo (toconline_fc_id) ou o estado passou o
+  // pre-ERP. NAO basta erp_synced (no n8n e' so' "enviado ao webhook").
+  const jaEnviada =
+    Boolean((invoice as { toconline_fc_id?: string | null }).toconline_fc_id) ||
+    !(PRE_ERP_STATUSES as readonly string[]).includes(invoice.status)
 
   async function patch(payload: Record<string, unknown>, successMsg: string) {
     setBusy(true)

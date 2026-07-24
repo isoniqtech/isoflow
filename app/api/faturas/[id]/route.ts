@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { log } from "@/lib/utils/audit"
+import { PRE_ERP_STATUSES } from "@/lib/utils/invoice-status"
 
 const invoiceUpdateSchema = z
   .object({
@@ -117,14 +118,20 @@ export async function PATCH(
   if (locksAfterErp) {
     const { data: atual } = await supabase
       .from("invoices")
-      .select("erp_synced, toconline_fc_id")
+      .select("status, toconline_fc_id")
       .eq("id", params.id)
       .eq("tenant_id", ctx.tenantId)
       .maybeSingle()
 
+    // So' bloqueia quando a FC EXISTE mesmo no ERP: ha' toconline_fc_id
+    // (confirmado pelo /update-fc no n8n, ou criado no modo direto) ou o estado
+    // ja' passou o pre-ERP. NAO basta erp_synced: no modo n8n isso e' so'
+    // "enviado ao webhook", nao "FC criada" - e deixava faturas sem FC com a
+    // categoria bloqueada (RNE 503508225 etc).
+    const row = atual as { status?: string | null; toconline_fc_id?: string | null } | null
     const jaEnviada =
-      Boolean(atual?.erp_synced) ||
-      Boolean((atual as { toconline_fc_id?: string | null } | null)?.toconline_fc_id)
+      Boolean(row?.toconline_fc_id) ||
+      (!!row?.status && !(PRE_ERP_STATUSES as readonly string[]).includes(row.status))
 
     if (jaEnviada) {
       const campo =
