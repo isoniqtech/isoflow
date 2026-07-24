@@ -2,13 +2,15 @@
 
 import { useState, useTransition, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Loader2, RefreshCw, History, SlidersHorizontal } from "lucide-react"
-import { Input } from "@/components/ui/input"
+import { FileText, Loader2, RefreshCw, History, SlidersHorizontal, Menu, Download, Sheet, FileSpreadsheet } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ExportDropdown } from "@/components/faturas/export-dropdown"
+import { DateInput } from "@/components/ui/date-input"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import {
   TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
@@ -159,6 +161,8 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   }
 
   const exportBaseUrl = `/api/efatura/export${atFilters.length > 0 ? `?at_status=${encodeURIComponent(atFilters.join(","))}` : ""}`
+  const buildExport = (format: "csv" | "xlsx" | "pdf") =>
+    `${exportBaseUrl}${exportBaseUrl.includes("?") ? "&" : "?"}format=${format}`
 
   return (
     <div className="flex-1 min-h-0 flex flex-col gap-3">
@@ -230,35 +234,15 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
             </PopoverContent>
           </Popover>
 
-          {/* Periodo — datas agrupadas (mes atual por defeito). O icone do
-              calendario e' o indicador nativo de cada input. */}
+          {/* Periodo — datas agrupadas, com o icone de calendario em cada input */}
           <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="h-7 w-[128px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
-              aria-label="Data início"
-            />
+            <DateInput value={dateFrom} onChange={setDateFrom} ariaLabel="Data início" />
             <span className="text-muted-foreground text-sm">–</span>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
-              aria-label="Data fim"
-            />
+            <DateInput value={dateTo} onChange={setDateTo} ariaLabel="Data fim" />
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button size="sm" variant="outline" className="h-9" onClick={handleImportHistory} disabled={isPendingHistory || isPendingRefresh}>
-            {isPendingHistory
-              ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              : <History className="mr-2 h-4 w-4" />
-            }
-            Importar histórico
-          </Button>
           <Button size="sm" className="h-9" onClick={handleRefresh} disabled={isPendingRefresh || isPendingHistory}>
             {isPendingRefresh
               ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -266,7 +250,36 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
             }
             Atualizar
           </Button>
-          <ExportDropdown exportUrl={exportBaseUrl} compact />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon" className="h-9 w-9 bg-card border-border/60 shadow-sm" aria-label="Mais ações">
+                <Menu className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleImportHistory} disabled={isPendingHistory || isPendingRefresh}>
+                {isPendingHistory
+                  ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  : <History className="mr-2 h-4 w-4" />
+                }
+                Importar histórico
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Download className="h-3.5 w-3.5" />
+                Exportar
+              </DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <a href={buildExport("csv")} download><Sheet className="mr-2 h-4 w-4" />CSV</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={buildExport("xlsx")} download><FileSpreadsheet className="mr-2 h-4 w-4" />Excel (.xlsx)</a>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href={buildExport("pdf")} download><FileText className="mr-2 h-4 w-4" />PDF</a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -280,11 +293,14 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
-                  <TableHead className="w-10 text-center" />
+                  <TableHead className="w-10 text-center">
+                    <FileText className="h-4 w-4 text-muted-foreground inline-block" />
+                  </TableHead>
                   <TableHead className="cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[0].tip)} onMouseLeave={hideTip}>Fornecedor</TableHead>
                   <TableHead className="hidden md:table-cell cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[2].tip)} onMouseLeave={hideTip}>Data</TableHead>
                   <TableHead className="cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[3].tip)} onMouseLeave={hideTip}>Valor</TableHead>
                   <TableHead className="cursor-default select-none" onMouseEnter={(e) => showTip(e, HEADERS[4].tip)} onMouseLeave={hideTip}>Estado AT</TableHead>
+                  <TableHead className="cursor-default select-none" onMouseEnter={(e) => showTip(e, "Fatura da ISOFlow conciliada com este documento (numero), ou - se ainda nao ha' ligacao")} onMouseLeave={hideTip}>Conciliada</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -302,14 +318,12 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
                     <TableCell className="hidden md:table-cell text-sm">{doc.document_date ? formatDate(doc.document_date) : "—"}</TableCell>
                     <TableCell className="tabular-nums font-medium">{doc.total !== null ? formatCurrency(doc.total!) : "—"}</TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <ATStatusBadge status={doc.at_status} />
-                        {doc.invoice_id && (
-                          <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">
-                            Conciliada
-                          </span>
-                        )}
-                      </div>
+                      <ATStatusBadge status={doc.at_status} />
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {doc.invoice_number
+                        ? <span className="text-foreground">{doc.invoice_number}</span>
+                        : <span className="text-muted-foreground">—</span>}
                     </TableCell>
                   </TableRow>
                 ))}

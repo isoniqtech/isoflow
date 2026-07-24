@@ -43,11 +43,10 @@ function BankBadge({ inv }: { inv: InvoiceListItem }) {
 }
 
 function ATBadge({ inv }: { inv: InvoiceListItem }) {
-  if (inv.at_communicated) {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Compra Registada</span>
-  }
-  if (inv.efatura_at_status) {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">Pendente AT</span>
+  // Conciliada = existe associacao entre a fatura e um documento na e-Fatura.
+  const conciliada = inv.at_communicated || Boolean(inv.efatura_at_status)
+  if (conciliada) {
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
   }
   return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Por conciliar</span>
 }
@@ -61,7 +60,7 @@ const TIPS: Record<string, string> = {
   value:    "Valor total da fatura com IVA incluido",
   status:   "Estado atual do processamento da fatura",
   bank:     "Indica se a fatura foi conciliada com um movimento bancario",
-  at:       "Indica se a fatura esta registada na e-Fatura da Autoridade Tributaria",
+  at:       "Conciliada quando a fatura esta associada a um documento na e-Fatura; senao Por conciliar",
 }
 
 export function InvoiceTableFC({

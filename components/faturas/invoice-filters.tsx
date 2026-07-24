@@ -4,7 +4,7 @@ import { useTransition } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import { SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { DateInput } from "@/components/ui/date-input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Select,
@@ -147,24 +147,11 @@ export function InvoiceFilters({
         </PopoverContent>
       </Popover>
 
-      {/* Periodo — datas agrupadas num so' controlo (icone do calendario e' o
-          indicador nativo de cada input) */}
+      {/* Periodo — datas agrupadas, com o icone de calendario em cada input */}
       <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
-        <Input
-          type="date"
-          value={value.date_from}
-          onChange={(e) => setParam("from", e.target.value)}
-          className="h-7 w-[128px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
-          aria-label="Data início"
-        />
+        <DateInput value={value.date_from} onChange={(v) => setParam("from", v)} ariaLabel="Data início" />
         <span className="text-muted-foreground text-sm">–</span>
-        <Input
-          type="date"
-          value={value.date_to}
-          onChange={(e) => setParam("to", e.target.value)}
-          className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
-          aria-label="Data fim"
-        />
+        <DateInput value={value.date_to} onChange={(v) => setParam("to", v)} ariaLabel="Data fim" />
       </div>
 
       <Button
