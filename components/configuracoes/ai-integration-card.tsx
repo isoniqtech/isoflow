@@ -204,16 +204,15 @@ export function AiIntegrationCard({
 function StatusBadge({ status }: { status: "connected" | "platform" | "error" }) {
   const map = {
     connected: {
-      label: "Chave propria",
+      label: "Ligado",
       dot: "bg-emerald-500",
       className:
         "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40",
     },
     platform: {
-      label: "Chave da plataforma",
-      dot: "bg-blue-500",
-      className:
-        "bg-blue-100 text-blue-900 border-blue-200 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-900/40",
+      label: "Desligado",
+      dot: "bg-muted-foreground",
+      className: "",
     },
     error: {
       label: "Erro",

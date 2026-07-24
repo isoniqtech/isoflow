@@ -305,7 +305,7 @@ export function ToconlineDirectCard({
               </p>
             </div>
           </div>
-          <StatusBadge status={status} />
+          {!bare && <StatusBadge status={status} />}
         </div>
 
         {/* Seletor de modo */}

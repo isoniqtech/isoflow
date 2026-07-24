@@ -7,6 +7,7 @@ import {
   Download,
   FileSpreadsheet,
   Loader2,
+  Power,
   RefreshCw,
   Trash2,
 } from "lucide-react"
@@ -243,7 +244,7 @@ export function ErpIntegrationCard({
               </p>
             </div>
           </div>
-          <StatusBadge status={status} />
+          {!bare && <StatusBadge status={status} />}
         </div>
 
         {initial && status !== "soon" && (
@@ -339,27 +340,50 @@ export function ErpIntegrationCard({
         {!showForm && canEdit && (
           <TooltipProvider delayDuration={200}>
             <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemove}
-                    disabled={removing}
-                  >
-                    {removing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
-                    )}
-                    Desligar
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  Desliga a integração ERP. As faturas novas deixam de ser enviadas
-                  automaticamente ao n8n.
-                </TooltipContent>
-              </Tooltip>
+              {initial?.is_active ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemove}
+                      disabled={removing}
+                    >
+                      {removing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      Desligar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Desliga a integração ERP. As faturas novas deixam de ser enviadas
+                    automaticamente ao n8n.
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={saving || !url}
+                    >
+                      {saving ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Power className="mr-2 h-4 w-4" />
+                      )}
+                      Ligar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Reativa a integração ERP. As faturas novas voltam a ser enviadas
+                    ao n8n (usa o URL e o secret já guardados).
+                  </TooltipContent>
+                </Tooltip>
+              )}
 
               <Tooltip>
                 <TooltipTrigger asChild>

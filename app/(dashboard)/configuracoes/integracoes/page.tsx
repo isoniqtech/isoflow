@@ -261,12 +261,12 @@ export default async function IntegracoesPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Configuracoes
+          Configurações
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Integracoes</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
         <p className="text-muted-foreground text-sm">
-          Liga ERPs, banco e canais de rececao de faturas. Configuracoes
-          completas vao sendo ativadas a medida que adicionas as chaves no
+          Liga ERPs, banco e canais de receção de faturas. As configurações
+          completas vão sendo ativadas à medida que adicionas as chaves no
           servidor.
         </p>
       </div>
