@@ -2,7 +2,7 @@
 
 import { useTransition } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { CalendarDays, SlidersHorizontal } from "lucide-react"
+import { SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -147,14 +147,14 @@ export function InvoiceFilters({
         </PopoverContent>
       </Popover>
 
-      {/* Periodo — datas agrupadas num so' controlo */}
+      {/* Periodo — datas agrupadas num so' controlo (icone do calendario e' o
+          indicador nativo de cada input) */}
       <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
-        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
         <Input
           type="date"
           value={value.date_from}
           onChange={(e) => setParam("from", e.target.value)}
-          className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
+          className="h-7 w-[128px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
           aria-label="Data início"
         />
         <span className="text-muted-foreground text-sm">–</span>

@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { FileText, Loader2, RefreshCw, History, CalendarDays, SlidersHorizontal } from "lucide-react"
+import { FileText, Loader2, RefreshCw, History, SlidersHorizontal } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -230,14 +230,14 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
             </PopoverContent>
           </Popover>
 
-          {/* Periodo — datas agrupadas (mes atual por defeito) */}
+          {/* Periodo — datas agrupadas (mes atual por defeito). O icone do
+              calendario e' o indicador nativo de cada input. */}
           <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
-            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
             <Input
               type="date"
               value={dateFrom}
               onChange={(e) => setDateFrom(e.target.value)}
-              className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
+              className="h-7 w-[128px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
               aria-label="Data início"
             />
             <span className="text-muted-foreground text-sm">–</span>
