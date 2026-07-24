@@ -2,7 +2,8 @@
 
 import { useState, useTransition, useMemo, useCallback } from "react"
 import { useRouter } from "next/navigation"
-import { FileSpreadsheet, FileText, Loader2, RefreshCw, ChevronDown, Download, Sheet, History } from "lucide-react"
+import { FileSpreadsheet, FileText, Loader2, RefreshCw, ChevronDown, Download, Sheet, History, CalendarDays } from "lucide-react"
+import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -114,7 +115,14 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const { efatura_docs } = data
   const router = useRouter()
 
+  // Periodo por defeito: mes atual (1 -> hoje).
+  const now = new Date()
+  const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+  const monthTo = now.toISOString().slice(0, 10)
+
   const [atFilters, setAtFilters] = useState<string[]>([])
+  const [dateFrom, setDateFrom] = useState(monthFrom)
+  const [dateTo, setDateTo] = useState(monthTo)
   const [isPendingRefresh, startRefresh] = useTransition()
   const [isPendingHistory, startHistory] = useTransition()
   const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null)
@@ -127,9 +135,13 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const hideTip = useCallback(() => setTooltip(null), [])
 
   const filteredDocs = useMemo(() => {
-    if (atFilters.length === 0) return efatura_docs
-    return efatura_docs.filter(d => d.at_status !== null && atFilters.includes(d.at_status))
-  }, [efatura_docs, atFilters])
+    return efatura_docs.filter((d) => {
+      if (atFilters.length > 0 && !(d.at_status !== null && atFilters.includes(d.at_status))) return false
+      if (dateFrom && (!d.document_date || d.document_date < dateFrom)) return false
+      if (dateTo && (!d.document_date || d.document_date > dateTo)) return false
+      return true
+    })
+  }, [efatura_docs, atFilters, dateFrom, dateTo])
 
   const pendingCount = efatura_docs.filter(d => !d.invoice_id).length
 
@@ -255,6 +267,25 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
           {pendingCount > 0 && ` · ${pendingCount} por conciliar`}
         </p>
         <div className="flex items-center gap-2 flex-wrap">
+          {/* Periodo — datas agrupadas (mes atual por defeito) */}
+          <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
+            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
+              aria-label="Data início"
+            />
+            <span className="text-muted-foreground text-sm">–</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
+              aria-label="Data fim"
+            />
+          </div>
           <MultiSelectFilter
             options={AT_STATUS_OPTIONS}
             selected={atFilters}

@@ -4,7 +4,6 @@ import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ExportDropdown } from "@/components/faturas/export-dropdown"
 import { InvoiceTableFC } from "@/components/faturas/invoice-table-fc"
-import { InvoiceFilters } from "@/components/faturas/invoice-filters"
 import { InvoicesRealtime } from "@/components/faturas/invoices-realtime"
 import { InvoicesPagination } from "./invoices-pagination"
 import { EFaturaTab } from "@/components/faturas/efatura-tab"
@@ -54,8 +53,12 @@ export default async function FaturasPage({
     : "all"
   const project_id = searchParams.project ?? "all"
   const needs_review = searchParams.review === "1"
-  const date_from = searchParams.from ?? ""
-  const date_to = searchParams.to ?? ""
+  // Por defeito, o periodo e' o mes atual (1 -> hoje). O utilizador pode alargar.
+  const now = new Date()
+  const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+  const monthTo = now.toISOString().slice(0, 10)
+  const date_from = searchParams.from ?? monthFrom
+  const date_to = searchParams.to ?? monthTo
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1)
 
   const filter: InvoicesFilter = {
@@ -144,12 +147,6 @@ export default async function FaturasPage({
           ))}
         </div>
 
-        {activeTab === "todas" && (
-          <InvoiceFilters
-            value={{ status, source, project_id, needs_review, date_from, date_to }}
-            projects={projects}
-          />
-        )}
       </div>
 
       {/* Tabela — flex-1, só as linhas fazem scroll */}
@@ -159,6 +156,8 @@ export default async function FaturasPage({
             <InvoiceTableFC
               invoices={invoices}
               canEdit={hasPermission(session.role, "faturas", "edit")}
+              filterProjects={projects}
+              filterValue={{ status, source, project_id, needs_review, date_from, date_to }}
             />
           )}
           {activeTab === "efatura" && <EFaturaTab data={eFaturaPageData} />}

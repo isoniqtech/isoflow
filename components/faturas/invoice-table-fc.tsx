@@ -18,9 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { StatusBadge } from "@/components/faturas/status-badge"
+import { InvoiceFilters, type InvoiceFiltersValue } from "@/components/faturas/invoice-filters"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
-import type { InvoiceListItem } from "@/lib/queries/invoices"
+import type { InvoiceListItem, ProjectOption as FilterProjectOption } from "@/lib/queries/invoices"
 import type { InvoiceSource } from "@/types"
 
 type ProjectOption = { id: string; name: string; color: string }
@@ -65,9 +66,13 @@ const TIPS: Record<string, string> = {
 export function InvoiceTableFC({
   invoices,
   canEdit = false,
+  filterProjects,
+  filterValue,
 }: {
   invoices: InvoiceListItem[]
   canEdit?: boolean
+  filterProjects: FilterProjectOption[]
+  filterValue: InvoiceFiltersValue
 }) {
   const [projects, setProjects] = useState<ProjectOption[]>([])
 
@@ -174,12 +179,28 @@ export function InvoiceTableFC({
   }
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col gap-2">
+    <div className="flex-1 min-h-0 flex flex-col gap-3">
       {tip && (
         <div style={{ position: "fixed", left: tip.x, top: tip.y, transform: "translateX(-50%)", zIndex: 9999, pointerEvents: "none", whiteSpace: "nowrap", background: "#111827", color: "#fff", padding: "4px 10px", borderRadius: "6px", fontSize: "12px", lineHeight: "1.5", boxShadow: "0 2px 8px rgba(0,0,0,0.25)" }}>
           {tip.text}
         </div>
       )}
+      {/* Filtros + Enviar ao ERP — mesma linha, sempre visivel (sticky no topo) */}
+      <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-2">
+        <InvoiceFilters value={filterValue} projects={filterProjects} />
+        {eligible.length > 0 && (
+          <Button
+            size="sm"
+            className="h-9 shrink-0"
+            onClick={handleCreateFC}
+            disabled={isPending || selected.size === 0}
+          >
+            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
+          </Button>
+        )}
+      </div>
+
       {invoices.length === 0 ? (
         <div className="flex-1 border border-border/60 rounded-lg p-12 flex flex-col items-center text-center bg-card shadow-[var(--shadow-card,none)]">
           <FileText className="h-10 w-10 text-muted-foreground mb-3" />
@@ -189,20 +210,7 @@ export function InvoiceTableFC({
           </p>
         </div>
       ) : (
-        <>
-          {/* Barra ERP — estática */}
-          <div className="flex-shrink-0 flex items-center justify-between px-1 min-h-[32px]">
-            <p className="text-sm text-muted-foreground">
-              {selected.size > 0 ? `${selected.size} selecionada${selected.size !== 1 ? "s" : ""}` : ""}
-            </p>
-            <Button size="sm" onClick={handleCreateFC} disabled={isPending || selected.size === 0}>
-              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-              Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
-            </Button>
-          </div>
-
-          {/* Tabela — thead sticky, tbody scrollável */}
-          <div className="flex-1 min-h-0 rounded-lg border border-border/60 bg-card overflow-auto shadow-[var(--shadow-card,none)]">
+        <div className="flex-1 min-h-0 rounded-lg border border-border/60 bg-card overflow-auto shadow-[var(--shadow-card,none)]">
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
@@ -336,7 +344,6 @@ export function InvoiceTableFC({
                 </TableBody>
             </table>
           </div>
-        </>
       )}
     </div>
   )
