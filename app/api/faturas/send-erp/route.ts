@@ -3,7 +3,7 @@ import { z } from "zod"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
+import { sendInvoiceToERP } from "@/lib/toconline/send-fc"
 import { log } from "@/lib/utils/audit"
 
 const bodySchema = z.object({
@@ -25,9 +25,9 @@ export async function POST(req: Request) {
   const errors: string[] = []
 
   for (const id of parsed.data.invoice_ids) {
-    const result = await forwardInvoiceToN8N(admin, id, ctx.tenantId)
+    const result = await sendInvoiceToERP(ctx.tenantId, id)
     if (result.skipped) { skipped++; continue }
-    if (!result.ok) { errors.push(`${id}: ${result.error ?? `HTTP ${result.status}`}`); continue }
+    if (!result.ok) { errors.push(`${id}: ${result.error ?? "erro"}`); continue }
     sent++
     await log(admin, {
       action: "invoice.erp_send",

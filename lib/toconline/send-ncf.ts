@@ -1,18 +1,15 @@
 /**
- * Envio de uma nota de credito (NCF) ao ERP - caminho ISOLADO, novo.
- * Nao passa pelo create-fc nem pelo forwardInvoiceToN8N (FC). Trata os dois modos:
- *  - toconline_direct: cria a NCF diretamente (lib/toconline/ncf.ts)
- *  - n8n: chama um webhook PROPRIO da NCF (N8N_NCF_WEBHOOK_URL), distinto do FC
+ * Envio de uma nota de credito (NCF) ao ERP - caminho ISOLADO.
+ * Cria a NCF via app nos DOIS modos (direto por OAuth, n8n pelo proxy), pelo
+ * ncf.ts/tocRequest. Ja NAO ha' forward a um webhook n8n proprio.
  *
- * Decisao de produto (Opcao A): a NCF e' independente do FC. Nao espera pelo FC
- * original; a ligacao FC<->NCF vive so na app. Ver o handoff das notas de credito.
+ * Decisao de produto (Opcao A): a NCF e' independente do FC. A ligacao FC<->NCF
+ * vive so' na app.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getValidToken } from "@/lib/toconline/token"
-import { createDirectNCF } from "@/lib/toconline/ncf"
-import { DEFAULT_EXPENSE_CATEGORY } from "@/lib/toconline/fc"
+import { createNCF } from "@/lib/toconline/ncf"
 import { PRE_ERP_STATUSES } from "@/lib/utils/invoice-status"
 
 export interface SendNCFResult {
@@ -70,18 +67,24 @@ export async function sendCreditNoteToERP(
     return { ok: true, skipped: true, ncfNumber: invoice.toconline_fc_id }
   }
 
-  const { data: tenantRow } = await admin
-    .from("tenants")
-    .select("integration_mode")
-    .eq("id", tenantId)
-    .maybeSingle()
-  const integrationMode =
-    (tenantRow as { integration_mode?: string } | null)?.integration_mode ?? "n8n"
-
-  if (integrationMode === "toconline_direct") {
-    return sendDirect(admin, tenantId, invoice)
+  // Cria a NCF via app (os dois modos, resolvido pelo tocRequest). Sem branching.
+  try {
+    const result = await createNCF(tenantId, {
+      invoiceId: invoice.id,
+      creditNoteNumber: invoice.invoice_number,
+      date: invoice.invoice_date,
+      supplierNif: invoice.supplier_nif,
+      supplierName: invoice.supplier_name,
+      subtotal: invoice.subtotal !== null ? Number(invoice.subtotal) : null,
+      description: invoice.description,
+      vatRate: invoice.vat_rate !== null ? Number(invoice.vat_rate) : null,
+      expenseCategoryCode: invoice.expense_category_code,
+    })
+    await markSent(admin, tenantId, invoice.id, result.ncfNumber)
+    return { ok: true, alreadyExisted: result.alreadyExisted, ncfNumber: result.ncfNumber }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
   }
-  return sendViaN8N(admin, tenantId, invoice)
 }
 
 /**
@@ -124,107 +127,4 @@ async function markSent(
     .eq("id", invoiceId)
     .eq("tenant_id", tenantId)
     .in("status", PRE_ERP_STATUSES as unknown as string[])
-}
-
-async function sendDirect(
-  admin: SupabaseClient,
-  tenantId: string,
-  invoice: InvoiceRow,
-): Promise<SendNCFResult> {
-  let token: Awaited<ReturnType<typeof getValidToken>>
-  try {
-    token = await getValidToken(tenantId)
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
-
-  try {
-    const result = await createDirectNCF(token.accessToken, token.appBase, token.apiBase, {
-      invoiceId: invoice.id,
-      creditNoteNumber: invoice.invoice_number,
-      date: invoice.invoice_date,
-      supplierNif: invoice.supplier_nif,
-      supplierName: invoice.supplier_name,
-      subtotal: invoice.subtotal !== null ? Number(invoice.subtotal) : null,
-      description: invoice.description,
-      vatRate: invoice.vat_rate !== null ? Number(invoice.vat_rate) : null,
-      expenseCategoryCode: invoice.expense_category_code,
-    })
-    await markSent(admin, tenantId, invoice.id, result.ncfNumber)
-    return { ok: true, alreadyExisted: result.alreadyExisted, ncfNumber: result.ncfNumber }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
-}
-
-async function sendViaN8N(
-  admin: SupabaseClient,
-  tenantId: string,
-  invoice: InvoiceRow,
-): Promise<SendNCFResult> {
-  // MESMO webhook do FC. O workflow diferencia FC de NC pelo document_type; o
-  // shape do payload e' identico ao do create-fc (create-fc/route.ts), so muda
-  // document_type: "NC". Assim basta um if no workflow existente.
-  const { data: integration } = await admin
-    .from("tenant_integrations")
-    .select("config")
-    .eq("tenant_id", tenantId)
-    .eq("type", "erp")
-    .eq("provider", "n8n")
-    .eq("is_active", true)
-    .maybeSingle()
-
-  const n8nUrl =
-    (integration?.config as { url?: string } | null)?.url || process.env.N8N_WEBHOOK_URL
-  if (!n8nUrl) {
-    return { ok: false, error: "Integracao ERP n8n nao configurada" }
-  }
-
-  // item_description (nome da categoria) para paridade total com o payload do FC.
-  let itemDescription: string | null = null
-  const itemCode = invoice.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY
-  try {
-    const { getExpenseCategories } = await import("@/lib/toconline/expense-categories")
-    const catalogo = await getExpenseCategories(tenantId, admin)
-    itemDescription = catalogo.find((c) => c.code === itemCode)?.name ?? null
-  } catch {
-    // best-effort: o item_description e' opcional
-  }
-
-  const cronSecret = process.env.CRON_SECRET ?? ""
-  try {
-    const res = await fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tenant_id: tenantId,
-        callback_secret: cronSecret,
-        document_type: "NC", // <- o workflow trata como nota de credito (NCF)
-        invoice: {
-          id: invoice.id,
-          supplier_name: invoice.supplier_name,
-          supplier_nif: invoice.supplier_nif,
-          invoice_number: invoice.invoice_number, // nº da NC -> external_reference
-          invoice_date: invoice.invoice_date,
-          subtotal: invoice.subtotal,
-          vat_rate: invoice.vat_rate,
-          vat_amount: invoice.vat_amount,
-          total: invoice.total,
-          description: invoice.description,
-          currency: invoice.currency ?? "EUR",
-          movement_note: null,
-          item_code: itemCode,
-          item_description: itemDescription,
-        },
-      }),
-    })
-    if (!res.ok) {
-      const text = await res.text().catch(() => "")
-      return { ok: false, error: `n8n NC ${res.status}: ${text.slice(0, 300)}` }
-    }
-    // O workflow cria a NCF e faz callback /api/faturas/[id]/update-fc (como o FC).
-    return { ok: true, queued: true }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) }
-  }
 }

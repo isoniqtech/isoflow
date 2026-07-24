@@ -1,7 +1,7 @@
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
+import { sendInvoiceToERP } from "@/lib/toconline/send-fc"
 import { log } from "@/lib/utils/audit"
 
 export const runtime = "nodejs"
@@ -22,7 +22,7 @@ export async function POST(
   }
 
   const admin = createAdminClient()
-  const result = await forwardInvoiceToN8N(admin, params.id, ctx.tenantId)
+  const result = await sendInvoiceToERP(ctx.tenantId, params.id)
 
   await log(admin, {
     action: "invoice.erp_resend",
@@ -32,19 +32,16 @@ export async function POST(
     resourceId: params.id,
     metadata: {
       ok: result.ok,
-      status: result.status,
       skipped: result.skipped ?? false,
+      fc_number: result.fcNumber ?? null,
     },
   })
 
-  if (result.skipped) {
-    return jsonError("Sem integração ERP/n8n configurada", 400)
-  }
   if (!result.ok) {
     return Response.json(
-      { ok: false, status: result.status, error: result.error },
+      { ok: false, error: result.error },
       { status: 502 },
     )
   }
-  return Response.json({ ok: true, status: result.status })
+  return Response.json({ ok: true, fc_number: result.fcNumber ?? null, already_existed: result.alreadyExisted ?? false })
 }

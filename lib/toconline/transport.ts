@@ -168,8 +168,11 @@ async function tocRequestViaN8N(
       path: opts.path,
       query: opts.query ?? {},
       body: opts.body ?? null,
+      // Content-Type para o POST (o proxy manda o body em Raw com este tipo).
+      // Criar fornecedor precisa de application/vnd.api+json; o resto json.
+      contentType: opts.contentType ?? "application/json",
     }),
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 30000),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 60000),
   })
 
   if (!res.ok) {
