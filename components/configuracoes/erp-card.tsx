@@ -26,44 +26,24 @@ const OPTIONS: {
 
 const BADGE_GREEN =
   "bg-emerald-100 text-emerald-900 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-200 dark:border-emerald-900/40"
-const BADGE_RED =
-  "bg-red-100 text-red-900 border-red-200 dark:bg-red-900/20 dark:text-red-200 dark:border-red-900/40"
-const BADGE_BLUE =
-  "bg-blue-100 text-blue-900 border-blue-200 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-900/40"
-
-type BadgeState = { label: string; dot: string; className: string }
 
 /**
- * Estado do modo ativo, com os mesmos labels/cores que cada card mostraria por
- * si (n8n: Ligado/Desligado/Pronto a ligar/Erro; TOConline: Ligado/Por
- * configurar/Erro), para o badge subir ao topo do quadrado.
+ * Estado do modo ativo em binario: so' Ligado (ativo, sem erro / token valido)
+ * ou Desligado.
  */
-function getActiveBadge(
+function isModeConnected(
   mode: IntegrationMode,
   erpInitial: ErpInitial,
   tcDirectConfig: TcDirectConfig,
-): BadgeState {
+): boolean {
   if (mode === "n8n") {
-    if (erpInitial?.is_active) {
-      return erpInitial.sync_error
-        ? { label: "Erro", dot: "bg-destructive", className: BADGE_RED }
-        : { label: "Ligado", dot: "bg-emerald-500", className: BADGE_GREEN }
-    }
-    return erpInitial
-      ? { label: "Desligado", dot: "bg-muted-foreground", className: "" }
-      : { label: "Pronto a ligar", dot: "bg-blue-500", className: BADGE_BLUE }
+    return Boolean(erpInitial?.is_active && !erpInitial.sync_error)
   }
-
   const c = tcDirectConfig
   const tokenExpired = c?.token_expires_at
     ? new Date(c.token_expires_at) < new Date()
     : false
-  if (!c?.configured || !c?.is_active) {
-    return { label: "Por configurar", dot: "bg-muted-foreground", className: "" }
-  }
-  return c.sync_error || tokenExpired
-    ? { label: "Erro", dot: "bg-destructive", className: BADGE_RED }
-    : { label: "Ligado", dot: "bg-emerald-500", className: BADGE_GREEN }
+  return Boolean(c?.configured && c?.is_active && !c.sync_error && !tokenExpired)
 }
 
 /**
@@ -88,7 +68,7 @@ export function ErpCard({
   const [saving, setSaving] = useState(false)
 
   // Estado do modo ativo, mostrado no topo do quadrado (como nos outros cartoes).
-  const badge = getActiveBadge(mode, erpInitial, tcDirectConfig)
+  const connected = isModeConnected(mode, erpInitial, tcDirectConfig)
 
   async function selectMode(next: IntegrationMode) {
     if (next === mode) return
@@ -155,10 +135,20 @@ export function ErpCard({
             })}
           </div>
 
-          <Badge variant="outline" className={cn("shrink-0", badge.className)}>
-            <span className={cn("h-1.5 w-1.5 rounded-full mr-1.5", badge.dot)} />
-            {badge.label}
-          </Badge>
+          {connected ? (
+            <Badge
+              variant="outline"
+              className={cn("shrink-0 gap-1.5 px-3 py-1 text-sm font-medium", BADGE_GREEN)}
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              Ligado
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="shrink-0 gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+              Desligado
+            </Badge>
+          )}
         </div>
 
         {/* Detalhe do modo selecionado (sem card proprio) */}
