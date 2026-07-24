@@ -146,7 +146,19 @@ export async function listInvoices(
 
   if (role === "member") query = query.eq("created_by", userId)
   if (investidorProjectIds) query = query.in("project_id", investidorProjectIds)
-  if (filter?.status && filter.status !== "all") query = query.eq("status", filter.status)
+  if (filter?.status && filter.status !== "all") {
+    // O badge "Em Sistema" agrupa varios estados internos (em_sistema, pending,
+    // processing, matched, paid, reconciled) - o filtro tem de apanhar o grupo,
+    // senao faturas que MOSTRAM "Em Sistema" mas nao sao exatamente "em_sistema"
+    // ficavam de fora. Os restantes estados sao match exato.
+    if (filter.status === "em_sistema") {
+      query = query.in("status", [
+        "em_sistema", "pending", "processing", "matched", "paid", "reconciled",
+      ])
+    } else {
+      query = query.eq("status", filter.status)
+    }
+  }
   if (filter?.source && filter.source !== "all") query = query.eq("source", filter.source)
   if (filter?.project_id) {
     if (filter.project_id === "none") query = query.is("project_id", null)

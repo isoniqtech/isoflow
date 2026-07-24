@@ -38,7 +38,7 @@ function BankBadge({ inv }: { inv: InvoiceListItem }) {
   if (inv.bank_transaction_id) {
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
   }
-  return <span className="text-xs text-muted-foreground">Por conciliar</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Por conciliar</span>
 }
 
 function ATBadge({ inv }: { inv: InvoiceListItem }) {
@@ -48,7 +48,7 @@ function ATBadge({ inv }: { inv: InvoiceListItem }) {
   if (inv.efatura_at_status) {
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">Pendente AT</span>
   }
-  return <span className="text-xs text-muted-foreground">Sem FC</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Sem FC</span>
 }
 
 const TIPS: Record<string, string> = {
@@ -227,8 +227,7 @@ export function InvoiceTableFC({
                 )}
               </TableHead>
               <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
-              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "number")} onMouseLeave={hideTip}>Nr. Fatura</TableHead>
-              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
+              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
               <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>FC ERP</TableHead>
               <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
               <TableHead className="text-right cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
@@ -246,15 +245,17 @@ export function InvoiceTableFC({
                 <TableRow key={inv.id} className={cn("cursor-pointer", isSelected && "bg-muted/40")}>
                   <TableCell className="px-3">
                     {isEligible ? (
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={e => toggle(inv.id, e.target.checked)}
-                        aria-label={`Selecionar ${inv.supplier_name ?? inv.id}`}
-                        className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
-                      />
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => toggle(inv.id, e.target.checked)}
+                          aria-label={`Selecionar ${inv.supplier_name ?? inv.id}`}
+                          className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                        />
+                      </span>
                     ) : (
-                      <Link href={`/faturas/${inv.id}`} className="block">
+                      <Link href={`/faturas/${inv.id}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
                         <SourceIcon className="h-4 w-4 text-muted-foreground" />
                       </Link>
                     )}
@@ -265,13 +266,10 @@ export function InvoiceTableFC({
                         <span className="font-medium truncate">{inv.supplier_name ?? "Fornecedor desconhecido"}</span>
                         {inv.needs_review && <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" aria-label="Necessita revisão" />}
                       </div>
-                      {inv.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{inv.supplier_nif}</p>}
+                      <p className="text-xs text-muted-foreground font-mono">{inv.invoice_number ?? "—"}</p>
                     </Link>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell font-mono text-sm">
-                    <Link href={`/faturas/${inv.id}`} className="block">{inv.invoice_number ?? "—"}</Link>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm">
+                  <TableCell className="hidden md:table-cell text-sm">
                     <Link href={`/faturas/${inv.id}`} className="block">
                       {inv.invoice_date ? formatDate(inv.invoice_date) : "—"}
                     </Link>
