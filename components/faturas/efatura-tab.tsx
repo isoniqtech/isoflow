@@ -15,7 +15,7 @@ import {
   TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
-import type { EFaturaPageData, EFaturaDocument } from "@/lib/queries/efatura-documents"
+import type { EFaturaPageData } from "@/lib/queries/efatura-documents"
 
 const AT_STATUS_OPTIONS: { value: string; label: string }[] = [
   { value: "Pendente",          label: "Pendente" },
@@ -48,9 +48,10 @@ export function EFaturaTab({ data }: { data: EFaturaPageData }) {
   const { efatura_docs } = data
   const router = useRouter()
 
-  // Periodo por defeito: mes atual (1 -> hoje).
+  // Periodo por defeito: mes anterior + mes atual (1o dia do mes anterior -> hoje).
   const now = new Date()
-  const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const monthFrom = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}-01`
   const monthTo = now.toISOString().slice(0, 10)
 
   const [atFilters, setAtFilters] = useState<string[]>([])

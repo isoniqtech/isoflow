@@ -60,7 +60,9 @@ export default async function FaturasPage({
     status !== "all" || source !== "all" || project_id !== "all" ||
     document_kind !== "all" || needs_review
   const now = new Date()
-  const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+  // Periodo default: mes anterior + mes atual (1o dia do mes anterior -> hoje).
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const monthFrom = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}-01`
   const monthTo = now.toISOString().slice(0, 10)
   const date_from = searchParams.from ?? (hasOtherFilter ? "" : monthFrom)
   const date_to = searchParams.to ?? (hasOtherFilter ? "" : monthTo)
