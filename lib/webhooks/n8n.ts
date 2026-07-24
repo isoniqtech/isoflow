@@ -236,13 +236,15 @@ export async function forwardInvoiceToN8N(
     { url: config.url, secret },
   )
 
-  // 5. Atualizar status na fatura + integração
+  // 5. Atualizar status
   const now = new Date().toISOString()
   if (result.ok) {
-    await admin
-      .from("invoices")
-      .update({ erp_synced: true, erp_synced_at: now, updated_at: now })
-      .eq("id", invoiceId)
+    // NAO marcar erp_synced aqui. O forward apenas ENVIA a fatura ao webhook
+    // n8n; a FC so' existe quando o n8n a cria e confirma via /update-fc (que
+    // preenche toconline_fc_id + erp_synced). Marcar erp_synced no envio deixava
+    // faturas "sincronizadas" sem FC nenhuma, com a categoria bloqueada e fora
+    // da lista de elegiveis para (re)criar FC. O estado da fatura fica intacto
+    // ate' a confirmacao real chegar.
     await admin
       .from("tenant_integrations")
       .update({ last_sync_at: now, sync_error: null, updated_at: now })
