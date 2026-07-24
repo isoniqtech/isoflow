@@ -4,8 +4,7 @@ import { getCurrentSession } from "@/lib/queries/current-session"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { hasPermission } from "@/lib/utils/permissions"
-import { getValidToken } from "@/lib/toconline/token"
-import { createDirectFC } from "@/lib/toconline/fc"
+import { createFC } from "@/lib/toconline/fc"
 import { PRE_ERP_STATUSES } from "@/lib/utils/invoice-status"
 
 const bodySchema = z.object({
@@ -25,15 +24,6 @@ export async function POST(request: Request) {
 
   const supabase = createClient()
   const tenantId = session.tenant.id
-
-  // Ler modo de integracao do tenant
-  const { data: tenantRow } = await supabase
-    .from("tenants")
-    .select("integration_mode")
-    .eq("id", tenantId)
-    .maybeSingle()
-
-  const integrationMode = (tenantRow as { integration_mode?: string } | null)?.integration_mode ?? "n8n"
 
   // Buscar faturas elegíveis
   const { data: invoices, error } = await supabase
@@ -70,149 +60,61 @@ export async function POST(request: Request) {
     inv.bank_transaction_id ? noteByTxId.get(inv.bank_transaction_id) ?? null : null
 
   // -------------------------------------------------------------------
-  // MODO DIRETO: cria FC directamente no TOConline sem passar pelo n8n
+  // Criar FC via app - os DOIS modos (direto por OAuth, n8n pelo proxy).
+  // O fc.ts trata dedup -> fornecedor -> criar FC e devolve o numero na hora,
+  // por isso ja NAO ha' forward ao webhook n8n nem callback /update-fc.
   // -------------------------------------------------------------------
-  if (integrationMode === "toconline_direct") {
-    let tokenConfig: Awaited<ReturnType<typeof getValidToken>>
-    try {
-      tokenConfig = await getValidToken(tenantId)
-    } catch (e) {
-      return NextResponse.json(
-        { error: `TOConline nao disponivel: ${e instanceof Error ? e.message : String(e)}` },
-        { status: 503 },
-      )
-    }
-
-    const admin = createAdminClient()
-    const now = new Date().toISOString()
-    const errors: string[] = []
-    let created = 0
-    let skipped = alreadyDone
-
-    await Promise.all(
-      pending.map(async (inv) => {
-        try {
-          const result = await createDirectFC(tokenConfig.accessToken, tokenConfig.appBase, tokenConfig.apiBase, {
-            invoiceId: inv.id,
-            invoiceNumber: inv.invoice_number,
-            invoiceDate: inv.invoice_date,
-            supplierNif: inv.supplier_nif,
-            supplierName: inv.supplier_name,
-            subtotal: inv.subtotal !== null ? Number(inv.subtotal) : null,
-            description: inv.description,
-            movementNote: noteForInvoice(inv),
-            vatRate: inv.vat_rate !== null ? Number(inv.vat_rate) : null,
-            expenseCategoryCode: inv.expense_category_code ?? null,
-          })
-
-          // Gravar fc_number directamente - mesma logica que /api/faturas/[id]/update-fc
-          await admin
-            .from("invoices")
-            .update({
-              toconline_fc_id: result.fcNumber,
-              erp_synced: true,
-              erp_synced_at: now,
-              updated_at: now,
-            })
-            .eq("id", inv.id)
-            .eq("tenant_id", tenantId)
-
-          // Promover o estado so' a partir de fases anteriores ao ERP
-          await admin
-            .from("invoices")
-            .update({ status: "enviada_erp", updated_at: now })
-            .eq("id", inv.id)
-            .eq("tenant_id", tenantId)
-            .in("status", PRE_ERP_STATUSES as unknown as string[])
-
-          if (result.alreadyExisted) {
-            skipped++
-          } else {
-            created++
-          }
-        } catch (e) {
-          errors.push(
-            `${inv.invoice_number ?? inv.id}: ${e instanceof Error ? e.message : String(e)}`,
-          )
-        }
-      }),
-    )
-
-    return NextResponse.json({ queued: created, skipped, errors })
-  }
-
-  // -------------------------------------------------------------------
-  // MODO N8N: comportamento original intocado
-  // O n8n recebe o payload e chama /api/faturas/[id]/update-fc de volta.
-  // -------------------------------------------------------------------
-
-  const { data: integration } = await supabase
-    .from("tenant_integrations")
-    .select("config")
-    .eq("tenant_id", tenantId)
-    .eq("type", "erp")
-    .eq("provider", "n8n")
-    .eq("is_active", true)
-    .maybeSingle()
-
-  const n8nUrl = (integration?.config as { url?: string } | null)?.url || process.env.N8N_WEBHOOK_URL
-  if (!n8nUrl)
-    return NextResponse.json({ error: "Integracao ERP nao configurada" }, { status: 503 })
-
-  const cronSecret = process.env.CRON_SECRET ?? ""
+  const admin = createAdminClient()
+  const now = new Date().toISOString()
   const errors: string[] = []
-
-  // Categoria de gasto (decidida pela IA / escolhida no detalhe da fatura).
-  // A logica e' a mesma do modo direto; aqui apenas viaja no payload para o
-  // n8n a mapear no TOConline. Campos aditivos: o n8n antigo ignora-os.
-  const { getExpenseCategories } = await import("@/lib/toconline/expense-categories")
-  const catalogo = await getExpenseCategories(tenantId, supabase)
-  const nomePorCodigo = new Map(catalogo.map((c) => [c.code, c.name]))
-  const { DEFAULT_EXPENSE_CATEGORY } = await import("@/lib/toconline/fc")
+  let created = 0
+  let skipped = alreadyDone
 
   await Promise.all(
     pending.map(async (inv) => {
       try {
-        const res = await fetch(n8nUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            tenant_id: tenantId,
-            callback_secret: cronSecret,
-            // Discriminador para o workflow n8n diferenciar FC de NC (aditivo:
-            // o workflow antigo ignora-o ate' ter o if). A NC vem no mesmo shape,
-            // pelo mesmo webhook, com document_type: "NC".
-            document_type: "FC",
-            invoice: {
-              id: inv.id,
-              supplier_name: inv.supplier_name,
-              supplier_nif: inv.supplier_nif,
-              invoice_number: inv.invoice_number,
-              invoice_date: inv.invoice_date,
-              subtotal: inv.subtotal,
-              vat_rate: inv.vat_rate,
-              vat_amount: inv.vat_amount,
-              total: inv.total,
-              description: inv.description,
-              currency: inv.currency ?? "EUR",
-              movement_note: noteForInvoice(inv),
-              // Categoria de gasto para a linha da FC no TOConline
-              item_code: inv.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY,
-              item_description:
-                nomePorCodigo.get(inv.expense_category_code ?? DEFAULT_EXPENSE_CATEGORY) ?? null,
-            },
-          }),
+        const result = await createFC(tenantId, {
+          invoiceId: inv.id,
+          invoiceNumber: inv.invoice_number,
+          invoiceDate: inv.invoice_date,
+          supplierNif: inv.supplier_nif,
+          supplierName: inv.supplier_name,
+          subtotal: inv.subtotal !== null ? Number(inv.subtotal) : null,
+          description: inv.description,
+          movementNote: noteForInvoice(inv),
+          vatRate: inv.vat_rate !== null ? Number(inv.vat_rate) : null,
+          expenseCategoryCode: inv.expense_category_code ?? null,
         })
-        if (!res.ok) {
-          const text = await res.text().catch(() => "")
-          errors.push(`${inv.invoice_number ?? inv.id}: HTTP ${res.status} ${text.slice(0, 200)}`)
-        }
+
+        // Gravar fc_number - mesma logica que /api/faturas/[id]/update-fc
+        await admin
+          .from("invoices")
+          .update({
+            toconline_fc_id: result.fcNumber,
+            erp_synced: true,
+            erp_synced_at: now,
+            updated_at: now,
+          })
+          .eq("id", inv.id)
+          .eq("tenant_id", tenantId)
+
+        // Promover o estado so' a partir de fases anteriores ao ERP
+        await admin
+          .from("invoices")
+          .update({ status: "enviada_erp", updated_at: now })
+          .eq("id", inv.id)
+          .eq("tenant_id", tenantId)
+          .in("status", PRE_ERP_STATUSES as unknown as string[])
+
+        if (result.alreadyExisted) skipped++
+        else created++
       } catch (e) {
-        errors.push(`${inv.invoice_number ?? inv.id}: ${e instanceof Error ? e.message : String(e)}`)
+        errors.push(
+          `${inv.invoice_number ?? inv.id}: ${e instanceof Error ? e.message : String(e)}`,
+        )
       }
     }),
   )
 
-  const queued = pending.length - errors.length
-  return NextResponse.json({ queued, skipped: alreadyDone, errors })
+  return NextResponse.json({ queued: created, skipped, errors })
 }

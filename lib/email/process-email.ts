@@ -19,7 +19,7 @@ import {
 } from "@/lib/claude/extract-invoice"
 import { matchProjectFromTextWithAI } from "@/lib/utils/projects"
 import { log as auditLog } from "@/lib/utils/audit"
-import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
+import { sendInvoiceToERP } from "@/lib/toconline/send-fc"
 import {
   matchCreditNoteToInvoice,
   matchPendingCreditNotesToInvoice,
@@ -419,7 +419,7 @@ export async function processEmailInvoice(
 
       // Auto-send ao ERP se auto_erp_send ativo e fatura não precisa revisão.
       // Notas de credito seguem o caminho NCF isolado; as faturas o caminho FC.
-      let n8nForward: Awaited<ReturnType<typeof forwardInvoiceToN8N>> | null = null
+      let n8nForward: Awaited<ReturnType<typeof sendInvoiceToERP>> | null = null
       const needsReview = extraction.needs_review || extraction.confidence < 0.7
       if (tenant.auto_erp_send && !needsReview) {
         if (inserted.document_kind === "credit_note") {
@@ -430,9 +430,10 @@ export async function processEmailInvoice(
           }
         } else {
           try {
-            n8nForward = await forwardInvoiceToN8N(supabase, inserted.id, tenantId)
+            // Cria a FC via app (direto ou proxy n8n). Ja NAO ha' forward ao webhook.
+            n8nForward = await sendInvoiceToERP(tenantId, inserted.id)
           } catch (e) {
-            console.warn("n8n forward failed:", e)
+            console.warn("FC send (email) failed:", e)
           }
         }
       }

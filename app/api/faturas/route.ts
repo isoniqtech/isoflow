@@ -4,72 +4,28 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { getApiContext, jsonError } from "@/lib/api/auth"
 import { hasPermission } from "@/lib/utils/permissions"
 import { log } from "@/lib/utils/audit"
-import { forwardInvoiceToN8N } from "@/lib/webhooks/n8n"
+import { sendInvoiceToERP } from "@/lib/toconline/send-fc"
 import {
   matchCreditNoteToInvoice,
   matchPendingCreditNotesToInvoice,
 } from "@/lib/utils/credit-note-match"
 import { autoSendCreditNoteIfEnabled } from "@/lib/toconline/send-ncf"
 
+/**
+ * Auto-cria a FC no ERP se o tenant tiver auto_erp_send ativo. So' faz algo com
+ * a flag ligada - com ela desligada a FC cria-se manualmente. Cria via
+ * sendInvoiceToERP (app -> TOConline direto ou proxy n8n), sem forward ao webhook.
+ */
 async function autoSendToERP(invoiceId: string, tenantId: string) {
   try {
     const admin = createAdminClient()
-
     const { data: tenant } = await admin
       .from("tenants")
       .select("auto_erp_send")
       .eq("id", tenantId)
       .maybeSingle()
-
     if (!tenant?.auto_erp_send) return
-
-    const { data: integration } = await admin
-      .from("tenant_integrations")
-      .select("config")
-      .eq("tenant_id", tenantId)
-      .eq("type", "erp")
-      .eq("provider", "n8n")
-      .eq("is_active", true)
-      .maybeSingle()
-
-    const n8nUrl = (integration?.config as { url?: string } | null)?.url || process.env.N8N_WEBHOOK_URL
-    if (!n8nUrl) return
-
-    const { data: inv } = await admin
-      .from("invoices")
-      .select("id, supplier_name, supplier_nif, invoice_number, invoice_date, subtotal, vat_rate, vat_amount, total, description, currency, toconline_fc_id")
-      .eq("id", invoiceId)
-      .eq("tenant_id", tenantId)
-      .maybeSingle()
-
-    if (!inv || inv.toconline_fc_id) return // já enviada
-
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://isoflow-seven.vercel.app"
-    const cronSecret = process.env.CRON_SECRET ?? ""
-
-    await fetch(n8nUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tenant_id: tenantId,
-        callback_url: `${appUrl}/api/faturas`,
-        callback_secret: cronSecret,
-        invoices: [{
-          id: inv.id,
-          supplier_name: inv.supplier_name,
-          supplier_nif: inv.supplier_nif,
-          invoice_number: inv.invoice_number,
-          invoice_date: inv.invoice_date,
-          subtotal: inv.subtotal,
-          vat_rate: inv.vat_rate,
-          vat_amount: inv.vat_amount,
-          total: inv.total,
-          description: inv.description,
-          currency: inv.currency ?? "EUR",
-        }],
-        auto_sent: true,
-      }),
-    }).catch(() => null)
+    await sendInvoiceToERP(tenantId, invoiceId)
   } catch (e) {
     console.warn("auto ERP send failed:", e)
   }
@@ -236,16 +192,9 @@ export async function POST(req: Request) {
     console.warn("credit-note match (manual upload) failed:", e)
   }
 
-  // n8n forwarder (fire-and-forget — não bloqueia a resposta da API).
-  // forwardInvoiceToN8N salta notas de credito (vao pelo caminho NCF dedicado).
-  try {
-    const admin = createAdminClient()
-    void forwardInvoiceToN8N(admin, invoice.id, ctx.tenantId)
-  } catch (e) {
-    console.warn("n8n forward (manual upload) failed:", e)
-  }
-
-  // Auto-send ao ERP se tenant tiver a opção activada e fatura não precisar revisão.
+  // Auto-envio ao ERP so' com a flag auto_erp_send ligada e fatura sem revisao.
+  // (Ja' NAO ha' forward incondicional ao n8n na criacao: a FC so' se cria com a
+  // flag, ou manualmente pelo botao. Assim erp_synced/estado ficam fiaveis.)
   if (!invoice.needs_review && invoice.type === "incoming") {
     if (invoice.document_kind === "credit_note") {
       // Caminho NCF isolado (independente do FC - Opcao A).
