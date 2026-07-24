@@ -2,7 +2,6 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
-import { IntegrationCard } from "@/components/configuracoes/integration-card"
 import { EmailIntegrationCard } from "@/components/configuracoes/email-integration-card"
 import { ErpIntegrationCard } from "@/components/configuracoes/erp-integration-card"
 import { WhatsAppIntegrationCard } from "@/components/configuracoes/whatsapp-integration-card"
@@ -252,7 +251,7 @@ export default async function IntegracoesPage() {
   const canEditBanking = hasPermission(session.role, "integracoes", "edit")
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
       <Suspense>
         <BankCallbackToast />
       </Suspense>
@@ -273,16 +272,18 @@ export default async function IntegracoesPage() {
         </p>
       </div>
 
-      <div className="space-y-3">
-        {/* ERP - modo n8n (card original intocado quando modo = n8n) */}
-        <ErpIntegrationCard initial={erpInitial} canEdit={canEditErp} />
-
-        {/* ERP - modo direto TOConline (seletor de modo + credenciais) */}
-        <ToconlineDirectCard
-          initial={tcDirectConfig}
-          integrationMode={integrationMode}
-          canEdit={canEditErp}
-        />
+      {/* Grid de integracoes — 2 a 2. O ERP e' um so' quadrado (n8n + TOConline
+          direto, com o seletor de modo dentro). */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
+        <div className="space-y-3">
+          {/* ERP - n8n (webhook) + TOConline direto (seletor de modo) */}
+          <ErpIntegrationCard initial={erpInitial} canEdit={canEditErp} />
+          <ToconlineDirectCard
+            initial={tcDirectConfig}
+            integrationMode={integrationMode}
+            canEdit={canEditErp}
+          />
+        </div>
 
         <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
 
