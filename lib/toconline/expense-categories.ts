@@ -13,7 +13,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getValidToken } from "@/lib/toconline/token"
+import { tocRequest } from "@/lib/toconline/transport"
 
 export interface ExpenseCategory {
   code: string
@@ -97,99 +97,27 @@ export async function storeCategories(
 /** Reexportado para o webhook aceitar os mesmos formatos de payload. */
 export { extrairLista }
 
-/** Modo direto: buscar directamente ao TOConline. */
+/** Busca o catalogo ao TOConline via tocRequest (direto por OAuth; n8n pelo proxy). */
 async function buscarNoToconline(tenantId: string): Promise<unknown[]> {
-  const t = await getValidToken(tenantId)
-  const res = await fetch(`${t.appBase.replace(/\/$/, "")}/api/expense_categories`, {
-    headers: { Authorization: `Bearer ${t.accessToken}`, Accept: "application/json" },
+  const { status, body } = await tocRequest(tenantId, {
+    base: "app",
+    method: "GET",
+    path: "/api/expense_categories",
   })
-  if (!res.ok) throw new Error(`TOConline expense_categories ${res.status}`)
-  return extrairLista(await res.json())
-}
-
-/** Intervalo minimo entre disparos do workflow n8n, para nao insistir em vao. */
-const TRIGGER_THROTTLE_HOURS = 1
-
-/**
- * Modo n8n: o ISOFlow DISPARA o workflow do tenant (fire-and-forget).
- *
- * O n8n responde logo ("Workflow was started") sem devolver dados; e' o proprio
- * workflow que, em segundo plano, vai buscar as categorias ao TOConline e as
- * empurra para POST /api/webhooks/categorias. Ou seja: a cadencia e' decidida
- * aqui, o tenant nao tem de agendar nada.
- *
- * URL: tenant_integrations(config.expense_categories_url) ou a variavel de
- * ambiente N8N_EXPENSE_CATEGORIES_URL.
- */
-async function dispararWorkflowN8n(tenantId: string, supabase: SupabaseClient): Promise<void> {
-  const { data: integ } = await supabase
-    .from("tenant_integrations")
-    .select("id, config")
-    .eq("tenant_id", tenantId)
-    .eq("type", "erp")
-    .eq("provider", "n8n")
-    .maybeSingle()
-
-  const config = (integ?.config ?? {}) as Record<string, unknown>
-  const url =
-    (config.expense_categories_url as string | undefined) ||
-    process.env.N8N_EXPENSE_CATEGORIES_URL
-  if (!url) return
-
-  // Throttle: se ja' disparamos ha' pouco, nao insistir (o push pode estar a
-  // caminho, ou o workflow pode estar em baixo).
-  const ultimo = config.categories_triggered_at as string | undefined
-  if (ultimo && Date.now() - new Date(ultimo).getTime() < TRIGGER_THROTTLE_HOURS * 3600_000) {
-    return
-  }
-
-  if (integ?.id) {
-    await supabase
-      .from("tenant_integrations")
-      .update({
-        config: { ...config, categories_triggered_at: new Date().toISOString() },
-      })
-      .eq("id", integ.id)
-  }
-
-  // Fire-and-forget: nao esperamos dados, so' que o workflow arranque.
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      tenant_id: tenantId,
-      callback_secret: process.env.CRON_SECRET ?? "",
-    }),
-    signal: AbortSignal.timeout(15000),
-  })
+  if (status >= 400) throw new Error(`TOConline expense_categories ${status}`)
+  return extrairLista(body)
 }
 
 /**
- * Sincroniza o catalogo a partir da origem correcta para o modo do tenant.
+ * Sincroniza o catalogo a partir do TOConline. Os dois modos (direto e n8n)
+ * buscam a lista de forma SINCRONA via tocRequest e gravam-na - o modo n8n
+ * deixou de disparar um workflow e esperar pelo push a /api/webhooks/categorias.
  * Lanca em caso de falha (o caller decide se ignora).
  */
 export async function syncExpenseCategories(
   tenantId: string,
   supabase: SupabaseClient,
-  modoDireto?: boolean,
 ): Promise<ExpenseCategory[]> {
-  let direto = modoDireto
-  if (direto === undefined) {
-    const { data: t } = await supabase
-      .from("tenants")
-      .select("integration_mode")
-      .eq("id", tenantId)
-      .maybeSingle()
-    direto = (t as { integration_mode?: string } | null)?.integration_mode === "toconline_direct"
-  }
-
-  if (!direto) {
-    // Modo n8n: nao ha' nada a buscar aqui. Disparamos o workflow do tenant e
-    // as categorias chegam depois, por push, a /api/webhooks/categorias.
-    await dispararWorkflowN8n(tenantId, supabase)
-    return []
-  }
-
   const items = await buscarNoToconline(tenantId)
   const rows = normalizar(items, tenantId, new Date().toISOString())
   if (rows.length === 0) return []
