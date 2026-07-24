@@ -179,11 +179,6 @@ export async function getDashboardData(
   }) =>
     (i.document_kind === "credit_note" ? -1 : 1) * Number(i.subtotal ?? i.total ?? 0)
 
-  // Expenses without VAT: use subtotal for incoming (fallback quando nao ha snapshot)
-  const expensesFromInvoices = periodList
-    .filter((i) => i.type === "incoming")
-    .reduce((s, i) => s + signedNet(i), 0)
-
   // Revenue without VAT
   const cachedRevenue = tenantCache
   const snapshotMap = new Map<number, number>(
@@ -199,27 +194,27 @@ export async function getDashboardData(
   let expensesRaw = 0
   let useToconlineCache = false
 
-  // Gastos = snapshot TOConline + faturas incoming na app (soma das duas fontes)
+  // Gastos por mes: o snapshot do TOConline e' autoritativo (ja' inclui as
+  // faturas enviadas ao ERP) - usa-se se existir; senao cai para as faturas
+  // incoming da app. NUNCA somar as duas fontes: contaria a dobrar a parte que
+  // esta' nos dois lados. Espelha a mesma logica da receita (snapshot else faturas).
+  const invoiceExpensesForMonth = (m: number): number => {
+    const ms = `${year}-${String(m).padStart(2, "0")}`
+    return periodList
+      .filter((i) => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
+      .reduce((s, i) => s + signedNet(i), 0)
+  }
+  const monthExpenses = (m: number): number =>
+    snapshotExpenses.has(m) ? (snapshotExpenses.get(m) ?? 0) : invoiceExpensesForMonth(m)
+
   if (mode === "mensal") {
-    expensesRaw = (snapshotExpenses.get(month) ?? 0) + expensesFromInvoices
+    expensesRaw = monthExpenses(month)
   } else if (mode === "trimestral") {
     const startM = (quarter - 1) * 3 + 1
-    for (let m = startM; m <= startM + 2; m++) {
-      const ms = `${year}-${String(m).padStart(2, "0")}`
-      expensesRaw += (snapshotExpenses.get(m) ?? 0)
-      expensesRaw += periodList
-        .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-        .reduce((s, i) => s + signedNet(i), 0)
-    }
+    for (let m = startM; m <= startM + 2; m++) expensesRaw += monthExpenses(m)
   } else {
     // Acumulado
-    for (let m = 1; m <= 12; m++) {
-      const ms = `${year}-${String(m).padStart(2, "0")}`
-      expensesRaw += (snapshotExpenses.get(m) ?? 0)
-      expensesRaw += periodList
-        .filter(i => i.type === "incoming" && (i.invoice_date ?? "").startsWith(ms))
-        .reduce((s, i) => s + signedNet(i), 0)
-    }
+    for (let m = 1; m <= 12; m++) expensesRaw += monthExpenses(m)
   }
 
   if (mode === "mensal") {
