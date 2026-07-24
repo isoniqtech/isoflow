@@ -203,8 +203,8 @@ export default async function BancoPage({
       </div>
 
       {/* Tabela de transações — flex-1 passa a altura ao componente */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 md:px-6 lg:px-8 py-4">
-        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 py-4">
           <TransactionTable
             rows={txList.map((t) => ({
               id: t.id,

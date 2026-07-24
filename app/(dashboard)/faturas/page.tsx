@@ -105,10 +105,10 @@ export default async function FaturasPage({
     <div className="h-full flex flex-col overflow-hidden">
       <InvoicesRealtime tenantId={session.tenant.id} />
 
-      {/* Secção estática — header + tabs. Mesma estrutura da tabela (px fora,
-          max-w dentro) para as tabs alinharem a' face da tabela. */}
-      <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8">
-        <div className="space-y-4 max-w-7xl mx-auto w-full">
+      {/* Secção estática — header + tabs. Padding DENTRO do max-w-7xl (como as
+          outras seccoes), para o width ser o mesmo em toda a app. */}
+      <div className="flex-shrink-0">
+        <div className="max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8 space-y-4">
           <h1 className="text-2xl font-display font-semibold tracking-tight">Faturas</h1>
 
           {/* Tabs — controlo segmentado (mesmo padrao dos projetos) */}
@@ -121,8 +121,8 @@ export default async function FaturasPage({
       </div>
 
       {/* Tabela — flex-1, só as linhas fazem scroll */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 md:px-6 lg:px-8 py-4">
-        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 py-4">
           {activeTab === "todas" && (
             <InvoiceTableFC
               invoices={invoices}
@@ -139,8 +139,8 @@ export default async function FaturasPage({
 
       {/* Paginação — estática no fundo */}
       {activeTab === "todas" && totalPages > 1 && (
-        <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pb-4">
-          <div className="max-w-7xl mx-auto w-full">
+        <div className="flex-shrink-0">
+          <div className="max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 pb-4">
             <InvoicesPagination page={page} totalPages={totalPages} total={total} pageSize={page_size} />
           </div>
         </div>
