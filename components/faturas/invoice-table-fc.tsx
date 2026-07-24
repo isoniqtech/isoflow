@@ -231,7 +231,7 @@ export function InvoiceTableFC({
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
-              <TableHead className="w-10">
+              <TableHead className="w-10 text-center">
                 {eligible.length > 0 && (
                   <input
                     type="checkbox"
@@ -239,18 +239,18 @@ export function InvoiceTableFC({
                     ref={el => { if (el) el.indeterminate = someSelected }}
                     onChange={e => toggleAll(e.target.checked)}
                     aria-label="Selecionar todas"
-                    className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                    className="h-4 w-4 rounded border-input accent-primary cursor-pointer align-middle"
                   />
                 )}
               </TableHead>
-              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
-              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
-              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>ERP</TableHead>
-              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
-              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
-              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "status")} onMouseLeave={hideTip}>Estado</TableHead>
-              <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "bank")} onMouseLeave={hideTip}>Bancario</TableHead>
-              <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "at")} onMouseLeave={hideTip}>AT</TableHead>
+              <TableHead className="text-center cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
+              <TableHead className="hidden md:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
+              <TableHead className="hidden lg:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>ERP</TableHead>
+              <TableHead className="hidden md:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
+              <TableHead className="text-center cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
+              <TableHead className="text-center cursor-default" onMouseEnter={e => showTip(e, "status")} onMouseLeave={hideTip}>Estado</TableHead>
+              <TableHead className="hidden xl:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "bank")} onMouseLeave={hideTip}>Bancario</TableHead>
+              <TableHead className="hidden xl:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "at")} onMouseLeave={hideTip}>AT</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -260,7 +260,7 @@ export function InvoiceTableFC({
               const isSelected = selected.has(inv.id)
               return (
                 <TableRow key={inv.id} className={cn("cursor-pointer", isSelected && "bg-muted/40")}>
-                  <TableCell className="px-3">
+                  <TableCell className="px-3 text-center">
                     {isEligible ? (
                       <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
                         <input
