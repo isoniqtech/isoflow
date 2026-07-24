@@ -2,7 +2,7 @@
 
 import { useTransition } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { X } from "lucide-react"
+import { CalendarDays, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { cn } from "@/lib/utils"
 import type { ProjectOption } from "@/lib/queries/invoices"
 import type { InvoiceSource, InvoiceStatus } from "@/types"
 
@@ -23,6 +24,8 @@ export type InvoiceFiltersValue = {
   date_from: string
   date_to: string
 }
+
+const TRIGGER = "h-9 bg-card border-border/60 shadow-sm rounded-md"
 
 export function InvoiceFilters({
   value,
@@ -60,8 +63,8 @@ export function InvoiceFilters({
     value.source !== "all" ||
     value.project_id !== "all" ||
     value.needs_review ||
-    value.date_from !== "" ||
-    value.date_to !== ""
+    searchParams.has("from") ||
+    searchParams.has("to")
 
   return (
     <div
@@ -69,7 +72,7 @@ export function InvoiceFilters({
       data-pending={isPending || undefined}
     >
       <Select value={value.status} onValueChange={(v) => setParam("status", v)}>
-        <SelectTrigger className="w-[140px] bg-card shadow-sm">
+        <SelectTrigger className={cn(TRIGGER, "w-[140px]")}>
           <SelectValue placeholder="Estado" />
         </SelectTrigger>
         <SelectContent>
@@ -82,11 +85,8 @@ export function InvoiceFilters({
         </SelectContent>
       </Select>
 
-      <Select
-        value={value.project_id}
-        onValueChange={(v) => setParam("project", v)}
-      >
-        <SelectTrigger className="w-[180px] bg-card shadow-sm">
+      <Select value={value.project_id} onValueChange={(v) => setParam("project", v)}>
+        <SelectTrigger className={cn(TRIGGER, "w-[170px]")}>
           <SelectValue placeholder="Projeto" />
         </SelectTrigger>
         <SelectContent>
@@ -101,7 +101,7 @@ export function InvoiceFilters({
       </Select>
 
       <Select value={value.source} onValueChange={(v) => setParam("source", v)}>
-        <SelectTrigger className="w-[140px] bg-card shadow-sm">
+        <SelectTrigger className={cn(TRIGGER, "w-[140px]")}>
           <SelectValue placeholder="Origem" />
         </SelectTrigger>
         <SelectContent>
@@ -114,31 +114,37 @@ export function InvoiceFilters({
         </SelectContent>
       </Select>
 
-      <Input
-        type="date"
-        value={value.date_from}
-        onChange={(e) => setParam("from", e.target.value)}
-        className="w-[150px] bg-card shadow-sm"
-        aria-label="Data início"
-      />
-      <Input
-        type="date"
-        value={value.date_to}
-        onChange={(e) => setParam("to", e.target.value)}
-        className="w-[150px] bg-card shadow-sm"
-        aria-label="Data fim"
-      />
+      {/* Periodo — datas agrupadas num so' controlo */}
+      <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
+        <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+        <Input
+          type="date"
+          value={value.date_from}
+          onChange={(e) => setParam("from", e.target.value)}
+          className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
+          aria-label="Data início"
+        />
+        <span className="text-muted-foreground text-sm">–</span>
+        <Input
+          type="date"
+          value={value.date_to}
+          onChange={(e) => setParam("to", e.target.value)}
+          className="h-7 w-[120px] border-0 bg-transparent shadow-none px-1 focus-visible:ring-0"
+          aria-label="Data fim"
+        />
+      </div>
 
       <Button
         variant={value.needs_review ? "default" : "outline"}
         size="sm"
+        className={cn("h-9", !value.needs_review && "bg-card border-border/60 shadow-sm")}
         onClick={() => setParam("review", value.needs_review ? null : "1")}
       >
         Necessita revisão
       </Button>
 
       {hasActive && (
-        <Button variant="ghost" size="sm" onClick={reset}>
+        <Button variant="ghost" size="sm" className="h-9" onClick={reset}>
           <X className="mr-1 h-3.5 w-3.5" />
           Limpar
         </Button>
