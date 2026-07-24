@@ -7,6 +7,7 @@ import { hasPermission } from "@/lib/utils/permissions"
 import { InvoiceDetail } from "@/components/faturas/invoice-detail"
 import { InvoiceActions } from "@/components/faturas/invoice-actions"
 import { ExpenseCategorySelect } from "@/components/faturas/expense-category-select"
+import { PRE_ERP_STATUSES } from "@/lib/utils/invoice-status"
 
 export default async function FaturaDetailPage({
   params,
@@ -93,8 +94,8 @@ export default async function FaturaDetailPage({
         decidedByAi={!categoriaJaExistia}
         canEdit={canEdit}
         alreadySent={
-          Boolean(invoice.erp_synced) ||
-          Boolean((invoice as { toconline_fc_id?: string | null }).toconline_fc_id)
+          Boolean((invoice as { toconline_fc_id?: string | null }).toconline_fc_id) ||
+          !(PRE_ERP_STATUSES as readonly string[]).includes(invoice.status)
         }
       />
 
