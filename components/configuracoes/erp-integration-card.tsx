@@ -37,9 +37,12 @@ type Existing = {
 export function ErpIntegrationCard({
   initial,
   canEdit,
+  bare = false,
 }: {
   initial: Existing | null
   canEdit: boolean
+  /** Renderiza sem o wrapper Card (quando embebido no ErpCard). */
+  bare?: boolean
 }) {
   const router = useRouter()
   const [url, setUrl] = useState(initial?.url ?? "")
@@ -224,9 +227,8 @@ export function ErpIntegrationCard({
       ? "disconnected"
       : "soon"
 
-  return (
-    <Card className={cn(status === "error" && "border-destructive/40")}>
-      <CardContent className="p-5 space-y-3">
+  const body = (
+    <>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
             <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center shrink-0">
@@ -420,7 +422,14 @@ export function ErpIntegrationCard({
             </div>
           </TooltipProvider>
         )}
-      </CardContent>
+    </>
+  )
+
+  if (bare) return <div className="space-y-3">{body}</div>
+
+  return (
+    <Card className={cn(status === "error" && "border-destructive/40")}>
+      <CardContent className="p-5 space-y-3">{body}</CardContent>
     </Card>
   )
 }

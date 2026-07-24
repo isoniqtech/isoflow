@@ -49,12 +49,15 @@ export function ToconlineDirectCard({
   integrationMode,
   canEdit,
   hideModeSelector = false,
+  bare = false,
 }: {
   initial: DirectConfig | null
   integrationMode: IntegrationMode
   canEdit: boolean
   /** Esconde o seletor de modo interno (usado quando o ErpCard ja' o fornece). */
   hideModeSelector?: boolean
+  /** Renderiza sem o wrapper Card (quando embebido no ErpCard). */
+  bare?: boolean
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -285,9 +288,8 @@ export function ToconlineDirectCard({
         ? "error"
         : "connected"
 
-  return (
-    <Card className={cn(status === "error" && "border-destructive/40")}>
-      <CardContent className="p-5 space-y-4">
+  const body = (
+    <>
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
@@ -537,7 +539,14 @@ export function ToconlineDirectCard({
             </div>
           </div>
         )}
-      </CardContent>
+    </>
+  )
+
+  if (bare) return <div className="space-y-4">{body}</div>
+
+  return (
+    <Card className={cn(status === "error" && "border-destructive/40")}>
+      <CardContent className="p-5 space-y-4">{body}</CardContent>
     </Card>
   )
 }

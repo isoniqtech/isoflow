@@ -271,32 +271,45 @@ export default async function IntegracoesPage() {
         </p>
       </div>
 
-      {/* Grid de integracoes - 2 a 2. O ERP e' um so' quadrado: dois icones
-          (n8n / TOConline) escolhem o modo e revelam o detalhe de cada um. */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-        <ErpCard
-          erpInitial={erpInitial}
-          tcDirectConfig={tcDirectConfig}
-          integrationMode={integrationMode}
-          canEdit={canEditErp}
-        />
+      {/* Grid de integracoes - 2 a 2, quadrados da mesma altura por linha
+          (wrapper h-full + card a preencher). O ERP e' um so' quadrado: dois
+          icones (n8n / TOConline) dentro escolhem o modo e revelam o detalhe. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="h-full [&>*]:h-full">
+          <ErpCard
+            erpInitial={erpInitial}
+            tcDirectConfig={tcDirectConfig}
+            integrationMode={integrationMode}
+            canEdit={canEditErp}
+          />
+        </div>
 
-        <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
+        <div className="h-full [&>*]:h-full">
+          <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
+        </div>
 
         {/* Google Drive - documentos dos projetos */}
-        <GoogleDriveCard canEdit={canEditErp} />
+        <div className="h-full [&>*]:h-full">
+          <GoogleDriveCard canEdit={canEditErp} />
+        </div>
 
-        <WhatsAppIntegrationCard
-          isActive={whatsappActive}
-          hasCredentials={whatsappHasCredentials}
-          phoneNumber={whatsappPhoneNumber}
-          canEdit={canEditWhatsapp}
-        />
+        <div className="h-full [&>*]:h-full">
+          <WhatsAppIntegrationCard
+            isActive={whatsappActive}
+            hasCredentials={whatsappHasCredentials}
+            phoneNumber={whatsappPhoneNumber}
+            canEdit={canEditWhatsapp}
+          />
+        </div>
 
-        <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
+        <div className="h-full [&>*]:h-full">
+          <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
+        </div>
 
         {/* IA - chave Anthropic por tenant */}
-        <AiIntegrationCard initial={aiConfig} canEdit={canEditErp} />
+        <div className="h-full [&>*]:h-full">
+          <AiIntegrationCard initial={aiConfig} canEdit={canEditErp} />
+        </div>
       </div>
     </div>
   )
