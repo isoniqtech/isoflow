@@ -15,6 +15,7 @@ export type EFaturaDocument = {
   currency: string
   at_status: string | null
   invoice_id: string | null
+  invoice_number: string | null
   matched_at: string | null
   matched_by: "auto" | "manual" | null
 }
@@ -60,7 +61,7 @@ export async function listEFaturaPageData(
     // Todos os docs e-Fatura (conciliados e por conciliar)
     supabase
       .from("efatura_documents")
-      .select("id, toconline_id, at_document_id, document_number, document_date, supplier_nif, supplier_name, total, subtotal, vat_amount, currency, at_status, invoice_id, matched_at, matched_by")
+      .select("id, toconline_id, at_document_id, document_number, document_date, supplier_nif, supplier_name, total, subtotal, vat_amount, currency, at_status, invoice_id, matched_at, matched_by, invoice:invoices(invoice_number)")
       .eq("tenant_id", tenantId)
       .order("document_date", { ascending: false })
       .limit(500),
@@ -83,6 +84,10 @@ export async function listEFaturaPageData(
     currency: (d.currency as string) ?? "EUR",
     at_status: (d.at_status as string | null) ?? null,
     invoice_id: (d.invoice_id as string | null) ?? null,
+    invoice_number: (() => {
+      const j = Array.isArray(d.invoice) ? d.invoice[0] : d.invoice
+      return ((j as { invoice_number?: string | null } | null)?.invoice_number) ?? null
+    })(),
     matched_at: (d.matched_at as string | null) ?? null,
     matched_by: (d.matched_by as "auto" | "manual" | null) ?? null,
   })

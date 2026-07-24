@@ -3,7 +3,7 @@
 import { useState, useTransition, useCallback, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, ChevronDown, FileText, Loader2, Mail, MessageCircle, Send, Upload } from "lucide-react"
+import { AlertTriangle, FileText, Loader2, Mail, MessageCircle, Plus, Send, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select"
 import { StatusBadge } from "@/components/faturas/status-badge"
 import { InvoiceFilters, type InvoiceFiltersValue } from "@/components/faturas/invoice-filters"
+import { ExportDropdown } from "@/components/faturas/export-dropdown"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
 import type { InvoiceListItem, ProjectOption as FilterProjectOption } from "@/lib/queries/invoices"
@@ -36,41 +37,44 @@ const SOURCE_ICONS: Record<InvoiceSource, typeof FileText> = {
 
 function BankBadge({ inv }: { inv: InvoiceListItem }) {
   if (inv.bank_transaction_id) {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
   }
-  return <span className="text-xs text-muted-foreground">Por conciliar</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-muted text-muted-foreground">Por conciliar</span>
 }
 
 function ATBadge({ inv }: { inv: InvoiceListItem }) {
-  if (inv.at_communicated) {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Compra Registada</span>
+  // Conciliada = existe associacao entre a fatura e um documento na e-Fatura.
+  const conciliada = inv.at_communicated || Boolean(inv.efatura_at_status)
+  if (conciliada) {
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
   }
-  if (inv.efatura_at_status) {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">Pendente AT</span>
-  }
-  return <span className="text-xs text-muted-foreground">Sem FC</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-muted text-muted-foreground">Por conciliar</span>
 }
 
 const TIPS: Record<string, string> = {
   supplier: "Nome e NIF do fornecedor da fatura",
   number:   "Numero de identificacao da fatura emitida pelo fornecedor",
   date:     "Data de emissao da fatura",
-  erp:      "Numero do documento no TOCONLINE (Fatura de Compra)",
+  erp:      "Numero de documento no ERP",
   project:  "Obra ou projeto ao qual esta fatura esta associada",
   value:    "Valor total da fatura com IVA incluido",
   status:   "Estado atual do processamento da fatura",
   bank:     "Indica se a fatura foi conciliada com um movimento bancario",
-  at:       "Indica se a fatura esta registada na e-Fatura da Autoridade Tributaria",
+  at:       "Conciliada quando a fatura esta associada a um documento na e-Fatura; senao Por conciliar",
 }
 
 export function InvoiceTableFC({
   invoices,
   canEdit = false,
+  canCreate = false,
+  exportUrl = null,
   filterProjects,
   filterValue,
 }: {
   invoices: InvoiceListItem[]
   canEdit?: boolean
+  canCreate?: boolean
+  exportUrl?: string | null
   filterProjects: FilterProjectOption[]
   filterValue: InvoiceFiltersValue
 }) {
@@ -185,20 +189,32 @@ export function InvoiceTableFC({
           {tip.text}
         </div>
       )}
-      {/* Filtros + Enviar ao ERP — mesma linha, sempre visivel (sticky no topo) */}
+      {/* Filtros + acoes — mesma linha, sempre visivel (sticky no topo).
+          Ordem a' direita: Nova fatura | Enviar ao ERP | menu (Exportar). */}
       <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-2">
         <InvoiceFilters value={filterValue} projects={filterProjects} />
-        {eligible.length > 0 && (
-          <Button
-            size="sm"
-            className="h-9 shrink-0"
-            onClick={handleCreateFC}
-            disabled={isPending || selected.size === 0}
-          >
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {canCreate && (
+            <Button size="sm" className="h-9" asChild>
+              <Link href="/faturas/nova">
+                <Plus className="mr-2 h-4 w-4" />
+                Nova fatura
+              </Link>
+            </Button>
+          )}
+          {eligible.length > 0 && (
+            <Button
+              size="sm"
+              className="h-9"
+              onClick={handleCreateFC}
+              disabled={isPending || selected.size === 0}
+            >
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
+            </Button>
+          )}
+          {exportUrl && <ExportDropdown exportUrl={exportUrl} compact />}
+        </div>
       </div>
 
       {invoices.length === 0 ? (
@@ -214,7 +230,7 @@ export function InvoiceTableFC({
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 z-10 bg-muted">
                 <TableRow>
-              <TableHead className="w-10">
+              <TableHead className="w-10 text-center">
                 {eligible.length > 0 && (
                   <input
                     type="checkbox"
@@ -222,16 +238,15 @@ export function InvoiceTableFC({
                     ref={el => { if (el) el.indeterminate = someSelected }}
                     onChange={e => toggleAll(e.target.checked)}
                     aria-label="Selecionar todas"
-                    className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                    className="h-4 w-4 rounded border-input accent-primary cursor-pointer align-middle"
                   />
                 )}
               </TableHead>
               <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
-              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "number")} onMouseLeave={hideTip}>Nr. Fatura</TableHead>
-              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
-              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>FC ERP</TableHead>
+              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
+              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>ERP</TableHead>
               <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
-              <TableHead className="text-right cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
+              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
               <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "status")} onMouseLeave={hideTip}>Estado</TableHead>
               <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "bank")} onMouseLeave={hideTip}>Bancario</TableHead>
               <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "at")} onMouseLeave={hideTip}>AT</TableHead>
@@ -244,17 +259,19 @@ export function InvoiceTableFC({
               const isSelected = selected.has(inv.id)
               return (
                 <TableRow key={inv.id} className={cn("cursor-pointer", isSelected && "bg-muted/40")}>
-                  <TableCell className="px-3">
+                  <TableCell className="px-3 text-center">
                     {isEligible ? (
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={e => toggle(inv.id, e.target.checked)}
-                        aria-label={`Selecionar ${inv.supplier_name ?? inv.id}`}
-                        className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
-                      />
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={e => toggle(inv.id, e.target.checked)}
+                          aria-label={`Selecionar ${inv.supplier_name ?? inv.id}`}
+                          className="h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                        />
+                      </span>
                     ) : (
-                      <Link href={`/faturas/${inv.id}`} className="block">
+                      <Link href={`/faturas/${inv.id}`} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
                         <SourceIcon className="h-4 w-4 text-muted-foreground" />
                       </Link>
                     )}
@@ -265,13 +282,10 @@ export function InvoiceTableFC({
                         <span className="font-medium truncate">{inv.supplier_name ?? "Fornecedor desconhecido"}</span>
                         {inv.needs_review && <AlertTriangle className="h-3.5 w-3.5 text-amber-600 shrink-0" aria-label="Necessita revisão" />}
                       </div>
-                      {inv.supplier_nif && <p className="text-xs text-muted-foreground font-mono">{inv.supplier_nif}</p>}
+                      <p className="text-xs text-muted-foreground font-mono">{inv.invoice_number ?? "—"}</p>
                     </Link>
                   </TableCell>
-                  <TableCell className="hidden md:table-cell font-mono text-sm">
-                    <Link href={`/faturas/${inv.id}`} className="block">{inv.invoice_number ?? "—"}</Link>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell text-sm">
+                  <TableCell className="hidden md:table-cell text-sm">
                     <Link href={`/faturas/${inv.id}`} className="block">
                       {inv.invoice_date ? formatDate(inv.invoice_date) : "—"}
                     </Link>
@@ -300,7 +314,6 @@ export function InvoiceTableFC({
                           ) : (
                             <span className="text-muted-foreground">Sem projeto</span>
                           )}
-                          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">
@@ -324,7 +337,7 @@ export function InvoiceTableFC({
                       </Link>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums font-medium">
+                  <TableCell className="tabular-nums font-medium">
                     <Link href={`/faturas/${inv.id}`} className="block">
                       {inv.total !== null ? formatCurrency(inv.total) : "—"}
                     </Link>

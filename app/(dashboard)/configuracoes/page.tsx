@@ -39,7 +39,7 @@ export default async function ConfiguracoesPage() {
     canManageIntegrations && {
       href: "/configuracoes/integracoes",
       label: "Integrações",
-      description: "ERPs, banco (Salt Edge), WhatsApp e email inbound",
+      description: "ERPs, banco, WhatsApp e receção de email",
       icon: Plug,
     },
     canManageBilling && {

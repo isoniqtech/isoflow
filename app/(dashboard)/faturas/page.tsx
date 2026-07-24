@@ -1,17 +1,13 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ExportDropdown } from "@/components/faturas/export-dropdown"
 import { InvoiceTableFC } from "@/components/faturas/invoice-table-fc"
 import { InvoicesRealtime } from "@/components/faturas/invoices-realtime"
 import { InvoicesPagination } from "./invoices-pagination"
 import { EFaturaTab } from "@/components/faturas/efatura-tab"
+import { SegmentedTabs } from "@/components/ui/segmented-tabs"
 import { getCurrentSession } from "@/lib/queries/current-session"
 import { listInvoices, listProjectOptions, type InvoicesFilter } from "@/lib/queries/invoices"
 import { listEFaturaPageData } from "@/lib/queries/efatura-documents"
 import { hasPermission } from "@/lib/utils/permissions"
-import { cn } from "@/lib/utils"
 import type { InvoiceSource, InvoiceStatus } from "@/types"
 
 const VALID_STATUS: Array<InvoiceStatus | "all"> = [
@@ -32,6 +28,7 @@ export default async function FaturasPage({
     status?: string
     source?: string
     project?: string
+    kind?: string
     review?: string
     from?: string
     to?: string
@@ -52,17 +49,27 @@ export default async function FaturasPage({
     ? (searchParams.source as InvoiceSource | "all")
     : "all"
   const project_id = searchParams.project ?? "all"
+  const document_kind = (["invoice", "credit_note"].includes(searchParams.kind ?? "")
+    ? searchParams.kind
+    : "all") as "all" | "invoice" | "credit_note"
   const needs_review = searchParams.review === "1"
-  // Por defeito, o periodo e' o mes atual (1 -> hoje). O utilizador pode alargar.
+  // Por defeito, o periodo e' o mes atual (1 -> hoje) - MAS so' quando nao ha'
+  // outro filtro ativo. Se o utilizador filtra por estado/origem/projeto/tipo/revisao,
+  // nao limitamos ao mes (senao "Em Sistema" mostrava vazio se estivesse fora do mes).
+  const hasOtherFilter =
+    status !== "all" || source !== "all" || project_id !== "all" ||
+    document_kind !== "all" || needs_review
   const now = new Date()
-  const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+  // Periodo default: mes anterior + mes atual (1o dia do mes anterior -> hoje).
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const monthFrom = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}-01`
   const monthTo = now.toISOString().slice(0, 10)
-  const date_from = searchParams.from ?? monthFrom
-  const date_to = searchParams.to ?? monthTo
+  const date_from = searchParams.from ?? (hasOtherFilter ? "" : monthFrom)
+  const date_to = searchParams.to ?? (hasOtherFilter ? "" : monthTo)
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1)
 
   const filter: InvoicesFilter = {
-    status, source, project_id, needs_review,
+    status, source, project_id, document_kind, needs_review,
     date_from: date_from || undefined,
     date_to: date_to || undefined,
   }
@@ -77,78 +84,53 @@ export default async function FaturasPage({
   const canCreate = hasPermission(session.role, "faturas", "create")
   const totalPages = Math.max(1, Math.ceil(total / page_size))
 
-  const eFaturaPending = eFaturaPageData.invoices.filter(i => !i.efatura_doc_id).length
-
   const showEFaturaTab = session.role !== "investidor"
-  const tabs: { id: Tab; label: string; count?: number }[] = [
-    { id: "todas", label: "Todas", count: total },
-    ...(showEFaturaTab ? [{ id: "efatura" as Tab, label: "e-Fatura", count: eFaturaPending || undefined }] : []),
+  const tabs: { id: Tab; label: string }[] = [
+    { id: "todas", label: "Todas" },
+    ...(showEFaturaTab ? [{ id: "efatura" as Tab, label: "e-Fatura" }] : []),
   ]
+
+  const canExport = hasPermission(session.role, "relatorios", "view_all") && total > 0
+  const exportUrl = `/api/faturas/export?${new URLSearchParams({
+    ...(status !== "all" ? { status } : {}),
+    ...(source !== "all" ? { source } : {}),
+    ...(project_id !== "all" ? { project: project_id } : {}),
+    ...(document_kind !== "all" ? { kind: document_kind } : {}),
+    ...(needs_review ? { review: "1" } : {}),
+    ...(date_from ? { from: date_from } : {}),
+    ...(date_to ? { to: date_to } : {}),
+  }).toString()}`
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <InvoicesRealtime tenantId={session.tenant.id} />
 
-      {/* Secção estática — header + tabs + filtros */}
-      <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8 space-y-4 max-w-7xl mx-auto w-full">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-display font-semibold tracking-tight">Faturas</h1>
-            <p className="text-muted-foreground text-sm">
-              {total.toLocaleString("pt-PT")} {total === 1 ? "fatura" : "faturas"}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {hasPermission(session.role, "relatorios", "view_all") && total > 0 && activeTab !== "efatura" && (
-              <ExportDropdown exportUrl={`/api/faturas/export?${new URLSearchParams({
-                ...(status !== "all" ? { status } : {}),
-                ...(source !== "all" ? { source } : {}),
-                ...(project_id !== "all" ? { project: project_id } : {}),
-                ...(needs_review ? { review: "1" } : {}),
-                ...(date_from ? { from: date_from } : {}),
-                ...(date_to ? { to: date_to } : {}),
-              }).toString()}`} />
-            )}
-            {canCreate && activeTab !== "efatura" && (
-              <Button asChild>
-                <Link href="/faturas/nova">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nova fatura
-                </Link>
-              </Button>
-            )}
-          </div>
-        </div>
+      {/* Secção estática — header + tabs. Padding DENTRO do max-w-7xl (como as
+          outras seccoes), para o width ser o mesmo em toda a app. */}
+      <div className="flex-shrink-0">
+        <div className="max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8 space-y-4">
+          <h1 className="text-2xl font-display font-semibold tracking-tight">Faturas</h1>
 
-        {/* Tabs */}
-        <div className="border-b flex gap-0">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.id}
-              href={`/faturas?tab=${tab.id}`}
-              className={cn(
-                "px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5",
-                activeTab === tab.id
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground",
-              )}
-            >
-              {tab.label}
-            </Link>
-          ))}
+          {/* Tabs — controlo segmentado (mesmo padrao dos projetos) */}
+          <SegmentedTabs
+            tabs={tabs}
+            activeId={activeTab}
+            hrefFor={(id) => `/faturas?tab=${id}`}
+          />
         </div>
-
       </div>
 
       {/* Tabela — flex-1, só as linhas fazem scroll */}
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 md:px-6 lg:px-8 py-4">
-        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex-1 min-h-0 flex flex-col max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 py-4">
           {activeTab === "todas" && (
             <InvoiceTableFC
               invoices={invoices}
               canEdit={hasPermission(session.role, "faturas", "edit")}
+              canCreate={canCreate}
+              exportUrl={canExport ? exportUrl : null}
               filterProjects={projects}
-              filterValue={{ status, source, project_id, needs_review, date_from, date_to }}
+              filterValue={{ status, source, project_id, document_kind, needs_review, date_from, date_to }}
             />
           )}
           {activeTab === "efatura" && <EFaturaTab data={eFaturaPageData} />}
@@ -157,8 +139,10 @@ export default async function FaturasPage({
 
       {/* Paginação — estática no fundo */}
       {activeTab === "todas" && totalPages > 1 && (
-        <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pb-4 max-w-7xl mx-auto w-full">
-          <InvoicesPagination page={page} totalPages={totalPages} total={total} pageSize={page_size} />
+        <div className="flex-shrink-0">
+          <div className="max-w-7xl mx-auto w-full px-4 md:px-6 lg:px-8 pb-4">
+            <InvoicesPagination page={page} totalPages={totalPages} total={total} pageSize={page_size} />
+          </div>
         </div>
       )}
     </div>

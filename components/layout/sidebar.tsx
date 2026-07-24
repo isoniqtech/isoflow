@@ -144,7 +144,7 @@ function NavLink({
       className={cn(
         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
         active
-          ? "bg-gradient-to-r from-primary/12 to-primary/5 text-primary font-medium border-l-2 border-primary pl-2.5"
+          ? "bg-card text-foreground shadow-[var(--shadow-card,0_1px_3px_rgba(0,0,0,0.08))]"
           : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >

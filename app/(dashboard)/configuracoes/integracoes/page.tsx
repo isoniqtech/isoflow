@@ -2,12 +2,10 @@ import { Suspense } from "react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { ChevronLeft } from "lucide-react"
-import { IntegrationCard } from "@/components/configuracoes/integration-card"
 import { EmailIntegrationCard } from "@/components/configuracoes/email-integration-card"
-import { ErpIntegrationCard } from "@/components/configuracoes/erp-integration-card"
+import { ErpCard } from "@/components/configuracoes/erp-card"
 import { WhatsAppIntegrationCard } from "@/components/configuracoes/whatsapp-integration-card"
 import { BankAccountsCard } from "@/components/configuracoes/bank-accounts-card"
-import { ToconlineDirectCard } from "@/components/configuracoes/toconline-direct-card"
 import { AiIntegrationCard } from "@/components/configuracoes/ai-integration-card"
 import { GoogleDriveCard } from "@/components/configuracoes/google-drive-card"
 import { BankCallbackToast } from "@/components/banco/bank-connect"
@@ -252,7 +250,7 @@ export default async function IntegracoesPage() {
   const canEditBanking = hasPermission(session.role, "integracoes", "edit")
 
   return (
-    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
       <Suspense>
         <BankCallbackToast />
       </Suspense>
@@ -263,43 +261,55 @@ export default async function IntegracoesPage() {
           className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-2"
         >
           <ChevronLeft className="h-4 w-4 mr-1" />
-          Configuracoes
+          Configurações
         </Link>
-        <h1 className="text-2xl font-semibold tracking-tight">Integracoes</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Integrações</h1>
         <p className="text-muted-foreground text-sm">
-          Liga ERPs, banco e canais de rececao de faturas. Configuracoes
-          completas vao sendo ativadas a medida que adicionas as chaves no
+          Liga ERPs, banco e canais de receção de faturas. As configurações
+          completas vão sendo ativadas à medida que adicionas as chaves no
           servidor.
         </p>
       </div>
 
-      <div className="space-y-3">
-        {/* ERP - modo n8n (card original intocado quando modo = n8n) */}
-        <ErpIntegrationCard initial={erpInitial} canEdit={canEditErp} />
+      {/* Grid de integracoes - 2 a 2, quadrados da mesma altura por linha
+          (wrapper h-full + card a preencher). O ERP e' um so' quadrado: dois
+          icones (n8n / TOConline) dentro escolhem o modo e revelam o detalhe. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="h-full [&>*]:h-full">
+          <ErpCard
+            erpInitial={erpInitial}
+            tcDirectConfig={tcDirectConfig}
+            integrationMode={integrationMode}
+            canEdit={canEditErp}
+          />
+        </div>
 
-        {/* ERP - modo direto TOConline (seletor de modo + credenciais) */}
-        <ToconlineDirectCard
-          initial={tcDirectConfig}
-          integrationMode={integrationMode}
-          canEdit={canEditErp}
-        />
-
-        <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
+        <div className="h-full [&>*]:h-full">
+          <BankAccountsCard initial={bankAccounts} canEdit={canEditBanking} />
+        </div>
 
         {/* Google Drive - documentos dos projetos */}
-        <GoogleDriveCard canEdit={canEditErp} />
+        <div className="h-full [&>*]:h-full">
+          <GoogleDriveCard canEdit={canEditErp} />
+        </div>
 
-        <WhatsAppIntegrationCard
-          isActive={whatsappActive}
-          hasCredentials={whatsappHasCredentials}
-          phoneNumber={whatsappPhoneNumber}
-          canEdit={canEditWhatsapp}
-        />
+        <div className="h-full [&>*]:h-full">
+          <WhatsAppIntegrationCard
+            isActive={whatsappActive}
+            hasCredentials={whatsappHasCredentials}
+            phoneNumber={whatsappPhoneNumber}
+            canEdit={canEditWhatsapp}
+          />
+        </div>
 
-        <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
+        <div className="h-full [&>*]:h-full">
+          <EmailIntegrationCard initial={emailInitial} canEdit={canEditEmail} />
+        </div>
 
         {/* IA - chave Anthropic por tenant */}
-        <AiIntegrationCard initial={aiConfig} canEdit={canEditErp} />
+        <div className="h-full [&>*]:h-full">
+          <AiIntegrationCard initial={aiConfig} canEdit={canEditErp} />
+        </div>
       </div>
     </div>
   )

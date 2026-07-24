@@ -38,6 +38,7 @@ export type InvoicesFilter = {
   source?: InvoiceSource | "all"
   project_id?: string | "all" | "none"
   category?: string | "all"
+  document_kind?: "all" | "invoice" | "credit_note"
   needs_review?: boolean
   date_from?: string
   date_to?: string
@@ -146,13 +147,33 @@ export async function listInvoices(
 
   if (role === "member") query = query.eq("created_by", userId)
   if (investidorProjectIds) query = query.in("project_id", investidorProjectIds)
-  if (filter?.status && filter.status !== "all") query = query.eq("status", filter.status)
+  if (filter?.status && filter.status !== "all") {
+    // O badge "Em Sistema" agrupa varios estados internos (em_sistema, pending,
+    // processing, matched, paid, reconciled) - o filtro tem de apanhar o grupo,
+    // senao faturas que MOSTRAM "Em Sistema" mas nao sao exatamente "em_sistema"
+    // ficavam de fora. Os restantes estados sao match exato.
+    if (filter.status === "em_sistema") {
+      query = query.in("status", [
+        "em_sistema", "pending", "processing", "matched", "paid", "reconciled",
+      ])
+    } else {
+      query = query.eq("status", filter.status)
+    }
+  }
   if (filter?.source && filter.source !== "all") query = query.eq("source", filter.source)
   if (filter?.project_id) {
     if (filter.project_id === "none") query = query.is("project_id", null)
     else if (filter.project_id !== "all") query = query.eq("project_id", filter.project_id)
   }
   if (filter?.category && filter.category !== "all") query = query.eq("category", filter.category)
+  if (filter?.document_kind && filter.document_kind !== "all") {
+    if (filter.document_kind === "credit_note") {
+      query = query.eq("document_kind", "credit_note")
+    } else {
+      // Faturas: tudo o que NAO e' nota de credito (inclui null/"invoice").
+      query = query.or("document_kind.is.null,document_kind.neq.credit_note")
+    }
+  }
   if (filter?.needs_review) query = query.eq("needs_review", true)
   if (filter?.date_from) query = query.gte("invoice_date", filter.date_from)
   if (filter?.date_to) query = query.lte("invoice_date", filter.date_to)

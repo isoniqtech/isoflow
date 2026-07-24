@@ -37,7 +37,7 @@ const STATUS_CLASSES: Record<InvoiceStatus, string> = {
 
 export function StatusBadge({ status }: { status: InvoiceStatus }) {
   return (
-    <Badge variant="outline" className={cn("font-medium", STATUS_CLASSES[status])}>
+    <Badge variant="outline" className={cn("font-medium whitespace-nowrap", STATUS_CLASSES[status])}>
       {STATUS_LABELS[status]}
     </Badge>
   )

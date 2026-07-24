@@ -7,6 +7,7 @@ import {
   Download,
   FileSpreadsheet,
   Loader2,
+  Power,
   RefreshCw,
   Trash2,
 } from "lucide-react"
@@ -37,9 +38,12 @@ type Existing = {
 export function ErpIntegrationCard({
   initial,
   canEdit,
+  bare = false,
 }: {
   initial: Existing | null
   canEdit: boolean
+  /** Renderiza sem o wrapper Card (quando embebido no ErpCard). */
+  bare?: boolean
 }) {
   const router = useRouter()
   const [url, setUrl] = useState(initial?.url ?? "")
@@ -224,9 +228,8 @@ export function ErpIntegrationCard({
       ? "disconnected"
       : "soon"
 
-  return (
-    <Card className={cn(status === "error" && "border-destructive/40")}>
-      <CardContent className="p-5 space-y-3">
+  const body = (
+    <>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0">
             <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center shrink-0">
@@ -241,7 +244,7 @@ export function ErpIntegrationCard({
               </p>
             </div>
           </div>
-          <StatusBadge status={status} />
+          {!bare && <StatusBadge status={status} />}
         </div>
 
         {initial && status !== "soon" && (
@@ -337,27 +340,50 @@ export function ErpIntegrationCard({
         {!showForm && canEdit && (
           <TooltipProvider delayDuration={200}>
             <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemove}
-                    disabled={removing}
-                  >
-                    {removing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
-                    )}
-                    Desligar
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="max-w-xs">
-                  Desliga a integração ERP. As faturas novas deixam de ser enviadas
-                  automaticamente ao n8n.
-                </TooltipContent>
-              </Tooltip>
+              {initial?.is_active ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemove}
+                      disabled={removing}
+                    >
+                      {removing ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="mr-2 h-4 w-4" />
+                      )}
+                      Desligar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Desliga a integração ERP. As faturas novas deixam de ser enviadas
+                    automaticamente ao n8n.
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      onClick={handleSave}
+                      disabled={saving || !url}
+                    >
+                      {saving ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Power className="mr-2 h-4 w-4" />
+                      )}
+                      Ligar
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    Reativa a integração ERP. As faturas novas voltam a ser enviadas
+                    ao n8n (usa o URL e o secret já guardados).
+                  </TooltipContent>
+                </Tooltip>
+              )}
 
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -420,7 +446,14 @@ export function ErpIntegrationCard({
             </div>
           </TooltipProvider>
         )}
-      </CardContent>
+    </>
+  )
+
+  if (bare) return <div className="space-y-3">{body}</div>
+
+  return (
+    <Card className={cn(status === "error" && "border-destructive/40")}>
+      <CardContent className="p-5 space-y-3">{body}</CardContent>
     </Card>
   )
 }
