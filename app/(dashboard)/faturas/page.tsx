@@ -28,6 +28,7 @@ export default async function FaturasPage({
     status?: string
     source?: string
     project?: string
+    kind?: string
     review?: string
     from?: string
     to?: string
@@ -48,12 +49,16 @@ export default async function FaturasPage({
     ? (searchParams.source as InvoiceSource | "all")
     : "all"
   const project_id = searchParams.project ?? "all"
+  const document_kind = (["invoice", "credit_note"].includes(searchParams.kind ?? "")
+    ? searchParams.kind
+    : "all") as "all" | "invoice" | "credit_note"
   const needs_review = searchParams.review === "1"
   // Por defeito, o periodo e' o mes atual (1 -> hoje) - MAS so' quando nao ha'
-  // outro filtro ativo. Se o utilizador filtra por estado/origem/projeto/revisao,
+  // outro filtro ativo. Se o utilizador filtra por estado/origem/projeto/tipo/revisao,
   // nao limitamos ao mes (senao "Em Sistema" mostrava vazio se estivesse fora do mes).
   const hasOtherFilter =
-    status !== "all" || source !== "all" || project_id !== "all" || needs_review
+    status !== "all" || source !== "all" || project_id !== "all" ||
+    document_kind !== "all" || needs_review
   const now = new Date()
   const monthFrom = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
   const monthTo = now.toISOString().slice(0, 10)
@@ -62,7 +67,7 @@ export default async function FaturasPage({
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1)
 
   const filter: InvoicesFilter = {
-    status, source, project_id, needs_review,
+    status, source, project_id, document_kind, needs_review,
     date_from: date_from || undefined,
     date_to: date_to || undefined,
   }
@@ -88,6 +93,7 @@ export default async function FaturasPage({
     ...(status !== "all" ? { status } : {}),
     ...(source !== "all" ? { source } : {}),
     ...(project_id !== "all" ? { project: project_id } : {}),
+    ...(document_kind !== "all" ? { kind: document_kind } : {}),
     ...(needs_review ? { review: "1" } : {}),
     ...(date_from ? { from: date_from } : {}),
     ...(date_to ? { to: date_to } : {}),
@@ -122,7 +128,7 @@ export default async function FaturasPage({
               canCreate={canCreate}
               exportUrl={canExport ? exportUrl : null}
               filterProjects={projects}
-              filterValue={{ status, source, project_id, needs_review, date_from, date_to }}
+              filterValue={{ status, source, project_id, document_kind, needs_review, date_from, date_to }}
             />
           )}
           {activeTab === "efatura" && <EFaturaTab data={eFaturaPageData} />}

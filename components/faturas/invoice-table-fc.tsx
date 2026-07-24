@@ -243,14 +243,14 @@ export function InvoiceTableFC({
                   />
                 )}
               </TableHead>
-              <TableHead className="text-center cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
-              <TableHead className="hidden md:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
-              <TableHead className="hidden lg:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>ERP</TableHead>
-              <TableHead className="hidden md:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
-              <TableHead className="text-center cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
-              <TableHead className="text-center cursor-default" onMouseEnter={e => showTip(e, "status")} onMouseLeave={hideTip}>Estado</TableHead>
-              <TableHead className="hidden xl:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "bank")} onMouseLeave={hideTip}>Bancario</TableHead>
-              <TableHead className="hidden xl:table-cell text-center cursor-default" onMouseEnter={e => showTip(e, "at")} onMouseLeave={hideTip}>AT</TableHead>
+              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
+              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
+              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>ERP</TableHead>
+              <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
+              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
+              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "status")} onMouseLeave={hideTip}>Estado</TableHead>
+              <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "bank")} onMouseLeave={hideTip}>Bancario</TableHead>
+              <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "at")} onMouseLeave={hideTip}>AT</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

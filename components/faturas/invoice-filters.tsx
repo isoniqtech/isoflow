@@ -2,9 +2,10 @@
 
 import { useTransition } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import { CalendarDays, X } from "lucide-react"
+import { CalendarDays, SlidersHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Select,
   SelectContent,
@@ -20,12 +21,11 @@ export type InvoiceFiltersValue = {
   status: InvoiceStatus | "all"
   source: InvoiceSource | "all"
   project_id: string | "all" | "none"
+  document_kind: "all" | "invoice" | "credit_note"
   needs_review: boolean
   date_from: string
   date_to: string
 }
-
-const TRIGGER = "h-9 bg-card border-border/60 shadow-sm rounded-md"
 
 export function InvoiceFilters({
   value,
@@ -52,67 +52,100 @@ export function InvoiceFilters({
     })
   }
 
-  function reset() {
+  // Limpa so' os filtros do popover (estado/projeto/origem/tipo).
+  function clearInner() {
+    const next = new URLSearchParams(searchParams.toString())
+    for (const k of ["status", "project", "source", "kind"]) next.delete(k)
+    next.delete("page")
     startTransition(() => {
-      router.push(pathname)
+      router.push(`${pathname}?${next.toString()}`)
     })
   }
 
-  const hasActive =
-    value.status !== "all" ||
-    value.source !== "all" ||
-    value.project_id !== "all" ||
-    value.needs_review ||
-    searchParams.has("from") ||
-    searchParams.has("to")
+  const activeInner =
+    (value.status !== "all" ? 1 : 0) +
+    (value.source !== "all" ? 1 : 0) +
+    (value.project_id !== "all" ? 1 : 0) +
+    (value.document_kind !== "all" ? 1 : 0)
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-2"
-      data-pending={isPending || undefined}
-    >
-      <Select value={value.status} onValueChange={(v) => setParam("status", v)}>
-        <SelectTrigger className={cn(TRIGGER, "w-[140px]")}>
-          <SelectValue placeholder="Estado" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos os estados</SelectItem>
-          <SelectItem value="em_sistema">Em Sistema</SelectItem>
-          <SelectItem value="necessita_revisao">Necessita Revisão</SelectItem>
-          <SelectItem value="enviada_erp">Enviada ERP</SelectItem>
-          <SelectItem value="rejected">Rejeitada</SelectItem>
-          <SelectItem value="duplicate">Duplicada</SelectItem>
-        </SelectContent>
-      </Select>
+    <div className="flex flex-wrap items-center gap-2" data-pending={isPending || undefined}>
+      {/* Filtrar — consolida estado, projeto, origem e tipo */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-9 bg-card border-border/60 shadow-sm">
+            <SlidersHorizontal className="mr-2 h-4 w-4" />
+            Filtrar
+            {activeInner > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-primary text-primary-foreground text-[10px] px-1">
+                {activeInner}
+              </span>
+            )}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-64 p-3 space-y-3">
+          <FilterField label="Estado">
+            <Select value={value.status} onValueChange={(v) => setParam("status", v)}>
+              <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os estados</SelectItem>
+                <SelectItem value="em_sistema">Em Sistema</SelectItem>
+                <SelectItem value="necessita_revisao">Necessita Revisão</SelectItem>
+                <SelectItem value="enviada_erp">Enviada ERP</SelectItem>
+                <SelectItem value="rejected">Rejeitada</SelectItem>
+                <SelectItem value="duplicate">Duplicada</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
 
-      <Select value={value.project_id} onValueChange={(v) => setParam("project", v)}>
-        <SelectTrigger className={cn(TRIGGER, "w-[170px]")}>
-          <SelectValue placeholder="Projeto" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todos os projetos</SelectItem>
-          <SelectItem value="none">Sem projeto</SelectItem>
-          {projects.map((p) => (
-            <SelectItem key={p.id} value={p.id}>
-              {p.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <FilterField label="Projeto">
+            <Select value={value.project_id} onValueChange={(v) => setParam("project", v)}>
+              <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os projetos</SelectItem>
+                <SelectItem value="none">Sem projeto</SelectItem>
+                {projects.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
 
-      <Select value={value.source} onValueChange={(v) => setParam("source", v)}>
-        <SelectTrigger className={cn(TRIGGER, "w-[140px]")}>
-          <SelectValue placeholder="Origem" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todas as origens</SelectItem>
-          <SelectItem value="manual">Manual</SelectItem>
-          <SelectItem value="whatsapp">WhatsApp</SelectItem>
-          <SelectItem value="email">Email</SelectItem>
-          <SelectItem value="api">API</SelectItem>
-          <SelectItem value="erp">ERP</SelectItem>
-        </SelectContent>
-      </Select>
+          <FilterField label="Origem">
+            <Select value={value.source} onValueChange={(v) => setParam("source", v)}>
+              <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as origens</SelectItem>
+                <SelectItem value="manual">Manual</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="api">API</SelectItem>
+                <SelectItem value="erp">ERP</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          <FilterField label="Tipo de documento">
+            <Select value={value.document_kind} onValueChange={(v) => setParam("kind", v)}>
+              <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Faturas e notas de crédito</SelectItem>
+                <SelectItem value="invoice">Só faturas</SelectItem>
+                <SelectItem value="credit_note">Só notas de crédito</SelectItem>
+              </SelectContent>
+            </Select>
+          </FilterField>
+
+          {activeInner > 0 && (
+            <button
+              onClick={clearInner}
+              className="w-full text-left text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </PopoverContent>
+      </Popover>
 
       {/* Periodo — datas agrupadas num so' controlo */}
       <div className="inline-flex items-center gap-1.5 h-9 px-2.5 bg-card border border-border/60 shadow-sm rounded-md">
@@ -142,13 +175,15 @@ export function InvoiceFilters({
       >
         Necessita revisão
       </Button>
+    </div>
+  )
+}
 
-      {hasActive && (
-        <Button variant="ghost" size="sm" className="h-9" onClick={reset}>
-          <X className="mr-1 h-3.5 w-3.5" />
-          Limpar
-        </Button>
-      )}
+function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-muted-foreground">{label}</label>
+      {children}
     </div>
   )
 }

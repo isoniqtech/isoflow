@@ -38,6 +38,7 @@ export type InvoicesFilter = {
   source?: InvoiceSource | "all"
   project_id?: string | "all" | "none"
   category?: string | "all"
+  document_kind?: "all" | "invoice" | "credit_note"
   needs_review?: boolean
   date_from?: string
   date_to?: string
@@ -165,6 +166,14 @@ export async function listInvoices(
     else if (filter.project_id !== "all") query = query.eq("project_id", filter.project_id)
   }
   if (filter?.category && filter.category !== "all") query = query.eq("category", filter.category)
+  if (filter?.document_kind && filter.document_kind !== "all") {
+    if (filter.document_kind === "credit_note") {
+      query = query.eq("document_kind", "credit_note")
+    } else {
+      // Faturas: tudo o que NAO e' nota de credito (inclui null/"invoice").
+      query = query.or("document_kind.is.null,document_kind.neq.credit_note")
+    }
+  }
   if (filter?.needs_review) query = query.eq("needs_review", true)
   if (filter?.date_from) query = query.gte("invoice_date", filter.date_from)
   if (filter?.date_to) query = query.lte("invoice_date", filter.date_to)
