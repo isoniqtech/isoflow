@@ -1,4 +1,5 @@
 import type { Invoice } from "@/types"
+import { tocRequest } from "@/lib/toconline/transport"
 
 export interface TOCOnlineDocument {
   id: number
@@ -236,26 +237,27 @@ export interface DocumentAssociation {
 }
 
 export async function fetchDocumentAssociations(
-  accessToken: string,
-  appBase: string,
+  tenantId: string,
   dateFrom: string,
   dateTo: string,
 ): Promise<DocumentAssociation[]> {
-  // Construir o URL a' mao com encodeURIComponent (espacos -> %20), tal como o
-  // workflow n8n que funciona. URLSearchParams codifica espacos como '+' e o
-  // TOConline devolve 400 (syntax error 42601) por nao os tratar como espaco.
+  // O transporte (direto ou proxy n8n) e' resolvido por tocRequest a partir do
+  // integration_mode do tenant. A query e' identica nos dois modos: o filtro
+  // `date BETWEEN` codificado com encodeURIComponent (espacos -> %20). NUNCA
+  // usar URLSearchParams: '+' faz o TOConline devolver 400 (syntax error 42601).
   const filter = `"date BETWEEN '${dateFrom}' AND '${dateTo}'"`
-  const url = `${appBase.replace(/\/$/, "")}/api/document_associations?filter=${encodeURIComponent(filter)}`
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+  const { status, body } = await tocRequest(tenantId, {
+    base: "app",
+    method: "GET",
+    path: "/api/document_associations",
+    query: { filter },
   })
 
-  if (!res.ok) {
-    throw new Error(`TOConline document_associations ${res.status}: ${await res.text()}`)
+  if (status >= 400) {
+    throw new Error(
+      `TOConline document_associations ${status}: ${JSON.stringify(body).slice(0, 200)}`,
+    )
   }
-
-  const body = await res.json()
 
   // A resposta do TOConline pode vir com `data` como string JSON aninhada
   // (comportamento observado no workflow n8n da e-Fatura) ou como objeto/array
