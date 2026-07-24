@@ -251,20 +251,45 @@ Verificação sempre via `hasPermission(role, recurso, acao)` (`lib/utils/permis
 - Reconciliação `efatura_documents` ↔ `invoices`, marcando `at_communicated`
 - Distingue documentos **novos** de **já existentes** no toast do resultado
 
-### 7. ERP - TOConline
-Dois modos por tenant (`tenants.integration_mode`), com **a mesma lógica de app**:
-- **`toconline_direct`**: o ISOFlow fala diretamente com o TOConline (OAuth próprio)
-- **`n8n`**: o ISOFlow envia o payload ao webhook n8n do cliente, que trata do resto
+### 7. ERP - TOConline (arquitetura "proxy fino")
+Dois modos por tenant (`tenants.integration_mode`), mas com **TODA a lógica na app**.
+A diferença entre modos colapsou para o **transporte HTTP**, via
+`lib/toconline/transport.ts` (`tocRequest(tenantId, {base:"app"|"api", method, path,
+query, body, contentType})`):
+- **`toconline_direct`** (Revive): `getValidToken` + fetch a `app{N}`/`api{N}.toconline.pt`.
+- **`n8n`** (FINMED): POST a um **proxy n8n genérico** (`config.proxy_url` da
+  integração ERP do tenant; fallback env `N8N_TOCONLINE_PROXY_URL`), que só resolve
+  o token e devolve a resposta CRUA `{status, body}`. **Um único workflow n8n** (o
+  proxy) - já não há workflows por fluxo.
 
-Criação de FC (`/api/faturas/create-fc`, trata os dois modos): dedup → fornecedor
-(procura ou cria) → cria FC → grava `toconline_fc_id`, `erp_synced` e promove o
-estado para `enviada_erp`. Faturas já lançadas são ignoradas (sem duplicados).
+**O proxy n8n** (webhook único): valida `X-ISOFlow-Secret` (=`CRON_SECRET`) **e** o
+`tenant_id` (fail-safe: recusa quem não for o tenant dele), resolve o token, monta o
+URL `app{N}`/`api{N}` + query (encodeURIComponent), faz a chamada e responde
+`{status, body}`. Body em **Raw** com Content-Type dinâmico (json / `vnd.api+json`)
+para suportar escritas. Cada tenant n8n tem o **seu** n8n e o **seu** `proxy_url`.
+
+Toda a leitura/escrita TOConline vive em `lib/`, partilhada pelos dois modos:
+- Leitura: `fetchDocumentAssociations` (e-Fatura), `fetchDocsNetByDate`/`fetchAllV1Docs`
+  (receita/gastos, paginado v1), `expense-categories` (catálogo).
+- Escrita: `fc.ts` (`createFC`), `ncf.ts` (`createNCF`) - dedup → fornecedor
+  (procura/**cria** via `/api/suppliers` + `vnd.api+json`) → cria documento →
+  devolve o número. `send-fc.ts` (`sendInvoiceToERP`) é o ponto único de envio
+  (send-erp, resend-erp, auto-envio, email).
+
+Criação de FC (`/api/faturas/create-fc`): dedup → fornecedor → cria FC → grava
+`toconline_fc_id`, `erp_synced` e promove para `enviada_erp`. Idempotente (dedup +
+JA000). O callback `/api/faturas/[id]/update-fc` já **não é usado** no caminho novo
+(a app cria e recebe o número na hora), mas fica ativo até o wf antigo ser desativado.
+
+**Auto-envio ao ERP**: só acontece com a flag `tenants.auto_erp_send` **ligada** (e
+fatura sem revisão). Com ela desligada, a FC cria-se **à mão**. Não há mais nenhum
+forward incondicional na criação. O FINMED tem a flag **OFF**.
 
 ### 8. Categoria de gasto (conta SNC da linha da FC)
 - Catálogo por tenant em `toconline_expense_categories` (código, descrição, IVA)
-  - modo direto: o ISOFlow vai buscá-lo ao TOConline sozinho (refresca se > 24h)
-  - modo n8n: o ISOFlow **dispara** o workflow do tenant, que empurra o catálogo
-    para `/api/webhooks/categorias`. O tenant não agenda nada
+  - **os dois modos** buscam o catálogo síncrono ao TOConline via `tocRequest`
+    (`/api/expense_categories`), refresca se > 24h. (O modo n8n já **não** dispara
+    workflow nem espera push; `/api/webhooks/categorias` ficou redundante.)
 - **A IA escolhe** a categoria quando a fatura é aberta pela primeira vez
   (`lib/claude/pick-expense-category.ts`), validando que o código existe no catálogo
 - **Editável no detalhe da fatura**, e **bloqueada** depois de ir para o ERP
@@ -362,24 +387,30 @@ Documentação oficial: https://api-docs.toconline.pt
 |---|---|---|
 | `/api/cron/email` | 08:00, 13:00, 19:00 | Sync de email inbound |
 | `/api/cron/reprocess-failed` | 08:30, 13:30, 19:30 | Retry da extração IA |
-| `/api/cron/sync-revenue` | 00:05 | Snapshot de receita |
-| `/api/cron/refresh-tokens` | **`*/15`** | Renovação do token TOConline |
+| `/api/cron/sync-revenue` | 00:05 | Snapshots **receita + gastos**, os dois modos (via `runSnapshotSync`) |
+| `/api/cron/efatura` | 08:00 dia 1 | Sync de e-Fatura, os dois modos (substitui o Schedule do wf n8n) |
+| `/api/cron/refresh-tokens` | **`*/15`** | Renovação do token TOConline (modo direto) |
 
-Autenticação: header `Authorization: Bearer <CRON_SECRET>`.
+Autenticação: header `Authorization: Bearer <CRON_SECRET>`. Os crons percorrem
+**todos** os tenants ERP (direto + n8n) e usam `tocRequest`.
 
 ---
 
-## 🔗 Webhooks recebidos (do n8n)
+## 🔗 Webhooks recebidos (do n8n) - **maioria REDUNDANTE** após o proxy
 
-Todos com header `X-ISOFlow-Secret` validado contra `CRON_SECRET`:
+Com a conversão para proxy fino, o n8n deixou de fazer push. Estas rotas ainda
+existem mas **já não são alimentadas** (retirar num cleanup; não construir sobre elas):
 
-| Rota | Payload |
+| Rota | Estado |
 |---|---|
-| `/api/efatura/sync` | documentos e-Fatura |
-| `/api/webhooks/receita` | receita mensal |
-| `/api/webhooks/gastos` | gastos mensais |
-| `/api/webhooks/categorias` | catálogo de categorias de gasto |
-| `/api/faturas/[id]/update-fc` | número da FC criada |
+| `/api/efatura/sync` | redundante (e-Fatura agora lida via `tocRequest`) |
+| `/api/webhooks/receita` | redundante (`runSnapshotSync` calcula) |
+| `/api/webhooks/gastos` | redundante (`runSnapshotSync` calcula) |
+| `/api/webhooks/categorias` | redundante (catálogo lido via `tocRequest`) |
+| `/api/faturas/[id]/update-fc` | redundante no caminho novo (a app cria e recebe o nº na hora) |
+
+Header `X-ISOFlow-Secret` (=`CRON_SECRET`). **O único webhook n8n ativo é o proxy
+genérico** (`config.proxy_url`), que a app **chama** (não recebe push).
 
 ---
 
@@ -447,13 +478,22 @@ formatDate(d)                       // Intl pt-PT
 
 ## ⚠️ Regras Absolutas de Desenvolvimento
 
-### Caminho n8n (FINMED) - INTOCÁVEL
-- **NUNCA** modificar a lógica do bloco n8n em `app/api/faturas/create-fc/route.ts`
-- **NUNCA** alterar `/api/efatura/sync` nem os webhooks existentes
-- `lib/toconline/token.ts` e `fc.ts` são **exclusivos do modo direto**
-- Campos novos no payload do n8n são sempre **aditivos** (o workflow antigo ignora-os)
-- Ao adicionar suporte a um caso novo, criar caminho **detetado e isolado**
-  (como `isBpiStatement`), nunca alterar o parser partilhado
+### Caminho n8n (FINMED) - já convertido para proxy fino (2026-07)
+> Nota histórica: **o n8n do FINMED deixou de ter workflows por fluxo.** Os 5
+> workflows (e-Fatura, gastos, receita, categorias, criar FC/NCF) foram
+> substituídos por **um proxy genérico**. Toda a lógica vive na app (ver Secção 7).
+> A antiga regra "não tocar no bloco n8n do create-fc" **já não se aplica** - esse
+> bloco foi removido; os dois modos usam `createFC`/`createNCF` via `tocRequest`.
+
+Regras que se mantêm:
+- **`tocRequest` é o único ponto de contacto com o TOConline.** Ao adicionar uma
+  chamada nova, usá-lo (nunca `fetch` direto ao TOConline) - serve os dois modos.
+- **Testar sempre no FINMED (n8n) E no Revive (direto)** - o FINMED só existe em
+  prod, por isso a validação é em prod, de forma aditiva (caminho novo em paralelo,
+  antigo desativado só após validar).
+- O **proxy** só faz query+devolve raw. Nenhuma lógica de negócio no n8n.
+- Cada tenant n8n tem o **seu** `config.proxy_url` (nunca partilhar um proxy entre
+  tenants - o guard de `tenant_id` no proxy protege disto).
 
 ### Lição transversal
 Vários bugs vieram de código escrito **só a pensar no FINMED** e exposto depois pela
@@ -557,8 +597,10 @@ GMAIL_CLIENT_SECRET=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
-# n8n
-N8N_WEBHOOK_URL=
+# n8n. O proxy fino usa config.proxy_url por tenant; a env abaixo é só fallback.
+N8N_TOCONLINE_PROXY_URL=          # fallback do proxy TOConline (por tenant: config.proxy_url)
+# Legado (redundante após o proxy - já não são usadas no caminho novo):
+N8N_WEBHOOK_URL=                  # era o webhook de FC
 N8N_WEBHOOK_SECRET=
 EFATURA_SYNC_WEBHOOK_URL=
 N8N_EXPENSE_CATEGORIES_URL=
