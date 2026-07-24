@@ -37,18 +37,18 @@ const SOURCE_ICONS: Record<InvoiceSource, typeof FileText> = {
 
 function BankBadge({ inv }: { inv: InvoiceListItem }) {
   if (inv.bank_transaction_id) {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
   }
-  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Por conciliar</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-muted text-muted-foreground">Por conciliar</span>
 }
 
 function ATBadge({ inv }: { inv: InvoiceListItem }) {
   // Conciliada = existe associacao entre a fatura e um documento na e-Fatura.
   const conciliada = inv.at_communicated || Boolean(inv.efatura_at_status)
   if (conciliada) {
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Conciliada</span>
   }
-  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Por conciliar</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-muted text-muted-foreground">Por conciliar</span>
 }
 
 const TIPS: Record<string, string> = {

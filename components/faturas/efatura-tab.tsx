@@ -28,12 +28,12 @@ const AT_STATUS_OPTIONS: { value: string; label: string }[] = [
 
 function ATStatusBadge({ status }: { status: string | null }) {
   if (status === "compra_registada" || status === "Associada")
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Compra Registada</span>
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300">Compra Registada</span>
   if (status === "doc_contabilidade")
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">Doc. Contabilidade</span>
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300">Doc. Contabilidade</span>
   if (status === "nao_considerado")
-    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Não considerado</span>
-  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">{status === "Pendente" ? "Pendente" : "Sem associação"}</span>
+    return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-muted text-muted-foreground">Não considerado</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">{status === "Pendente" ? "Pendente" : "Sem associação"}</span>
 }
 
 const HEADERS = [
