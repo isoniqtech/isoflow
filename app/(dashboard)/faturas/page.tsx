@@ -134,15 +134,6 @@ export default async function FaturasPage({
               )}
             >
               {tab.label}
-              {tab.count !== undefined && tab.count > 0 && (
-                <span className={cn(
-                  "text-xs rounded-full px-1.5 py-0.5 font-medium",
-                  activeTab === tab.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground",
-                  tab.id === "efatura" && "bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300",
-                )}>
-                  {tab.count}
-                </span>
-              )}
             </Link>
           ))}
         </div>
