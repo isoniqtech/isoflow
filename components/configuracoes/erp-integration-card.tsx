@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
   CheckCircle2,
+  Download,
   FileSpreadsheet,
   Loader2,
   RefreshCw,
@@ -42,6 +43,7 @@ export function ErpIntegrationCard({
   const [saving, setSaving] = useState(false)
   const [removing, setRemoving] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [importingHistory, setImportingHistory] = useState(false)
 
   async function handleTest() {
     if (!url || !secret) {
@@ -147,6 +149,40 @@ export function ErpIntegrationCard({
       })
     } finally {
       setSyncing(false)
+    }
+  }
+
+  async function handleImportHistory() {
+    if (
+      !confirm(
+        "Importar o histórico de receita e gastos do TOConline (jan/2025 ao mês atual)?\n\nBusca as vendas e compras via n8n e recalcula os totais mensais. Pode demorar até um minuto.",
+      )
+    ) {
+      return
+    }
+    setImportingHistory(true)
+    try {
+      const res = await fetch("/api/integracoes/toconline/import-historico", { method: "POST" })
+      const body = await res.json()
+      if (res.ok && body.ok) {
+        if (body.errors?.length) {
+          toast.warning("Histórico importado com erros", {
+            description: `${body.months_processed} meses ok, ${body.errors.length} erros: ${body.errors.slice(0, 2).join(" | ")}`,
+            duration: 15000,
+          })
+        } else {
+          toast.success("Histórico importado", {
+            description: `${body.months_processed} meses processados`,
+          })
+        }
+        router.refresh()
+      } else {
+        toast.error("Falha na importação", { description: body.error ?? `HTTP ${res.status}` })
+      }
+    } catch (e) {
+      toast.error("Erro de rede", { description: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setImportingHistory(false)
     }
   }
 
@@ -332,6 +368,21 @@ export function ErpIntegrationCard({
                   <RefreshCw className="mr-2 h-4 w-4" />
                 )}
                 Sincronizar TOCONLINE
+              </Button>
+            )}
+            {initial?.is_active && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleImportHistory}
+                disabled={importingHistory}
+              >
+                {importingHistory ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Importar histórico
               </Button>
             )}
           </div>

@@ -10,6 +10,8 @@
  * net_total e ignora o filtro de data nas compras - nao serve.)
  */
 
+import { tocRequest } from "@/lib/toconline/transport"
+
 export type Segment = "commercial_sales_documents" | "commercial_purchases_documents"
 
 export interface DocNet {
@@ -49,27 +51,32 @@ function flat(el: Record<string, unknown>): Record<string, unknown> {
 
 /**
  * Todos os documentos de um segmento (paginacao v1 ate esgotar).
+ *
+ * O transporte (direto ou proxy n8n) e' resolvido por tocRequest a partir do
+ * integration_mode do tenant. No modo n8n, cada pagina passa pelo proxy, que
+ * so' faz a query e devolve o raw - a paginacao e o calculo ficam aqui.
  */
 export async function fetchAllV1Docs(
-  accessToken: string,
-  apiBase: string,
+  tenantId: string,
   segment: Segment,
 ): Promise<DocNet[]> {
   const out: DocNet[] = []
   const seen = new Set<number>()
 
   for (let page = 1; page <= MAX_PAGES; page++) {
-    const url = `${apiBase.replace(/\/$/, "")}/api/v1/${segment}?page%5Bnumber%5D=${page}&page%5Bsize%5D=${PAGE_SIZE}`
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
+    const { status, body } = await tocRequest(tenantId, {
+      base: "api",
+      method: "GET",
+      path: `/api/v1/${segment}`,
+      query: { "page[number]": String(page), "page[size]": String(PAGE_SIZE) },
     })
-    if (!res.ok) {
+    if (status >= 400) {
       if (page === 1) {
-        throw new Error(`TOConline v1 ${segment} ${res.status}: ${(await res.text()).slice(0, 200)}`)
+        throw new Error(`TOConline v1 ${segment} ${status}: ${JSON.stringify(body).slice(0, 200)}`)
       }
       break
     }
-    const rows = toArray(await res.json()).map(flat)
+    const rows = toArray(body).map(flat)
     if (rows.length === 0) break
 
     let added = 0
@@ -99,14 +106,13 @@ export async function fetchAllV1Docs(
  * por tipo, do lado do cliente). net_total fiavel do v1.
  */
 export async function fetchDocsNetByDate(
-  accessToken: string,
-  apiBase: string,
+  tenantId: string,
   segment: Segment,
   from: string,
   to: string,
   onlyTypes?: Set<string>,
 ): Promise<DocNet[]> {
-  const all = await fetchAllV1Docs(accessToken, apiBase, segment)
+  const all = await fetchAllV1Docs(tenantId, segment)
   return all.filter((d) => {
     if (!d.date || d.date < from || d.date > to) return false
     if (onlyTypes && !onlyTypes.has(d.document_type.toUpperCase())) return false
