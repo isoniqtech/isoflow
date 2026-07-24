@@ -3,7 +3,7 @@
 import { useState, useTransition, useCallback, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, ChevronDown, FileText, Loader2, Mail, MessageCircle, Plus, Send, Upload } from "lucide-react"
+import { AlertTriangle, FileText, Loader2, Mail, MessageCircle, Plus, Send, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -56,7 +56,7 @@ const TIPS: Record<string, string> = {
   supplier: "Nome e NIF do fornecedor da fatura",
   number:   "Numero de identificacao da fatura emitida pelo fornecedor",
   date:     "Data de emissao da fatura",
-  erp:      "Numero do documento no TOCONLINE (Fatura de Compra)",
+  erp:      "Numero de documento no ERP",
   project:  "Obra ou projeto ao qual esta fatura esta associada",
   value:    "Valor total da fatura com IVA incluido",
   status:   "Estado atual do processamento da fatura",
@@ -245,9 +245,9 @@ export function InvoiceTableFC({
               </TableHead>
               <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "supplier")} onMouseLeave={hideTip}>Fornecedor</TableHead>
               <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "date")} onMouseLeave={hideTip}>Data</TableHead>
-              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>FC ERP</TableHead>
+              <TableHead className="hidden lg:table-cell cursor-default" onMouseEnter={e => showTip(e, "erp")} onMouseLeave={hideTip}>ERP</TableHead>
               <TableHead className="hidden md:table-cell cursor-default" onMouseEnter={e => showTip(e, "project")} onMouseLeave={hideTip}>Projeto</TableHead>
-              <TableHead className="text-right cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
+              <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "value")} onMouseLeave={hideTip}>Valor</TableHead>
               <TableHead className="cursor-default" onMouseEnter={e => showTip(e, "status")} onMouseLeave={hideTip}>Estado</TableHead>
               <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "bank")} onMouseLeave={hideTip}>Bancario</TableHead>
               <TableHead className="hidden xl:table-cell cursor-default" onMouseEnter={e => showTip(e, "at")} onMouseLeave={hideTip}>AT</TableHead>
@@ -315,7 +315,6 @@ export function InvoiceTableFC({
                           ) : (
                             <span className="text-muted-foreground">Sem projeto</span>
                           )}
-                          <ChevronDown className="h-3 w-3 shrink-0 text-muted-foreground" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">
@@ -339,7 +338,7 @@ export function InvoiceTableFC({
                       </Link>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums font-medium">
+                  <TableCell className="tabular-nums font-medium">
                     <Link href={`/faturas/${inv.id}`} className="block">
                       {inv.total !== null ? formatCurrency(inv.total) : "—"}
                     </Link>
