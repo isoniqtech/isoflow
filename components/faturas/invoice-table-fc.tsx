@@ -3,7 +3,7 @@
 import { useState, useTransition, useCallback, useRef, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, ChevronDown, FileText, Loader2, Mail, MessageCircle, Send, Upload } from "lucide-react"
+import { AlertTriangle, ChevronDown, FileText, Loader2, Mail, MessageCircle, Plus, Send, Upload } from "lucide-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select"
 import { StatusBadge } from "@/components/faturas/status-badge"
 import { InvoiceFilters, type InvoiceFiltersValue } from "@/components/faturas/invoice-filters"
+import { ExportDropdown } from "@/components/faturas/export-dropdown"
 import { formatCurrency, formatDate } from "@/lib/utils/portugal"
 import { cn } from "@/lib/utils"
 import type { InvoiceListItem, ProjectOption as FilterProjectOption } from "@/lib/queries/invoices"
@@ -48,7 +49,7 @@ function ATBadge({ inv }: { inv: InvoiceListItem }) {
   if (inv.efatura_at_status) {
     return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/20 dark:text-amber-300">Pendente AT</span>
   }
-  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Sem FC</span>
+  return <span className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground">Por conciliar</span>
 }
 
 const TIPS: Record<string, string> = {
@@ -66,11 +67,15 @@ const TIPS: Record<string, string> = {
 export function InvoiceTableFC({
   invoices,
   canEdit = false,
+  canCreate = false,
+  exportUrl = null,
   filterProjects,
   filterValue,
 }: {
   invoices: InvoiceListItem[]
   canEdit?: boolean
+  canCreate?: boolean
+  exportUrl?: string | null
   filterProjects: FilterProjectOption[]
   filterValue: InvoiceFiltersValue
 }) {
@@ -185,20 +190,32 @@ export function InvoiceTableFC({
           {tip.text}
         </div>
       )}
-      {/* Filtros + Enviar ao ERP — mesma linha, sempre visivel (sticky no topo) */}
+      {/* Filtros + acoes — mesma linha, sempre visivel (sticky no topo).
+          Ordem a' direita: Nova fatura | Enviar ao ERP | menu (Exportar). */}
       <div className="flex-shrink-0 flex flex-wrap items-center justify-between gap-2">
         <InvoiceFilters value={filterValue} projects={filterProjects} />
-        {eligible.length > 0 && (
-          <Button
-            size="sm"
-            className="h-9 shrink-0"
-            onClick={handleCreateFC}
-            disabled={isPending || selected.size === 0}
-          >
-            {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-            Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
-          </Button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {canCreate && (
+            <Button size="sm" className="h-9" asChild>
+              <Link href="/faturas/nova">
+                <Plus className="mr-2 h-4 w-4" />
+                Nova fatura
+              </Link>
+            </Button>
+          )}
+          {eligible.length > 0 && (
+            <Button
+              size="sm"
+              className="h-9"
+              onClick={handleCreateFC}
+              disabled={isPending || selected.size === 0}
+            >
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+              Enviar ao ERP{selected.size > 0 ? ` (${selected.size})` : ""}
+            </Button>
+          )}
+          {exportUrl && <ExportDropdown exportUrl={exportUrl} compact />}
+        </div>
       </div>
 
       {invoices.length === 0 ? (

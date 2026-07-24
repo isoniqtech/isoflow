@@ -1,8 +1,4 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ExportDropdown } from "@/components/faturas/export-dropdown"
 import { InvoiceTableFC } from "@/components/faturas/invoice-table-fc"
 import { InvoicesRealtime } from "@/components/faturas/invoices-realtime"
 import { InvoicesPagination } from "./invoices-pagination"
@@ -87,35 +83,23 @@ export default async function FaturasPage({
     ...(showEFaturaTab ? [{ id: "efatura" as Tab, label: "e-Fatura" }] : []),
   ]
 
+  const canExport = hasPermission(session.role, "relatorios", "view_all") && total > 0
+  const exportUrl = `/api/faturas/export?${new URLSearchParams({
+    ...(status !== "all" ? { status } : {}),
+    ...(source !== "all" ? { source } : {}),
+    ...(project_id !== "all" ? { project: project_id } : {}),
+    ...(needs_review ? { review: "1" } : {}),
+    ...(date_from ? { from: date_from } : {}),
+    ...(date_to ? { to: date_to } : {}),
+  }).toString()}`
+
   return (
     <div className="h-full flex flex-col overflow-hidden">
       <InvoicesRealtime tenantId={session.tenant.id} />
 
       {/* Secção estática — header + tabs + filtros */}
       <div className="flex-shrink-0 px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8 space-y-4 max-w-7xl mx-auto w-full">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-2xl font-display font-semibold tracking-tight">Faturas</h1>
-          <div className="flex items-center gap-2 ml-auto">
-            {hasPermission(session.role, "relatorios", "view_all") && total > 0 && activeTab !== "efatura" && (
-              <ExportDropdown exportUrl={`/api/faturas/export?${new URLSearchParams({
-                ...(status !== "all" ? { status } : {}),
-                ...(source !== "all" ? { source } : {}),
-                ...(project_id !== "all" ? { project: project_id } : {}),
-                ...(needs_review ? { review: "1" } : {}),
-                ...(date_from ? { from: date_from } : {}),
-                ...(date_to ? { to: date_to } : {}),
-              }).toString()}`} />
-            )}
-            {canCreate && activeTab !== "efatura" && (
-              <Button asChild>
-                <Link href="/faturas/nova">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nova fatura
-                </Link>
-              </Button>
-            )}
-          </div>
-        </div>
+        <h1 className="text-2xl font-display font-semibold tracking-tight">Faturas</h1>
 
         {/* Tabs — controlo segmentado (mesmo padrao dos projetos) */}
         <SegmentedTabs
@@ -132,6 +116,8 @@ export default async function FaturasPage({
             <InvoiceTableFC
               invoices={invoices}
               canEdit={hasPermission(session.role, "faturas", "edit")}
+              canCreate={canCreate}
+              exportUrl={canExport ? exportUrl : null}
               filterProjects={projects}
               filterValue={{ status, source, project_id, needs_review, date_from, date_to }}
             />
